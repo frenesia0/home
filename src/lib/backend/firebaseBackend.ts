@@ -199,6 +199,54 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
         return { ok: true };
       } catch (e) { return { ok: false, error: humanError(e) }; }
     },
+    
+    async signInWithGoogle() {
+  try {
+    const provider = new authMod.GoogleAuthProvider();
+
+    provider.setCustomParameters({
+      prompt: 'select_account',
+    });
+
+    const cred = await authMod.signInWithPopup(auth, provider);
+
+    const nickname =
+      cred.user.displayName ||
+      cred.user.email?.split('@')[0] ||
+      'user';
+
+    await setDoc(
+      doc(db, 'profiles', cred.user.uid),
+      {
+        nickname,
+        createdAt: Date.now(),
+      },
+      { merge: true }
+    );
+
+    const own = await ownerInfo();
+
+    if (!own?.uid) {
+      const r = await withLimit(
+        setDoc(doc(db, 'meta', 'owner'), {
+          uid: cred.user.uid,
+          admins: [cred.user.uid],
+          at: Date.now(),
+        })
+      );
+
+      if (r === TIMEOUT) {
+        return { ok: false, error: NO_REACH };
+      }
+
+      ownerCache = undefined;
+    }
+
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: humanError(e) };
+  }
+},
 
     async signUp(id, password, nickname) {
       try {
