@@ -1,36 +1,38 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 type Category = 'all' | 'original' | 'commission';
 type CharacterTag = 'all' | 'shiki' | 'solas';
 
-type Illustration = {
-  id: number;
+type GalleryPost = {
+  id: string;
   title: string;
   date: string;
   category: 'original' | 'commission';
   tags: ('shiki' | 'solas')[];
 };
 
-const illustrations: Illustration[] = [
+const STORAGE_KEY = 'shiki-solas-gallery-posts';
+
+const demoPosts: GalleryPost[] = [
   {
-    id: 1,
+    id: 'demo-1',
     title: 'Illustration 01',
     date: '2026.08.25',
     category: 'original',
     tags: ['shiki'],
   },
   {
-    id: 2,
+    id: 'demo-2',
     title: 'Illustration 02',
     date: '2026.07.10',
     category: 'commission',
     tags: ['solas'],
   },
   {
-    id: 3,
+    id: 'demo-3',
     title: 'Illustration 03',
     date: '2026.06.18',
     category: 'original',
@@ -43,6 +45,25 @@ export default function GalleryPage() {
 
   const [category, setCategory] = useState<Category>('all');
   const [tag, setTag] = useState<CharacterTag>('all');
+  const [savedPosts, setSavedPosts] = useState<GalleryPost[]>([]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+
+    if (!saved) {
+      setSavedPosts([]);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(saved) as GalleryPost[];
+      setSavedPosts(parsed);
+    } catch {
+      setSavedPosts([]);
+    }
+  }, []);
+
+  const illustrations = [...savedPosts, ...demoPosts];
 
   const filtered = illustrations.filter((item) => {
     const categoryMatch =
@@ -199,8 +220,14 @@ export default function GalleryPage() {
                 background: 'rgba(255,255,255,.82)',
                 borderRadius: '8px',
                 marginBottom: '12px',
+                display: 'grid',
+                placeItems: 'center',
+                color: '#17191d',
+                fontSize: '12px',
               }}
-            />
+            >
+              IMAGE
+            </div>
 
             <h2
               style={{
