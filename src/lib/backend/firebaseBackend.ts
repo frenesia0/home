@@ -200,66 +200,6 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
       } catch (e) { return { ok: false, error: humanError(e) }; }
     },
 
-
-    async signInWithGoogle() {
-      try {
-        const provider = new authMod.GoogleAuthProvider();
-
-        // 毎回どのGoogleアカウントで入るか選べるようにする
-        provider.setCustomParameters({
-          prompt: 'select_account',
-        });
-
-        const cred = await authMod.signInWithPopup(auth, provider);
-
-        // Googleの表示名をこのサイト用プロフィールにも保存
-        const nickname =
-          cred.user.displayName ||
-          cred.user.email?.split('@')[0] ||
-          'user';
-
-        await setDoc(
-          doc(db, 'profiles', cred.user.uid),
-          {
-            nickname,
-            createdAt: Date.now(),
-          },
-          { merge: true }
-        );
-
-        // まだ管理者が存在しない場合だけ、
-        // 最初にGoogleログインしたアカウントをownerにする
-        const own = await ownerInfo();
-
-        if (!own?.uid) {
-          const r = await withLimit(
-            setDoc(doc(db, 'meta', 'owner'), {
-              uid: cred.user.uid,
-              admins: [cred.user.uid],
-              at: Date.now(),
-            })
-          );
-
-          if (r === TIMEOUT) {
-            return {
-              ok: false,
-              error: NO_REACH,
-            };
-          }
-
-          // 管理者情報を読み直させる
-          ownerCache = undefined;
-        }
-
-        return { ok: true };
-      } catch (e) {
-        return {
-          ok: false,
-          error: humanError(e),
-        };
-      }
-    },
-      
     async signUp(id, password, nickname) {
       try {
         const cred = await authMod.createUserWithEmailAndPassword(auth, id, password);
@@ -350,9 +290,9 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
       for (const part of chunk(ops, 400)) {
         const batch = writeBatch(db);
         part.forEach(({ item, sort }) => {
-          const { authorId, visibility } = metaOf(item, uid);
+          const { authorId, visibility, editorIds } = metaOf(item, uid);
           batch.set(doc(db, coll, item.id), {
-            data: item, authorId, visibility, sort, updatedAt: Date.now(),
+            data: item, authorId, visibility, editorIds, sort, updatedAt: Date.now(),
           });
         });
         await batch.commit();
