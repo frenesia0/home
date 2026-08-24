@@ -8,7 +8,7 @@ type CharacterTag = 'shiki' | 'solas';
 export default function NewIllustrationPage() {
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
-  const [category, setCategory] = useState<Category>('mine');
+  const [category, setCategory] = useState<Category>('original');
   const [tags, setTags] = useState<CharacterTag[]>([]);
   const [image, setImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
