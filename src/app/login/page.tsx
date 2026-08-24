@@ -1,6 +1,7 @@
 'use client';
-// 로그인 페이지 (4.8) — 회원정보창 위젯은 버튼만 두고 여기로 이동 (위젯 크기 유지 목적)
-// 회원가입(가입코드) · 비밀번호 찾기 포함
+// ログインページ
+// 会員登録（招待コード）・パスワード再設定・Googleログイン対応
+
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
@@ -32,7 +33,7 @@ export default function LoginPage() {
   const [signupOpen, setSignupOpen] = useState(false);
   const [findOpen, setFindOpen] = useState(false);
 
-  // 회원가입 폼
+  // 会員登録フォーム
   const [sId, setSId] = useState('');
   const [sPw, setSPw] = useState('');
   const [sNick, setSNick] = useState('');
@@ -40,12 +41,12 @@ export default function LoginPage() {
   const [sCode, setSCode] = useState('');
   const [sErr, setSErr] = useState('');
 
-  // 아이디/비밀번호 찾기
+  // ID / パスワード確認
   const [fEmail, setFEmail] = useState('');
   const [fErr, setFErr] = useState('');
   const [fInfo, setFInfo] = useState('');
 
-  // 이미 로그인 상태면 메인으로
+  // すでにログイン済みならトップへ
   useEffect(() => {
     if (user) router.replace('/');
   }, [user, router]);
@@ -60,12 +61,12 @@ export default function LoginPage() {
 
     if (!r.ok) {
       setErr(
-        r.error ?? '로그인 실패'
+        r.error ?? 'ログインに失敗しました。'
       );
       return;
     }
 
-    toast('로그인되었습니다');
+    toast('ログインしました。');
     router.push('/');
   };
 
@@ -74,19 +75,18 @@ export default function LoginPage() {
     setGoogleBusy(true);
 
     try {
-      const r =
-        await loginWithGoogle();
+      const r = await loginWithGoogle();
 
       if (!r.ok) {
         setErr(
           r.error ??
-          'Google 로그인에 실패했습니다'
+          'Googleログインに失敗しました。'
         );
         return;
       }
 
       toast(
-        'Google 계정으로 로그인되었습니다'
+        'Googleアカウントでログインしました。'
       );
 
       router.push('/');
@@ -98,7 +98,6 @@ export default function LoginPage() {
   const doSignup = async () => {
     setSErr('');
 
-    // 서버 모드에서는 아이디가 곧 이메일 — 따로 받지 않고 그대로 쓴다
     const r = await signup(
       sId.trim(),
       sPw,
@@ -109,7 +108,7 @@ export default function LoginPage() {
 
     if (!r.ok) {
       setSErr(
-        r.error ?? '가입 실패'
+        r.error ?? '会員登録に失敗しました。'
       );
       return;
     }
@@ -118,30 +117,28 @@ export default function LoginPage() {
 
     toast(
       mock
-        ? '가입되었습니다 — 만든 계정으로 로그인해 보세요'
-        : '가입되었습니다 — 이메일 인증 후 로그인해 주세요'
+        ? '会員登録が完了しました。作成したアカウントでログインしてください。'
+        : '会員登録が完了しました。メール認証後にログインしてください。'
     );
   };
 
-  // 아이디 찾기 (v1.9) — 가입 이메일로
   const doFindId = async () => {
     setFErr('');
     setFInfo('');
 
-    const r =
-      await findId(
-        fEmail.trim()
-      );
+    const r = await findId(
+      fEmail.trim()
+    );
 
     if (!r.ok) {
       setFErr(
-        r.error ?? '요청 실패'
+        r.error ?? '確認に失敗しました。'
       );
       return;
     }
 
     setFInfo(
-      `아이디: ${r.foundId}`
+      `ID：${r.foundId}`
     );
   };
 
@@ -149,27 +146,26 @@ export default function LoginPage() {
     setFErr('');
     setFInfo('');
 
-    const r =
-      await resetPassword(
-        fEmail.trim()
-      );
+    const r = await resetPassword(
+      fEmail.trim()
+    );
 
     if (!r.ok) {
       setFErr(
-        r.error ?? '요청 실패'
+        r.error ?? '確認に失敗しました。'
       );
       return;
     }
 
     if (r.tempPassword) {
       setFInfo(
-        `임시 비밀번호: ${r.tempPassword} — 로그인 후 마이페이지에서 변경해 주세요`
+        `仮パスワード：${r.tempPassword} — ログイン後、マイページから変更してください。`
       );
     } else {
       setFindOpen(false);
 
       toast(
-        '재설정 링크를 이메일로 보냈습니다'
+        'パスワード再設定用のメールを送信しました。'
       );
     }
   };
@@ -205,7 +201,7 @@ export default function LoginPage() {
         >
           <EditableDesc
             k="login-desc"
-            def="로그인 후 멤버 전용 콘텐츠를 열람할 수 있습니다"
+            def="ログインすると、メンバー限定コンテンツを閲覧できます。"
           />
         </div>
 
@@ -223,8 +219,8 @@ export default function LoginPage() {
               disabled={googleBusy}
             >
               {googleBusy
-                ? 'SIGNING IN...'
-                : 'SIGN IN WITH GOOGLE'}
+                ? 'Googleに接続中...'
+                : 'Googleでログイン'}
             </button>
 
             <div
@@ -241,19 +237,17 @@ export default function LoginPage() {
                 style={{
                   height: 1,
                   flex: 1,
-                  background:
-                    'var(--line)',
+                  background: 'var(--line)',
                 }}
               />
 
-              <span>OR</span>
+              <span>または</span>
 
               <span
                 style={{
                   height: 1,
                   flex: 1,
-                  background:
-                    'var(--line)',
+                  background: 'var(--line)',
                 }}
               />
             </div>
@@ -269,8 +263,8 @@ export default function LoginPage() {
           <KInput
             placeholder={
               mock
-                ? '아이디'
-                : '이메일'
+                ? 'ID'
+                : 'メールアドレス'
             }
             value={id}
             onChange={e =>
@@ -279,7 +273,7 @@ export default function LoginPage() {
           />
 
           <KInput
-            placeholder="비밀번호"
+            placeholder="パスワード"
             type="password"
             value={pw}
             onChange={e =>
@@ -311,7 +305,7 @@ export default function LoginPage() {
             }}
             onClick={doLogin}
           >
-            로그인
+            ログイン
           </button>
         </div>
 
@@ -334,7 +328,7 @@ export default function LoginPage() {
               setSignupOpen(true)
             }
           >
-            회원가입
+            会員登録
           </button>
 
           <button
@@ -349,7 +343,7 @@ export default function LoginPage() {
               setFindOpen(true)
             }
           >
-            비밀번호 찾기
+            パスワードを忘れた方
           </button>
         </div>
       </div>
@@ -360,8 +354,8 @@ export default function LoginPage() {
           setSignupOpen(false)
         }
         small
-        title="회원가입"
-        desc="가입코드(초대코드)가 있어야 가입할 수 있습니다"
+        title="会員登録"
+        desc="会員登録には招待コードが必要です。"
         dirty={
           !!(
             sId ||
@@ -378,14 +372,14 @@ export default function LoginPage() {
                 setSignupOpen(false)
               }
             >
-              CANCEL
+              キャンセル
             </button>
 
             <button
               className="btn btn-dark"
               onClick={doSignup}
             >
-              가입
+              登録
             </button>
           </>
         }
@@ -399,8 +393,8 @@ export default function LoginPage() {
           <KInput
             placeholder={
               mock
-                ? '아이디'
-                : '이메일 (아이디)'
+                ? 'ID'
+                : 'メールアドレス'
             }
             value={sId}
             onChange={e =>
@@ -409,7 +403,7 @@ export default function LoginPage() {
           />
 
           <KInput
-            placeholder="비밀번호"
+            placeholder="パスワード"
             type="password"
             value={sPw}
             onChange={e =>
@@ -418,7 +412,7 @@ export default function LoginPage() {
           />
 
           <KInput
-            placeholder="닉네임"
+            placeholder="ニックネーム"
             value={sNick}
             onChange={e =>
               setSNick(e.target.value)
@@ -427,7 +421,7 @@ export default function LoginPage() {
 
           {mock && (
             <KInput
-              placeholder="이메일 — 아이디·비밀번호 찾기에 사용"
+              placeholder="メールアドレス"
               value={sEmail}
               onChange={e =>
                 setSEmail(
@@ -438,7 +432,7 @@ export default function LoginPage() {
           )}
 
           <KInput
-            placeholder="가입코드"
+            placeholder="招待コード"
             value={sCode}
             onChange={e =>
               setSCode(e.target.value)
@@ -468,13 +462,13 @@ export default function LoginPage() {
         small
         title={
           mock
-            ? '아이디·비밀번호 찾기'
-            : '비밀번호 재설정'
+            ? 'ID・パスワード確認'
+            : 'パスワード再設定'
         }
         desc={
           mock
-            ? '가입 시 등록한 이메일로 아이디를 찾거나 임시 비밀번호를 발급합니다'
-            : '가입한 이메일로 재설정 링크를 보냅니다'
+            ? '登録時のメールアドレスからIDを確認、または仮パスワードを発行します。'
+            : '登録済みのメールアドレスに再設定用リンクを送信します。'
         }
         dirty={!!fEmail}
         actions={
@@ -487,7 +481,7 @@ export default function LoginPage() {
                 setFErr('');
               }}
             >
-              CANCEL
+              キャンセル
             </button>
 
             {mock && (
@@ -495,7 +489,7 @@ export default function LoginPage() {
                 className="btn btn-ghost"
                 onClick={doFindId}
               >
-                아이디 찾기
+                IDを確認
               </button>
             )}
 
@@ -504,8 +498,8 @@ export default function LoginPage() {
               onClick={doFind}
             >
               {mock
-                ? '임시 비밀번호'
-                : 'SEND'}
+                ? '仮パスワードを発行'
+                : '送信'}
             </button>
           </>
         }
@@ -517,7 +511,7 @@ export default function LoginPage() {
           }}
         >
           <KInput
-            placeholder="이메일"
+            placeholder="メールアドレス"
             value={fEmail}
             onChange={e =>
               setFEmail(e.target.value)
