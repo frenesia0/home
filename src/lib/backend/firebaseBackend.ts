@@ -200,14 +200,6 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
       } catch (e) { return { ok: false, error: humanError(e) }; }
     },
 
-        async signIn(id, password) {
-      try {
-        await authMod.signInWithEmailAndPassword(auth, id, password);
-        return { ok: true };
-      } catch (e) {
-        return { ok: false, error: humanError(e) };
-      }
-    },
 
     async signInWithGoogle() {
       try {
