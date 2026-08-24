@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth';
 
 type Category = 'original' | 'commission';
-type CharacterTag = 'shiki' | 'solas';
+type CharacterTag = 'shiki' | 'solas' | 'reference';
 
 type GalleryPost = {
   id: string;
@@ -18,6 +19,7 @@ const STORAGE_KEY = 'shiki-solas-gallery-posts';
 
 export default function NewIllustrationPage() {
   const router = useRouter();
+  const { isAdmin } = useAuth();
 
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
@@ -98,6 +100,54 @@ export default function NewIllustrationPage() {
     gap: '7px',
     cursor: 'pointer',
   };
+
+  if (!isAdmin) {
+    return (
+      <main
+        style={{
+          maxWidth: '720px',
+          margin: '0 auto',
+          padding: '80px 32px',
+          color: '#f5f5f5',
+          textAlign: 'center',
+        }}
+      >
+        <h1
+          style={{
+            marginBottom: '12px',
+            fontSize: '28px',
+            letterSpacing: '.08em',
+          }}
+        >
+          ACCESS DENIED
+        </h1>
+
+        <p
+          style={{
+            color: 'rgba(255,255,255,.6)',
+            marginBottom: '28px',
+          }}
+        >
+          This page is available to the administrator only.
+        </p>
+
+        <button
+          onClick={() => router.push('/gallery')}
+          style={{
+            padding: '10px 18px',
+            borderRadius: '8px',
+            border: '1px solid rgba(255,255,255,.25)',
+            background: '#f1f1f1',
+            color: '#17191d',
+            cursor: 'pointer',
+            fontWeight: 700,
+          }}
+        >
+          BACK TO GALLERY
+        </button>
+      </main>
+    );
+  }
 
   return (
     <main
@@ -275,6 +325,7 @@ export default function NewIllustrationPage() {
             <div
               style={{
                 display: 'flex',
+                flexWrap: 'wrap',
                 gap: '24px',
               }}
             >
@@ -294,6 +345,15 @@ export default function NewIllustrationPage() {
                   onChange={() => toggleTag('solas')}
                 />
                 SOLAS
+              </label>
+
+              <label style={choiceStyle}>
+                <input
+                  type="checkbox"
+                  checked={tags.includes('reference')}
+                  onChange={() => toggleTag('reference')}
+                />
+                REFERENCE
               </label>
             </div>
           </fieldset>
