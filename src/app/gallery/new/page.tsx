@@ -1,11 +1,24 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 type Category = 'original' | 'commission';
 type CharacterTag = 'shiki' | 'solas';
 
+type GalleryPost = {
+  id: string;
+  title: string;
+  date: string;
+  category: Category;
+  tags: CharacterTag[];
+};
+
+const STORAGE_KEY = 'shiki-solas-gallery-posts';
+
 export default function NewIllustrationPage() {
+  const router = useRouter();
+
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
   const [category, setCategory] = useState<Category>('original');
@@ -36,14 +49,32 @@ export default function NewIllustrationPage() {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    alert(
-      `投稿内容を受け取りました。\n\n` +
-      `TITLE: ${title}\n` +
-      `DATE: ${date}\n` +
-      `CATEGORY: ${category}\n` +
-      `TAGS: ${tags.join(', ') || 'none'}\n\n` +
-      `※まだ保存はされません。`
+    const newPost: GalleryPost = {
+      id: crypto.randomUUID(),
+      title,
+      date,
+      category,
+      tags,
+    };
+
+    const saved = localStorage.getItem(STORAGE_KEY);
+
+    let currentPosts: GalleryPost[] = [];
+
+    if (saved) {
+      try {
+        currentPosts = JSON.parse(saved);
+      } catch {
+        currentPosts = [];
+      }
+    }
+
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify([newPost, ...currentPosts])
     );
+
+    router.push('/gallery');
   };
 
   const fieldStyle = {
@@ -147,6 +178,7 @@ export default function NewIllustrationPage() {
             }}
           >
             <span>IMAGE</span>
+
             <input
               type="file"
               accept="image/*"
@@ -164,6 +196,7 @@ export default function NewIllustrationPage() {
         >
           <label style={fieldStyle}>
             <span>TITLE</span>
+
             <input
               type="text"
               value={title}
@@ -176,6 +209,7 @@ export default function NewIllustrationPage() {
 
           <label style={fieldStyle}>
             <span>DATE</span>
+
             <input
               type="date"
               value={date}
@@ -195,7 +229,9 @@ export default function NewIllustrationPage() {
               padding: '18px',
             }}
           >
-            <legend style={{ padding: '0 8px' }}>CATEGORY</legend>
+            <legend style={{ padding: '0 8px' }}>
+              CATEGORY
+            </legend>
 
             <div
               style={{
@@ -232,7 +268,9 @@ export default function NewIllustrationPage() {
               padding: '18px',
             }}
           >
-            <legend style={{ padding: '0 8px' }}>TAGS</legend>
+            <legend style={{ padding: '0 8px' }}>
+              TAGS
+            </legend>
 
             <div
               style={{
