@@ -1,282 +1,251 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
-type Category = 'original' | 'commission';
-type CharacterTag = 'shiki' | 'solas';
+type Category = 'all' | 'original' | 'commission';
+type CharacterTag = 'all' | 'shiki' | 'solas';
 
-export default function NewIllustrationPage() {
-  const [title, setTitle] = useState('');
-  const [date, setDate] = useState('');
-  const [category, setCategory] = useState<Category>('original');
-  const [tags, setTags] = useState<CharacterTag[]>([]);
-  const [image, setImage] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+type Illustration = {
+  id: number;
+  title: string;
+  date: string;
+  category: 'original' | 'commission';
+  tags: ('shiki' | 'solas')[];
+};
 
-  useEffect(() => {
-    if (!image) {
-      setPreviewUrl(null);
-      return;
-    }
+const illustrations: Illustration[] = [
+  {
+    id: 1,
+    title: 'Illustration 01',
+    date: '2026.08.25',
+    category: 'original',
+    tags: ['shiki'],
+  },
+  {
+    id: 2,
+    title: 'Illustration 02',
+    date: '2026.07.10',
+    category: 'commission',
+    tags: ['solas'],
+  },
+  {
+    id: 3,
+    title: 'Illustration 03',
+    date: '2026.06.18',
+    category: 'original',
+    tags: ['shiki', 'solas'],
+  },
+];
 
-    const url = URL.createObjectURL(image);
-    setPreviewUrl(url);
+export default function GalleryPage() {
+  const router = useRouter();
 
-    return () => URL.revokeObjectURL(url);
-  }, [image]);
+  const [category, setCategory] = useState<Category>('all');
+  const [tag, setTag] = useState<CharacterTag>('all');
 
-  const toggleTag = (tag: CharacterTag) => {
-    setTags((current) =>
-      current.includes(tag)
-        ? current.filter((item) => item !== tag)
-        : [...current, tag]
-    );
-  };
+  const filtered = illustrations.filter((item) => {
+    const categoryMatch =
+      category === 'all' || item.category === category;
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+    const tagMatch =
+      tag === 'all' || item.tags.includes(tag);
 
-    alert(
-      `投稿内容を受け取りました。\n\n` +
-      `TITLE: ${title}\n` +
-      `DATE: ${date}\n` +
-      `CATEGORY: ${category}\n` +
-      `TAGS: ${tags.join(', ') || 'none'}\n\n` +
-      `※まだ保存はされません。`
-    );
-  };
+    return categoryMatch && tagMatch;
+  });
 
-  const fieldStyle = {
-    display: 'grid',
-    gap: '8px',
-  };
-
-  const inputStyle = {
-    width: '100%',
-    padding: '12px 14px',
-    borderRadius: '8px',
-    border: '1px solid rgba(255,255,255,.25)',
-    background: 'rgba(255,255,255,.08)',
-    color: '#f5f5f5',
-    boxSizing: 'border-box' as const,
-  };
-
-  const choiceStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '7px',
+  const buttonStyle = (active: boolean) => ({
+    padding: '8px 14px',
+    borderRadius: '999px',
+    border: '1px solid rgba(255,255,255,.2)',
+    background: active
+      ? 'rgba(255,255,255,.9)'
+      : 'rgba(255,255,255,.06)',
+    color: active ? '#17191d' : '#f5f5f5',
     cursor: 'pointer',
-  };
+    fontSize: '12px',
+  });
 
   return (
     <main
       style={{
-        maxWidth: '920px',
+        maxWidth: '1200px',
         margin: '0 auto',
         padding: '56px 32px 80px',
         color: '#f5f5f5',
       }}
     >
-      <h1
+      <div
         style={{
-          margin: '0 0 8px',
-          fontSize: '32px',
-          letterSpacing: '.08em',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: '24px',
+          marginBottom: '34px',
         }}
       >
-        ADD ILLUSTRATION
-      </h1>
-
-      <p
-        style={{
-          margin: '0 0 36px',
-          color: 'rgba(255,255,255,.6)',
-          fontSize: '13px',
-        }}
-      >
-        Add a new work to the archive.
-      </p>
-
-      <form
-        onSubmit={handleSubmit}
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(260px, 360px) 1fr',
-          gap: '40px',
-          alignItems: 'start',
-        }}
-      >
-        <section>
-          <div
+        <div>
+          <h1
             style={{
-              aspectRatio: '4 / 5',
-              borderRadius: '12px',
-              overflow: 'hidden',
-              border: '1px solid rgba(255,255,255,.2)',
-              background: 'rgba(255,255,255,.06)',
-              display: 'grid',
-              placeItems: 'center',
+              margin: '0 0 8px',
+              fontSize: '32px',
+              letterSpacing: '.08em',
             }}
           >
-            {previewUrl ? (
-              <img
-                src={previewUrl}
-                alt="preview"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain',
-                }}
-              />
-            ) : (
-              <span
-                style={{
-                  color: 'rgba(255,255,255,.4)',
-                  fontSize: '12px',
-                }}
-              >
-                IMAGE PREVIEW
-              </span>
-            )}
-          </div>
+            ILLUSTRATION
+          </h1>
 
-          <label
+          <p
             style={{
-              ...fieldStyle,
-              marginTop: '14px',
+              margin: 0,
+              color: 'rgba(255,255,255,.55)',
+              fontSize: '13px',
             }}
           >
-            <span>IMAGE</span>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => setImage(e.target.files?.[0] ?? null)}
-              style={{ color: '#f5f5f5' }}
-            />
-          </label>
-        </section>
+            shiki & solas archive
+          </p>
+        </div>
 
-        <section
+        <button
+          onClick={() => router.push('/gallery/new')}
           style={{
-            display: 'grid',
-            gap: '26px',
+            padding: '10px 16px',
+            borderRadius: '8px',
+            border: '1px solid rgba(255,255,255,.3)',
+            background: '#f1f1f1',
+            color: '#17191d',
+            fontWeight: 700,
+            cursor: 'pointer',
           }}
         >
-          <label style={fieldStyle}>
-            <span>TITLE</span>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Illustration title"
-              required
-              style={inputStyle}
-            />
-          </label>
+          ＋ ADD ILLUSTRATION
+        </button>
+      </div>
 
-          <label style={fieldStyle}>
-            <span>DATE</span>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-              style={{
-                ...inputStyle,
-                maxWidth: '220px',
-              }}
-            />
-          </label>
-
-          <fieldset
-            style={{
-              border: '1px solid rgba(255,255,255,.18)',
-              borderRadius: '10px',
-              padding: '18px',
-            }}
+      <section style={{ marginBottom: '18px' }}>
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '8px',
+          }}
+        >
+          <button
+            onClick={() => setCategory('all')}
+            style={buttonStyle(category === 'all')}
           >
-            <legend style={{ padding: '0 8px' }}>CATEGORY</legend>
-
-            <div
-              style={{
-                display: 'flex',
-                gap: '24px',
-              }}
-            >
-              <label style={choiceStyle}>
-                <input
-                  type="radio"
-                  name="category"
-                  checked={category === 'original'}
-                  onChange={() => setCategory('original')}
-                />
-                ORIGINAL
-              </label>
-
-              <label style={choiceStyle}>
-                <input
-                  type="radio"
-                  name="category"
-                  checked={category === 'commission'}
-                  onChange={() => setCategory('commission')}
-                />
-                COMMISSION
-              </label>
-            </div>
-          </fieldset>
-
-          <fieldset
-            style={{
-              border: '1px solid rgba(255,255,255,.18)',
-              borderRadius: '10px',
-              padding: '18px',
-            }}
-          >
-            <legend style={{ padding: '0 8px' }}>TAGS</legend>
-
-            <div
-              style={{
-                display: 'flex',
-                gap: '24px',
-              }}
-            >
-              <label style={choiceStyle}>
-                <input
-                  type="checkbox"
-                  checked={tags.includes('shiki')}
-                  onChange={() => toggleTag('shiki')}
-                />
-                SHIKI
-              </label>
-
-              <label style={choiceStyle}>
-                <input
-                  type="checkbox"
-                  checked={tags.includes('solas')}
-                  onChange={() => toggleTag('solas')}
-                />
-                SOLAS
-              </label>
-            </div>
-          </fieldset>
+            ALL
+          </button>
 
           <button
-            type="submit"
-            style={{
-              marginTop: '6px',
-              padding: '13px 20px',
-              border: '1px solid rgba(255,255,255,.35)',
-              borderRadius: '9px',
-              background: '#f1f1f1',
-              color: '#17191d',
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
+            onClick={() => setCategory('original')}
+            style={buttonStyle(category === 'original')}
           >
-            POST
+            ORIGINAL
           </button>
-        </section>
-      </form>
+
+          <button
+            onClick={() => setCategory('commission')}
+            style={buttonStyle(category === 'commission')}
+          >
+            COMMISSION
+          </button>
+        </div>
+      </section>
+
+      <section style={{ marginBottom: '36px' }}>
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '8px',
+          }}
+        >
+          <button
+            onClick={() => setTag('all')}
+            style={buttonStyle(tag === 'all')}
+          >
+            ALL CHARACTERS
+          </button>
+
+          <button
+            onClick={() => setTag('shiki')}
+            style={buttonStyle(tag === 'shiki')}
+          >
+            SHIKI
+          </button>
+
+          <button
+            onClick={() => setTag('solas')}
+            style={buttonStyle(tag === 'solas')}
+          >
+            SOLAS
+          </button>
+        </div>
+      </section>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+          gap: '28px 22px',
+        }}
+      >
+        {filtered.map((item) => (
+          <article key={item.id}>
+            <div
+              style={{
+                aspectRatio: '1 / 1',
+                background: 'rgba(255,255,255,.82)',
+                borderRadius: '8px',
+                marginBottom: '12px',
+              }}
+            />
+
+            <h2
+              style={{
+                fontSize: '15px',
+                margin: '0 0 5px',
+                fontWeight: 600,
+              }}
+            >
+              {item.title}
+            </h2>
+
+            <p
+              style={{
+                margin: '0 0 5px',
+                fontSize: '11px',
+                color: 'rgba(255,255,255,.55)',
+              }}
+            >
+              {item.date}
+            </p>
+
+            <p
+              style={{
+                margin: 0,
+                fontSize: '11px',
+                color: 'rgba(255,255,255,.7)',
+              }}
+            >
+              {item.category.toUpperCase()} · {item.tags.join(' / ')}
+            </p>
+          </article>
+        ))}
+      </div>
+
+      {filtered.length === 0 && (
+        <p
+          style={{
+            padding: '60px 0',
+            textAlign: 'center',
+            color: 'rgba(255,255,255,.45)',
+          }}
+        >
+          NO ILLUSTRATIONS
+        </p>
+      )}
     </main>
   );
 }
