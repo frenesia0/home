@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-type Category = 'mine' | 'commission';
+type Category = 'original' | 'commission';
 type CharacterTag = 'shiki' | 'solas';
 
 export default function NewIllustrationPage() {
@@ -216,9 +216,9 @@ export default function NewIllustrationPage() {
                   type="radio"
                   name="category"
                   checked={category === 'mine'}
-                  onChange={() => setCategory('mine')}
+                  onChange={() => setCategory('original')}
                 />
-                mine
+                original
               </label>
 
               <label style={choiceStyle}>
