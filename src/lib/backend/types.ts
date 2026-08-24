@@ -44,11 +44,16 @@ export interface Backend {
   /* ---- 연결 점검 ---- */
   check(): Promise<BackendCheck>;
 
-  /* ---- 인증 ---- */
+   /* ---- 인증 ---- */
   currentUser(): Promise<BackendUser | null>;
   onAuthChange(cb: (u: BackendUser | null) => void): () => void;
+
+  /** 이메일 / 비밀번호 로그인 */
   signIn(id: string, password: string): Promise<{ ok: boolean; error?: string }>;
+
+  /** Google 로그인 */
   signInWithGoogle?(): Promise<{ ok: boolean; error?: string }>;
+
   signUp(id: string, password: string, nickname: string): Promise<{ ok: boolean; error?: string }>;
   signOut(): Promise<void>;
   resetPassword(email: string): Promise<{ ok: boolean; error?: string }>;
