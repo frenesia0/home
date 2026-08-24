@@ -267,8 +267,6 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
         };
       }
     },
-
-    async signUp(id, password, nickname) {
       
     async signUp(id, password, nickname) {
       try {
