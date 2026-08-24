@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 type Category = 'original' | 'commission';
 type CharacterTag = 'shiki' | 'solas';
@@ -11,6 +11,19 @@ export default function NewIllustrationPage() {
   const [category, setCategory] = useState<Category>('original');
   const [tags, setTags] = useState<CharacterTag[]>([]);
   const [image, setImage] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!image) {
+      setPreviewUrl(null);
+      return;
+    }
+
+    const url = URL.createObjectURL(image);
+    setPreviewUrl(url);
+
+    return () => URL.revokeObjectURL(url);
+  }, [image]);
 
   const toggleTag = (tag: CharacterTag) => {
     setTags((current) =>
@@ -23,127 +36,246 @@ export default function NewIllustrationPage() {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    console.log({
-      image,
-      title,
-      date,
-      category,
-      tags,
-    });
+    alert(
+      `投稿内容を受け取りました。\n\n` +
+      `TITLE: ${title}\n` +
+      `DATE: ${date}\n` +
+      `CATEGORY: ${category}\n` +
+      `TAGS: ${tags.join(', ') || 'none'}\n\n` +
+      `※まだ保存はされません。`
+    );
+  };
 
-    alert('入力内容を受け取りました！保存機能は次に接続します。');
+  const fieldStyle = {
+    display: 'grid',
+    gap: '8px',
+  };
+
+  const inputStyle = {
+    width: '100%',
+    padding: '12px 14px',
+    borderRadius: '8px',
+    border: '1px solid rgba(255,255,255,.25)',
+    background: 'rgba(255,255,255,.08)',
+    color: '#f5f5f5',
+    boxSizing: 'border-box' as const,
+  };
+
+  const choiceStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '7px',
+    cursor: 'pointer',
   };
 
   return (
     <main
       style={{
-        maxWidth: '700px',
+        maxWidth: '920px',
         margin: '0 auto',
-        padding: '48px',
+        padding: '56px 32px 80px',
+        color: '#f5f5f5',
       }}
     >
-      <h1 style={{ marginBottom: '36px' }}>ADD ILLUSTRATION</h1>
+      <h1
+        style={{
+          margin: '0 0 8px',
+          fontSize: '32px',
+          letterSpacing: '.08em',
+        }}
+      >
+        ADD ILLUSTRATION
+      </h1>
+
+      <p
+        style={{
+          margin: '0 0 36px',
+          color: 'rgba(255,255,255,.6)',
+          fontSize: '13px',
+        }}
+      >
+        Add a new work to the archive.
+      </p>
 
       <form
         onSubmit={handleSubmit}
         style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '28px',
+          display: 'grid',
+          gridTemplateColumns: 'minmax(260px, 360px) 1fr',
+          gap: '40px',
+          alignItems: 'start',
         }}
       >
-        <label>
-          <div style={{ marginBottom: '8px' }}>IMAGE</div>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => setImage(e.target.files?.[0] ?? null)}
-          />
-        </label>
-
-        <label>
-          <div style={{ marginBottom: '8px' }}>TITLE</div>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="イラストのタイトル"
-            required
+        <section>
+          <div
             style={{
-              width: '100%',
-              padding: '10px',
+              aspectRatio: '4 / 5',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              border: '1px solid rgba(255,255,255,.2)',
+              background: 'rgba(255,255,255,.06)',
+              display: 'grid',
+              placeItems: 'center',
             }}
-          />
-        </label>
+          >
+            {previewUrl ? (
+              <img
+                src={previewUrl}
+                alt="preview"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                }}
+              />
+            ) : (
+              <span
+                style={{
+                  color: 'rgba(255,255,255,.4)',
+                  fontSize: '12px',
+                }}
+              >
+                IMAGE PREVIEW
+              </span>
+            )}
+          </div>
 
-        <label>
-          <div style={{ marginBottom: '8px' }}>DATE</div>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            required
+          <label
             style={{
-              padding: '10px',
+              ...fieldStyle,
+              marginTop: '14px',
             }}
-          />
-        </label>
-
-        <fieldset>
-          <legend>CATEGORY</legend>
-
-          <label style={{ marginRight: '20px' }}>
+          >
+            <span>IMAGE</span>
             <input
-              type="radio"
-              name="category"
-              checked={category === 'original'}
-              onChange={() => setCategory('original')}
+              type="file"
+              accept="image/*"
+              onChange={(e) => setImage(e.target.files?.[0] ?? null)}
+              style={{ color: '#f5f5f5' }}
             />
-            {' '}自作
           </label>
+        </section>
 
-          <label>
-            <input
-              type="radio"
-              name="category"
-              checked={category === 'commission'}
-              onChange={() => setCategory('commission')}
-            />
-            {' '}依頼
-          </label>
-        </fieldset>
-
-        <fieldset>
-          <legend>TAGS</legend>
-
-          <label style={{ marginRight: '20px' }}>
-            <input
-              type="checkbox"
-              checked={tags.includes('shiki')}
-              onChange={() => toggleTag('shiki')}
-            />
-            {' '}shiki
-          </label>
-
-          <label>
-            <input
-              type="checkbox"
-              checked={tags.includes('solas')}
-              onChange={() => toggleTag('solas')}
-            />
-            {' '}solas
-          </label>
-        </fieldset>
-
-        <button
-          type="submit"
+        <section
           style={{
-            padding: '12px 20px',
-            cursor: 'pointer',
+            display: 'grid',
+            gap: '26px',
           }}
         >
-          POST
-        </button>
+          <label style={fieldStyle}>
+            <span>TITLE</span>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Illustration title"
+              required
+              style={inputStyle}
+            />
+          </label>
+
+          <label style={fieldStyle}>
+            <span>DATE</span>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              required
+              style={{
+                ...inputStyle,
+                maxWidth: '220px',
+              }}
+            />
+          </label>
+
+          <fieldset
+            style={{
+              border: '1px solid rgba(255,255,255,.18)',
+              borderRadius: '10px',
+              padding: '18px',
+            }}
+          >
+            <legend style={{ padding: '0 8px' }}>CATEGORY</legend>
+
+            <div
+              style={{
+                display: 'flex',
+                gap: '24px',
+              }}
+            >
+              <label style={choiceStyle}>
+                <input
+                  type="radio"
+                  name="category"
+                  checked={category === 'original'}
+                  onChange={() => setCategory('original')}
+                />
+                ORIGINAL
+              </label>
+
+              <label style={choiceStyle}>
+                <input
+                  type="radio"
+                  name="category"
+                  checked={category === 'commission'}
+                  onChange={() => setCategory('commission')}
+                />
+                COMMISSION
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset
+            style={{
+              border: '1px solid rgba(255,255,255,.18)',
+              borderRadius: '10px',
+              padding: '18px',
+            }}
+          >
+            <legend style={{ padding: '0 8px' }}>TAGS</legend>
+
+            <div
+              style={{
+                display: 'flex',
+                gap: '24px',
+              }}
+            >
+              <label style={choiceStyle}>
+                <input
+                  type="checkbox"
+                  checked={tags.includes('shiki')}
+                  onChange={() => toggleTag('shiki')}
+                />
+                SHIKI
+              </label>
+
+              <label style={choiceStyle}>
+                <input
+                  type="checkbox"
+                  checked={tags.includes('solas')}
+                  onChange={() => toggleTag('solas')}
+                />
+                SOLAS
+              </label>
+            </div>
+          </fieldset>
+
+          <button
+            type="submit"
+            style={{
+              marginTop: '6px',
+              padding: '13px 20px',
+              border: '1px solid rgba(255,255,255,.35)',
+              borderRadius: '9px',
+              background: '#f1f1f1',
+              color: '#17191d',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            POST
+          </button>
+        </section>
       </form>
     </main>
   );
