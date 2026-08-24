@@ -10,21 +10,21 @@ const illustrations = [
     title: 'イラストA',
     date: '2026.08.25',
     category: 'mine',
-    tags: ['キャラA'],
+    tags: ['shiki'],
   },
   {
     id: 2,
     title: 'イラストB',
     date: '2026.07.10',
-    category: 'commission',
-    tags: ['キャラB'],
+    category: 'mine',
+    tags: ['solas'],
   },
   {
     id: 3,
     title: 'イラストC',
     date: '2026.06.18',
-    category: 'mine',
-    tags: ['キャラA', 'キャラB'],
+    category: 'commission',
+    tags: ['shiki', 'solas'],
   },
 ];
 
@@ -54,8 +54,8 @@ export default function GalleryPage() {
 
       <div style={{ marginBottom: '32px' }}>
         <button onClick={() => setTag('all')}>すべてのキャラ</button>
-        <button onClick={() => setTag('キャラA')}>キャラA</button>
-        <button onClick={() => setTag('キャラB')}>キャラB</button>
+        <button onClick={() => setTag('shiki')}>shiki</button>
+        <button onClick={() => setTag('solas')}>solas</button>
       </div>
 
       <div
