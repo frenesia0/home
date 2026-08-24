@@ -1,17 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth';
 
-type Category = 'all' | 'original' | 'commission';
-type CharacterTag = 'all' | 'shiki' | 'solas';
+type Category = 'original' | 'commission';
+type CharacterTag = 'shiki' | 'solas' | 'reference';
+type FilterTag = 'all' | CharacterTag;
 
 type GalleryPost = {
   id: string;
   title: string;
   date: string;
-  category: 'original' | 'commission';
-  tags: ('shiki' | 'solas')[];
+  category: Category;
+  tags: CharacterTag[];
 };
 
 const STORAGE_KEY = 'shiki-solas-gallery-posts';
@@ -20,31 +22,33 @@ const demoPosts: GalleryPost[] = [
   {
     id: 'demo-1',
     title: 'Illustration 01',
-    date: '2026.08.25',
+    date: '2026-08-25',
     category: 'original',
     tags: ['shiki'],
   },
   {
     id: 'demo-2',
     title: 'Illustration 02',
-    date: '2026.07.10',
+    date: '2026-07-10',
     category: 'commission',
     tags: ['solas'],
   },
   {
     id: 'demo-3',
     title: 'Illustration 03',
-    date: '2026.06.18',
+    date: '2026-06-18',
     category: 'original',
-    tags: ['shiki', 'solas'],
+    tags: ['shiki', 'solas', 'reference'],
   },
 ];
 
 export default function GalleryPage() {
   const router = useRouter();
+  const { isAdmin } = useAuth();
 
-  const [category, setCategory] = useState<Category>('all');
-  const [tag, setTag] = useState<CharacterTag>('all');
+  const [category, setCategory] = useState<Category>('original');
+  const [tag, setTag] = useState<FilterTag>('all');
+  const [query, setQuery] = useState('');
   const [savedPosts, setSavedPosts] = useState<GalleryPost[]>([]);
 
   useEffect(() => {
@@ -63,28 +67,48 @@ export default function GalleryPage() {
     }
   }, []);
 
-  const illustrations = [...savedPosts, ...demoPosts];
+  const illustrations = useMemo(
+    () => [...savedPosts, ...demoPosts],
+    [savedPosts]
+  );
 
-  const filtered = illustrations.filter((item) => {
-    const categoryMatch =
-      category === 'all' || item.category === category;
+  const filtered = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
 
-    const tagMatch =
-      tag === 'all' || item.tags.includes(tag);
+    return illustrations
+      .filter((item) => item.category === category)
+      .filter((item) => {
+        if (tag === 'all') return true;
+        return item.tags.includes(tag);
+      })
+      .filter((item) => {
+        if (!normalizedQuery) return true;
 
-    return categoryMatch && tagMatch;
-  });
+        const searchableText = [
+          item.title,
+          item.date,
+          item.category,
+          ...item.tags,
+        ]
+          .join(' ')
+          .toLowerCase();
 
-  const buttonStyle = (active: boolean) => ({
+        return searchableText.includes(normalizedQuery);
+      })
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [illustrations, category, tag, query]);
+
+  const pillStyle = (active: boolean) => ({
     padding: '8px 14px',
     borderRadius: '999px',
     border: '1px solid rgba(255,255,255,.2)',
     background: active
-      ? 'rgba(255,255,255,.9)'
+      ? 'rgba(255,255,255,.92)'
       : 'rgba(255,255,255,.06)',
     color: active ? '#17191d' : '#f5f5f5',
     cursor: 'pointer',
     fontSize: '12px',
+    transition: 'all .18s ease',
   });
 
   return (
@@ -127,82 +151,105 @@ export default function GalleryPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => router.push('/gallery/new')}
-          style={{
-            padding: '10px 16px',
-            borderRadius: '8px',
-            border: '1px solid rgba(255,255,255,.3)',
-            background: '#f1f1f1',
-            color: '#17191d',
-            fontWeight: 700,
-            cursor: 'pointer',
-          }}
-        >
-          ＋ ADD ILLUSTRATION
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => router.push('/gallery/new')}
+            style={{
+              padding: '10px 16px',
+              borderRadius: '8px',
+              border: '1px solid rgba(255,255,255,.3)',
+              background: '#f1f1f1',
+              color: '#17191d',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            ＋ ADD ILLUSTRATION
+          </button>
+        )}
       </div>
 
-      <section style={{ marginBottom: '18px' }}>
-        <div
+      <div
+        style={{
+          marginBottom: '22px',
+        }}
+      >
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search illustrations..."
           style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '8px',
+            width: '100%',
+            maxWidth: '520px',
+            padding: '11px 14px',
+            borderRadius: '9px',
+            border: '1px solid rgba(255,255,255,.2)',
+            background: 'rgba(255,255,255,.06)',
+            color: '#f5f5f5',
+            outline: 'none',
           }}
+        />
+      </div>
+
+      <section
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '8px',
+          marginBottom: '18px',
+        }}
+      >
+        <button
+          onClick={() => setCategory('original')}
+          style={pillStyle(category === 'original')}
         >
-          <button
-            onClick={() => setCategory('all')}
-            style={buttonStyle(category === 'all')}
-          >
-            ALL
-          </button>
+          ORIGINAL
+        </button>
 
-          <button
-            onClick={() => setCategory('original')}
-            style={buttonStyle(category === 'original')}
-          >
-            ORIGINAL
-          </button>
-
-          <button
-            onClick={() => setCategory('commission')}
-            style={buttonStyle(category === 'commission')}
-          >
-            COMMISSION
-          </button>
-        </div>
+        <button
+          onClick={() => setCategory('commission')}
+          style={pillStyle(category === 'commission')}
+        >
+          COMMISSION
+        </button>
       </section>
 
-      <section style={{ marginBottom: '36px' }}>
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '8px',
-          }}
+      <section
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '8px',
+          marginBottom: '36px',
+        }}
+      >
+        <button
+          onClick={() => setTag('all')}
+          style={pillStyle(tag === 'all')}
         >
-          <button
-            onClick={() => setTag('all')}
-            style={buttonStyle(tag === 'all')}
-          >
-            ALL CHARACTERS
-          </button>
+          ALL
+        </button>
 
-          <button
-            onClick={() => setTag('shiki')}
-            style={buttonStyle(tag === 'shiki')}
-          >
-            SHIKI
-          </button>
+        <button
+          onClick={() => setTag('shiki')}
+          style={pillStyle(tag === 'shiki')}
+        >
+          SHIKI
+        </button>
 
-          <button
-            onClick={() => setTag('solas')}
-            style={buttonStyle(tag === 'solas')}
-          >
-            SOLAS
-          </button>
-        </div>
+        <button
+          onClick={() => setTag('solas')}
+          style={pillStyle(tag === 'solas')}
+        >
+          SOLAS
+        </button>
+
+        <button
+          onClick={() => setTag('reference')}
+          style={pillStyle(tag === 'reference')}
+        >
+          REFERENCE
+        </button>
       </section>
 
       <div
@@ -256,7 +303,8 @@ export default function GalleryPage() {
                 color: 'rgba(255,255,255,.7)',
               }}
             >
-              {item.category.toUpperCase()} · {item.tags.join(' / ')}
+              {item.category.toUpperCase()} ·{' '}
+              {item.tags.map((itemTag) => itemTag.toUpperCase()).join(' / ')}
             </p>
           </article>
         ))}
