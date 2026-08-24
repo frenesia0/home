@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 
-type Category = 'mine' | 'commission';
+type Category = 'original' | 'commission';
 type CharacterTag = 'shiki' | 'solas';
 
 export default function NewIllustrationPage() {
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
-  const [category, setCategory] = useState<Category>('mine');
+  const [category, setCategory] = useState<Category>('original');
   const [tags, setTags] = useState<CharacterTag[]>([]);
   const [image, setImage] = useState<File | null>(null);
 
@@ -96,8 +96,8 @@ export default function NewIllustrationPage() {
             <input
               type="radio"
               name="category"
-              checked={category === 'mine'}
-              onChange={() => setCategory('mine')}
+              checked={category === 'original'}
+              onChange={() => setCategory('original')}
             />
             {' '}自作
           </label>
