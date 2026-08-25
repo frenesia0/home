@@ -1,15 +1,7 @@
 'use client';
 
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
-import {
-  useParams,
-  useRouter,
-  useSearchParams,
-} from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import {
   fetchGalleryPosts,
@@ -19,15 +11,11 @@ import {
   getGallerySong,
   getGalleryTags,
   subscribeGallery,
-  type GalleryCategory,
   type GalleryCharacter,
   type GalleryPost,
   type GalleryTag,
 } from '@/lib/galleryData';
-
-type CharacterFilter = 'all' | GalleryCharacter;
-type TagFilter = 'all' | GalleryTag;
-type SortOrder = 'newest' | 'oldest';
+import { WatermarkedImage } from '@/components/gallery/WatermarkedImage';
 
 function characterLabel(character: GalleryCharacter) {
   return character.toUpperCase();
@@ -47,43 +35,9 @@ function optimizeThumbUrl(url: string) {
   );
 }
 
-function isCategory(value: string | null): value is GalleryCategory {
-  return value === 'original' || value === 'commission';
-}
-
-function isCharacterFilter(
-  value: string | null
-): value is CharacterFilter {
-  return (
-    value === 'all' ||
-    value === 'shiki' ||
-    value === 'solas'
-  );
-}
-
-function isTagFilter(
-  value: string | null
-): value is TagFilter {
-  return (
-    value === 'all' ||
-    value === 'reference' ||
-    value === 'song-parody' ||
-    value === 'manga' ||
-    value === 'rakugaki' ||
-    value === 'tachie'
-  );
-}
-
-function isSortOrder(
-  value: string | null
-): value is SortOrder {
-  return value === 'newest' || value === 'oldest';
-}
-
 export default function GalleryDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
-  const searchParams = useSearchParams();
   const { isAdmin } = useAuth();
 
   const id =
@@ -91,28 +45,6 @@ export default function GalleryDetailPage() {
       ? decodeURIComponent(params.id)
       : '';
 
-  const category: GalleryCategory =
-    isCategory(searchParams.get('category'))
-      ? searchParams.get('category') as GalleryCategory
-      : 'original';
-
-  const character: CharacterFilter =
-    isCharacterFilter(searchParams.get('character'))
-      ? searchParams.get('character') as CharacterFilter
-      : 'all';
-
-  const tag: TagFilter =
-    isTagFilter(searchParams.get('tag'))
-      ? searchParams.get('tag') as TagFilter
-      : 'all';
-
-  const sortOrder: SortOrder =
-    isSortOrder(searchParams.get('sort'))
-      ? searchParams.get('sort') as SortOrder
-      : 'newest';
-
-  const [allPosts, setAllPosts] =
-    useState<GalleryPost[]>([]);
   const [post, setPost] =
     useState<GalleryPost | null>(null);
   const [imageIndex, setImageIndex] =
@@ -129,7 +61,6 @@ export default function GalleryDetailPage() {
       if (!id) {
         if (alive) {
           setPost(null);
-          setAllPosts([]);
           setLoading(false);
         }
         return;
@@ -145,7 +76,6 @@ export default function GalleryDetailPage() {
           ) ?? null;
 
         if (alive) {
-          setAllPosts(posts);
           setPost(found);
           setError('');
         }
@@ -238,113 +168,6 @@ export default function GalleryDetailPage() {
       );
   }, [post]);
 
-  const filteredPosts = useMemo(() => {
-    return allPosts
-      .filter((item) => item.category === category)
-      .filter((item) => {
-        if (character === 'all') return true;
-
-        return getGalleryCharacters(item).includes(
-          character
-        );
-      })
-      .filter((item) => {
-        if (
-          category === 'commission' ||
-          tag === 'all'
-        ) {
-          return true;
-        }
-
-        return getGalleryTags(item).includes(tag);
-      })
-      .sort((a, b) =>
-        sortOrder === 'newest'
-          ? b.date.localeCompare(a.date)
-          : a.date.localeCompare(b.date)
-      );
-  }, [
-    allPosts,
-    category,
-    character,
-    tag,
-    sortOrder,
-  ]);
-
-  const currentIndex = useMemo(
-    () =>
-      filteredPosts.findIndex(
-        (item) => item.id === id
-      ),
-    [filteredPosts, id]
-  );
-
-  const previousPost =
-    currentIndex > 0
-      ? filteredPosts[currentIndex - 1]
-      : null;
-
-  const nextPost =
-    currentIndex >= 0 &&
-    currentIndex < filteredPosts.length - 1
-      ? filteredPosts[currentIndex + 1]
-      : null;
-
-  const contextQuery = useMemo(() => {
-    const query = new URLSearchParams();
-
-    if (category !== 'original') {
-      query.set('category', category);
-    }
-
-    if (character !== 'all') {
-      query.set('character', character);
-    }
-
-    if (
-      category === 'original' &&
-      tag !== 'all'
-    ) {
-      query.set('tag', tag);
-    }
-
-    if (sortOrder !== 'newest') {
-      query.set('sort', sortOrder);
-    }
-
-    return query.toString();
-  }, [
-    category,
-    character,
-    tag,
-    sortOrder,
-  ]);
-
-  const goToPost = (
-    target: GalleryPost | null
-  ) => {
-    if (!target) return;
-
-    const base =
-      `/gallery/${encodeURIComponent(
-        target.id
-      )}`;
-
-    router.push(
-      contextQuery
-        ? `${base}?${contextQuery}`
-        : base
-    );
-  };
-
-  const goBackToGallery = () => {
-    router.push(
-      contextQuery
-        ? `/gallery?${contextQuery}`
-        : '/gallery'
-    );
-  };
-
   if (loading) {
     return (
       <main
@@ -407,7 +230,9 @@ export default function GalleryDetailPage() {
 
         <button
           type="button"
-          onClick={goBackToGallery}
+          onClick={() =>
+            router.push('/gallery')
+          }
           style={{
             marginTop: '20px',
             padding: '10px 16px',
@@ -455,142 +280,50 @@ export default function GalleryDetailPage() {
     >
       <div
         style={{
-          display: 'grid',
-          gridTemplateColumns:
-            '1fr auto 1fr',
+          display: 'flex',
+          justifyContent:
+            'space-between',
           alignItems: 'center',
-          gap: '16px',
+          gap: '18px',
           marginBottom: '18px',
         }}
       >
-        <div
+        <button
+          type="button"
+          onClick={() =>
+            router.push('/gallery')
+          }
           style={{
-            display: 'flex',
-            justifyContent: 'flex-start',
+            padding: 0,
+            border: 0,
+            background:
+              'transparent',
+            color:
+              'rgba(255,255,255,.62)',
+            cursor: 'pointer',
+            fontSize: '12px',
           }}
         >
-          <button
-            type="button"
-            onClick={goBackToGallery}
-            style={{
-              padding: '9px 13px',
-              borderRadius: '8px',
-              border:
-                '1px solid rgba(255,255,255,.18)',
-              background:
-                'rgba(255,255,255,.07)',
-              color: '#f5f5f5',
-              cursor: 'pointer',
-              fontSize: '11px',
-              fontWeight: 700,
-              letterSpacing: '.05em',
-            }}
-          >
-            ← GALLERY
-          </button>
-        </div>
+          ← GALLERY
+        </button>
 
         <div
           style={{
             display: 'flex',
             gap: '8px',
             alignItems: 'center',
-            justifyContent: 'center',
           }}
         >
-          <button
-            type="button"
-            aria-label="前の作品"
-            title={
-              previousPost
-                ? '前の作品'
-                : '前の作品はありません'
-            }
-            disabled={!previousPost}
-            onClick={() =>
-              goToPost(previousPost)
-            }
-            style={{
-              width: '38px',
-              height: '38px',
-              borderRadius: '999px',
-              border:
-                '1px solid rgba(255,255,255,.2)',
-              background:
-                'rgba(255,255,255,.07)',
-              color: '#fff',
-              cursor:
-                previousPost
-                  ? 'pointer'
-                  : 'default',
-              opacity:
-                previousPost
-                  ? 1
-                  : 0.28,
-              fontSize: '18px',
-            }}
-          >
-            ←
-          </button>
-
           <span
             style={{
-              minWidth: '84px',
-              textAlign: 'center',
-              fontSize: '11px',
               color:
-                'rgba(255,255,255,.5)',
+                'rgba(255,255,255,.45)',
+              fontSize: '11px',
             }}
           >
-            {currentIndex >= 0
-              ? `${currentIndex + 1} / ${filteredPosts.length}`
-              : ''}
+            {post.id}
           </span>
 
-          <button
-            type="button"
-            aria-label="次の作品"
-            title={
-              nextPost
-                ? '次の作品'
-                : '次の作品はありません'
-            }
-            disabled={!nextPost}
-            onClick={() =>
-              goToPost(nextPost)
-            }
-            style={{
-              width: '38px',
-              height: '38px',
-              borderRadius: '999px',
-              border:
-                '1px solid rgba(255,255,255,.2)',
-              background:
-                'rgba(255,255,255,.07)',
-              color: '#fff',
-              cursor:
-                nextPost
-                  ? 'pointer'
-                  : 'default',
-              opacity:
-                nextPost
-                  ? 1
-                  : 0.28,
-              fontSize: '18px',
-            }}
-          >
-            →
-          </button>
-        </div>
-
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '8px',
-            alignItems: 'center',
-          }}
-        >
           {isAdmin && (
             <button
               type="button"
@@ -647,13 +380,13 @@ export default function GalleryDetailPage() {
             }}
           >
             {currentImage ? (
-              <img
+              <WatermarkedImage
                 src={currentImage.url}
                 alt={`illustration ${
                   imageIndex + 1
                 }`}
-                draggable={false}
-                style={{
+                watermark={currentImage.watermark}
+                imageStyle={{
                   display: 'block',
                   maxWidth: '100%',
                   maxHeight:
