@@ -195,6 +195,16 @@ export default function GalleryPage() {
       >
         <button
           type="button"
+          aria-label={
+            sortOrder === 'newest'
+              ? '新しい順。押すと古い順に切り替えます'
+              : '古い順。押すと新しい順に切り替えます'
+          }
+          title={
+            sortOrder === 'newest'
+              ? '新しい順'
+              : '古い順'
+          }
           onClick={() =>
             setSortOrder((current) =>
               current === 'newest'
@@ -212,7 +222,15 @@ export default function GalleryPage() {
             fontSize: '11px',
           }}
         >
-          {sortOrder === 'newest' ? 'NEWEST' : 'OLDEST'}
+          <span
+            aria-hidden="true"
+            style={{
+              fontSize: '16px',
+              lineHeight: 1,
+            }}
+          >
+            {sortOrder === 'newest' ? '↓' : '↑'}
+          </span>
         </button>
       </div>
 
