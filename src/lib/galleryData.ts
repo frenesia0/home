@@ -67,7 +67,7 @@ export interface GalleryPost {
   [key: string]: unknown;
 }
 
-export const GALLERY_COLLECTION = 'illustrations';
+export const GALLERY_COLLECTION = 'gallery';
 
 export function getGalleryImages(post: GalleryPost): GalleryImage[] {
   if (Array.isArray(post.images) && post.images.length > 0) {
