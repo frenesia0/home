@@ -3,7 +3,6 @@
 import React, { useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 
-import { useSiteSettings } from '@/lib/siteStore';
 import { useAuth } from '@/lib/auth';
 import { useMainStore } from '@/lib/mainStore';
 import { useBlobUrl } from '@/lib/blobStore';
@@ -12,7 +11,7 @@ import { KToggle } from '@/components/ui/Kit';
 
 const NAV_ITEMS = [
   { label: 'HOME', href: '/' },
-  { label: 'CHARACTER', href: '/chars' },
+  { label: 'CHARACTER', href: '/character' },
   { label: 'GALLERY', href: '/gallery' },
   { label: 'NEWS', href: '/news' },
   { label: 'KOBANASHI', href: '/kobanashi' },
@@ -35,7 +34,6 @@ export function TopBar() {
   const pathname = usePathname();
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const [site, , siteLoaded] = useSiteSettings();
   const avatarSrc = useBlobUrl(user?.avatarUrl);
   const userRef = useRef<HTMLDivElement>(null);
 
@@ -65,12 +63,7 @@ export function TopBar() {
         }}
         style={{ cursor: 'pointer' }}
       >
-        {siteLoaded ? site.title : 'frenesia'}
-        {siteLoaded && site.subtitle && (
-          <small className={`al-${site.align}`}>
-            {site.subtitle}
-          </small>
-        )}
+        frenesia
       </div>
 
       <nav
