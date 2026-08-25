@@ -16,6 +16,9 @@ export interface GalleryPost {
   authorId: string;
   visibility: 'public';
   createdAt: string;
+
+  // backend側のListItem型と互換にするためのインデックスシグネチャ
+  [key: string]: unknown;
 }
 
 /** Gallery一覧をFirestoreから取得する */
