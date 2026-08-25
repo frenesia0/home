@@ -28,6 +28,9 @@ import {
 } from '@/lib/galleryData';
 
 import { CropImg } from '@/components/ui/CropEditor';
+import {
+  WatermarkOverlay,
+} from '@/components/gallery/WatermarkedImage';
 
 type CharacterFilter =
   | 'all'
@@ -1159,15 +1162,26 @@ export default function GalleryPage() {
                       }}
                     >
                       {thumbnail ? (
-                        <CropImg
-                          src={optimizeCloudinaryUrl(
-                            thumbnail.url
-                          )}
-                          crop={
-                            item.thumbnailCrop
-                          }
-                          alt="gallery thumbnail"
-                        />
+                        <>
+                          <CropImg
+                            src={optimizeCloudinaryUrl(
+                              thumbnail.url
+                            )}
+                            crop={
+                              item.thumbnailCrop
+                            }
+                            alt="gallery thumbnail"
+                          />
+
+                          <WatermarkOverlay
+                            watermark={
+                              thumbnail.watermark
+                            }
+                            referenceWidth={
+                              240
+                            }
+                          />
+                        </>
                       ) : (
                         <div
                           style={{
