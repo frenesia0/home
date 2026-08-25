@@ -1,9 +1,18 @@
 'use client';
 
-import { fetchList, syncList, subscribeTable } from '@/lib/db';
-import type { CropValue } from '@/components/ui/CropEditor';
+import {
+  fetchList,
+  syncList,
+  subscribeTable,
+} from '@/lib/db';
 
-export type GalleryCategory = 'original' | 'commission';
+import type {
+  CropValue,
+} from '@/components/ui/CropEditor';
+
+export type GalleryCategory =
+  | 'original'
+  | 'commission';
 
 export type GalleryCharacter =
   | 'shiki'
@@ -16,10 +25,234 @@ export type GalleryTag =
   | 'rakugaki'
   | 'tachie';
 
+/* =========================================================
+   WATERMARK
+========================================================= */
+
+export type GalleryWatermarkColor =
+  | 'white'
+  | 'black'
+  | 'none';
+
+export interface GalleryWatermark {
+  /**
+   * white:
+   *   白いウォーターマーク
+   *
+   * black:
+   *   黒いウォーターマーク
+   *
+   * none:
+   *   ウォーターマークなし
+   */
+  color: GalleryWatermarkColor;
+
+  /**
+   * 不透明度。
+   * 0〜100 の数値で保存する。
+   *
+   * WHITE初期値:
+   * 25
+   *
+   * BLACK初期値:
+   * 5
+   */
+  opacity: number;
+
+  /**
+   * ウォーターマークとして表示するID。
+   *
+   * ORIGINAL初期値:
+   * @frenesia0
+   *
+   * COMMISSION:
+   * 絵師さんのSNS IDを自動設定
+   */
+  text: string;
+
+  /**
+   * 大きな斜め格子模様を表示するか。
+   */
+  grid: boolean;
+}
+
+/**
+ * ORIGINAL用の標準ウォーターマーク。
+ */
+export const DEFAULT_ORIGINAL_WATERMARK: GalleryWatermark = {
+  color: 'white',
+  opacity: 25,
+  text: '@frenesia0',
+  grid: true,
+};
+
+/**
+ * 指定された色に応じた標準不透明度を返す。
+ */
+export function getDefaultWatermarkOpacity(
+  color: GalleryWatermarkColor
+): number {
+  if (color === 'black') {
+    return 5;
+  }
+
+  if (color === 'white') {
+    return 25;
+  }
+
+  return 0;
+}
+
+/**
+ * SNS IDをウォーターマーク向けに整形する。
+ *
+ * example
+ * frenesia0
+ * ↓
+ * @frenesia0
+ */
+export function normalizeWatermarkText(
+  value: string
+): string {
+  const trimmed =
+    value.trim();
+
+  if (!trimmed) {
+    return '';
+  }
+
+  if (
+    trimmed.startsWith('@')
+  ) {
+    return trimmed;
+  }
+
+  return `@${trimmed}`;
+}
+
+/**
+ * 新しいウォーターマーク設定を作る。
+ *
+ * ORIGINAL:
+ * createGalleryWatermark(
+ *   'white',
+ *   '@frenesia0'
+ * )
+ *
+ * COMMISSION:
+ * createGalleryWatermark(
+ *   'black',
+ *   snsId
+ * )
+ */
+export function createGalleryWatermark(
+  color: GalleryWatermarkColor = 'white',
+  text = '@frenesia0'
+): GalleryWatermark {
+  return {
+    color,
+    opacity:
+      getDefaultWatermarkOpacity(
+        color
+      ),
+    text:
+      normalizeWatermarkText(
+        text
+      ),
+    grid:
+      color !== 'none',
+  };
+}
+
+/**
+ * 保存済みウォーターマークを安全な値に整える。
+ *
+ * 古い投稿には watermark が存在しないため、
+ * ORIGINAL標準値を返す。
+ */
+export function normalizeGalleryWatermark(
+  watermark:
+    | GalleryWatermark
+    | undefined
+): GalleryWatermark {
+  if (!watermark) {
+    return {
+      ...DEFAULT_ORIGINAL_WATERMARK,
+    };
+  }
+
+  const color:
+    GalleryWatermarkColor =
+      watermark.color ===
+        'black' ||
+      watermark.color ===
+        'none'
+        ? watermark.color
+        : 'white';
+
+  const rawOpacity =
+    typeof watermark.opacity ===
+      'number' &&
+    Number.isFinite(
+      watermark.opacity
+    )
+      ? watermark.opacity
+      : getDefaultWatermarkOpacity(
+          color
+        );
+
+  const opacity =
+    Math.min(
+      100,
+      Math.max(
+        0,
+        rawOpacity
+      )
+    );
+
+  const text =
+    typeof watermark.text ===
+      'string'
+      ? normalizeWatermarkText(
+          watermark.text
+        )
+      : '@frenesia0';
+
+  return {
+    color,
+    opacity:
+      color === 'none'
+        ? 0
+        : opacity,
+    text,
+    grid:
+      color === 'none'
+        ? false
+        : watermark.grid !==
+          false,
+  };
+}
+
+/* =========================================================
+   IMAGE
+========================================================= */
+
 export interface GalleryImage {
   url: string;
   publicId: string;
+
+  /**
+   * この画像専用のウォーターマーク設定。
+   *
+   * optional にしてあるので、
+   * 既存投稿との互換性を維持できる。
+   */
+  watermark?: GalleryWatermark;
 }
+
+/* =========================================================
+   COMMISSION
+========================================================= */
 
 export interface GalleryCommission {
   artistName: string;
@@ -27,84 +260,202 @@ export interface GalleryCommission {
   snsUrl?: string;
 }
 
+/* =========================================================
+   SONG
+========================================================= */
+
 export interface GallerySong {
   title?: string;
   url?: string;
 }
 
-export type GalleryThumbnailMode = 'post' | 'custom';
+/* =========================================================
+   THUMBNAIL
+========================================================= */
+
+export type GalleryThumbnailMode =
+  | 'post'
+  | 'custom';
+
+/* =========================================================
+   POST
+========================================================= */
 
 export interface GalleryPost {
   id: string;
   title?: string;
   date: string;
-  category: GalleryCategory;
 
-  characters?: GalleryCharacter[];
-  tags?: GalleryTag[];
+  category:
+    GalleryCategory;
 
-  images?: GalleryImage[];
+  characters?:
+    GalleryCharacter[];
 
-  thumbnailMode?: GalleryThumbnailMode;
-  thumbnailIndex?: number;
-  thumbnailCrop?: CropValue;
-  customThumbnail?: GalleryImage;
+  tags?:
+    GalleryTag[];
 
-  commission?: GalleryCommission;
+  images?:
+    GalleryImage[];
 
-  // SONG PARODYのときだけ使用。どちらも任意
-  song?: GallerySong;
+  thumbnailMode?:
+    GalleryThumbnailMode;
 
-  // 旧形式との互換用
+  thumbnailIndex?:
+    number;
+
+  thumbnailCrop?:
+    CropValue;
+
+  customThumbnail?:
+    GalleryImage;
+
+  commission?:
+    GalleryCommission;
+
+  /**
+   * SONG PARODYのときだけ使用。
+   * title / url はどちらも任意。
+   */
+  song?:
+    GallerySong;
+
+  /* -------------------------
+     旧形式との互換用
+  ------------------------- */
+
   imageUrl?: string;
-  cloudinaryPublicId?: string;
-  legacyTags?: string[];
+
+  cloudinaryPublicId?:
+    string;
+
+  legacyTags?:
+    string[];
 
   authorId: string;
-  visibility: 'public';
+
+  visibility:
+    'public';
+
   createdAt: string;
 
-  [key: string]: unknown;
+  [key: string]:
+    unknown;
 }
 
-export const GALLERY_COLLECTION = 'gallery';
+/* =========================================================
+   COLLECTION
+========================================================= */
 
-export function getGalleryImages(post: GalleryPost): GalleryImage[] {
-  if (Array.isArray(post.images) && post.images.length > 0) {
+export const GALLERY_COLLECTION =
+  'gallery';
+
+/* =========================================================
+   IMAGE HELPERS
+========================================================= */
+
+export function getGalleryImages(
+  post: GalleryPost
+): GalleryImage[] {
+  if (
+    Array.isArray(
+      post.images
+    ) &&
+    post.images.length > 0
+  ) {
     return post.images.filter(
-      (image) =>
-        typeof image?.url === 'string' &&
+      (
+        image
+      ): image is GalleryImage =>
+        typeof image?.url ===
+          'string' &&
         image.url.length > 0 &&
-        typeof image?.publicId === 'string' &&
+        typeof image?.publicId ===
+          'string' &&
         image.publicId.length > 0
     );
   }
 
+  /**
+   * 旧形式との互換。
+   *
+   * watermark は存在しないため、
+   * 表示側では
+   * normalizeGalleryWatermark()
+   * を通す。
+   */
   if (
-    typeof post.imageUrl === 'string' &&
+    typeof post.imageUrl ===
+      'string' &&
     post.imageUrl.length > 0 &&
-    typeof post.cloudinaryPublicId === 'string' &&
-    post.cloudinaryPublicId.length > 0
+    typeof post.cloudinaryPublicId ===
+      'string' &&
+    post.cloudinaryPublicId.length >
+      0
   ) {
-    return [{
-      url: post.imageUrl,
-      publicId: post.cloudinaryPublicId,
-    }];
+    return [
+      {
+        url:
+          post.imageUrl,
+
+        publicId:
+          post.cloudinaryPublicId,
+      },
+    ];
   }
 
   return [];
 }
 
-export function getGalleryThumbnailIndex(post: GalleryPost): number {
-  const images = getGalleryImages(post);
-  if (images.length === 0) return 0;
+/**
+ * 画像に設定されたウォーターマークを取得する。
+ *
+ * 古い画像など設定がない場合は、
+ * ORIGINAL標準値
+ * WHITE / 25% / @frenesia0 / GRID ON
+ * を返す。
+ */
+export function getGalleryImageWatermark(
+  image: GalleryImage
+): GalleryWatermark {
+  return normalizeGalleryWatermark(
+    image.watermark
+  );
+}
+
+/* =========================================================
+   THUMBNAIL HELPERS
+========================================================= */
+
+export function getGalleryThumbnailIndex(
+  post: GalleryPost
+): number {
+  const images =
+    getGalleryImages(
+      post
+    );
+
+  if (
+    images.length === 0
+  ) {
+    return 0;
+  }
 
   const index =
-    typeof post.thumbnailIndex === 'number'
-      ? Math.floor(post.thumbnailIndex)
+    typeof post.thumbnailIndex ===
+      'number'
+      ? Math.floor(
+          post.thumbnailIndex
+        )
       : 0;
 
-  if (index < 0 || index >= images.length) return 0;
+  if (
+    index < 0 ||
+    index >= images.length
+  ) {
+    return 0;
+  }
+
   return index;
 }
 
@@ -112,127 +463,309 @@ export function getGalleryThumbnailImage(
   post: GalleryPost
 ): GalleryImage | null {
   if (
-    post.thumbnailMode === 'custom' &&
+    post.thumbnailMode ===
+      'custom' &&
     post.customThumbnail &&
-    typeof post.customThumbnail.url === 'string' &&
-    post.customThumbnail.url.length > 0 &&
-    typeof post.customThumbnail.publicId === 'string' &&
-    post.customThumbnail.publicId.length > 0
+    typeof post
+      .customThumbnail
+      .url === 'string' &&
+    post.customThumbnail
+      .url.length > 0 &&
+    typeof post
+      .customThumbnail
+      .publicId ===
+      'string' &&
+    post.customThumbnail
+      .publicId.length > 0
   ) {
     return post.customThumbnail;
   }
 
-  const images = getGalleryImages(post);
-  if (images.length === 0) return null;
-
-  return images[getGalleryThumbnailIndex(post)] ?? images[0] ?? null;
-}
-
-export function getGalleryCharacters(post: GalleryPost): GalleryCharacter[] {
-  if (Array.isArray(post.characters)) {
-    return post.characters.filter(
-      (character): character is GalleryCharacter =>
-        character === 'shiki' || character === 'solas'
+  const images =
+    getGalleryImages(
+      post
     );
+
+  if (
+    images.length === 0
+  ) {
+    return null;
   }
 
-  const rawTags = (post as { tags?: unknown }).tags;
-  const legacy = Array.isArray(rawTags)
-    ? rawTags
-    : Array.isArray(post.legacyTags)
-      ? post.legacyTags
-      : [];
-
-  return legacy.filter(
-    (item): item is GalleryCharacter =>
-      item === 'shiki' || item === 'solas'
+  return (
+    images[
+      getGalleryThumbnailIndex(
+        post
+      )
+    ] ??
+    images[0] ??
+    null
   );
 }
 
-export function getGalleryTags(post: GalleryPost): GalleryTag[] {
-  if (post.category === 'commission') return [];
+/* =========================================================
+   CHARACTER HELPERS
+========================================================= */
 
-  const rawTags = (post as { tags?: unknown }).tags;
-  const source = Array.isArray(rawTags)
-    ? rawTags
-    : Array.isArray(post.legacyTags)
-      ? post.legacyTags
-      : [];
-
-  const converted: GalleryTag[] = [];
-
-  for (const item of source) {
-    if (item === 'reference') converted.push('reference');
-
-    if (item === 'song-inspired' || item === 'song-parody') {
-      converted.push('song-parody');
-    }
-
-    if (item === 'manga') converted.push('manga');
-    if (item === 'rakugaki') converted.push('rakugaki');
-    if (item === 'tachie') converted.push('tachie');
+export function getGalleryCharacters(
+  post: GalleryPost
+): GalleryCharacter[] {
+  if (
+    Array.isArray(
+      post.characters
+    )
+  ) {
+    return post.characters.filter(
+      (
+        character
+      ): character is GalleryCharacter =>
+        character ===
+          'shiki' ||
+        character ===
+          'solas'
+    );
   }
 
-  return Array.from(new Set(converted));
+  const rawTags =
+    (
+      post as {
+        tags?: unknown;
+      }
+    ).tags;
+
+  const legacy =
+    Array.isArray(
+      rawTags
+    )
+      ? rawTags
+      : Array.isArray(
+            post.legacyTags
+          )
+        ? post.legacyTags
+        : [];
+
+  return legacy.filter(
+    (
+      item
+    ): item is GalleryCharacter =>
+      item === 'shiki' ||
+      item === 'solas'
+  );
 }
+
+/* =========================================================
+   TAG HELPERS
+========================================================= */
+
+export function getGalleryTags(
+  post: GalleryPost
+): GalleryTag[] {
+  if (
+    post.category ===
+    'commission'
+  ) {
+    return [];
+  }
+
+  const rawTags =
+    (
+      post as {
+        tags?: unknown;
+      }
+    ).tags;
+
+  const source =
+    Array.isArray(
+      rawTags
+    )
+      ? rawTags
+      : Array.isArray(
+            post.legacyTags
+          )
+        ? post.legacyTags
+        : [];
+
+  const converted:
+    GalleryTag[] = [];
+
+  for (
+    const item of source
+  ) {
+    if (
+      item ===
+      'reference'
+    ) {
+      converted.push(
+        'reference'
+      );
+    }
+
+    if (
+      item ===
+        'song-inspired' ||
+      item ===
+        'song-parody'
+    ) {
+      converted.push(
+        'song-parody'
+      );
+    }
+
+    if (
+      item ===
+      'manga'
+    ) {
+      converted.push(
+        'manga'
+      );
+    }
+
+    if (
+      item ===
+      'rakugaki'
+    ) {
+      converted.push(
+        'rakugaki'
+      );
+    }
+
+    if (
+      item ===
+      'tachie'
+    ) {
+      converted.push(
+        'tachie'
+      );
+    }
+  }
+
+  return Array.from(
+    new Set(
+      converted
+    )
+  );
+}
+
+/* =========================================================
+   COMMISSION HELPERS
+========================================================= */
 
 export function getGalleryCommission(
   post: GalleryPost
 ): GalleryCommission | null {
   if (
-    post.category !== 'commission' ||
+    post.category !==
+      'commission' ||
     !post.commission ||
-    typeof post.commission.artistName !== 'string'
+    typeof post
+      .commission
+      .artistName !==
+      'string'
   ) {
     return null;
   }
 
   return {
-    artistName: post.commission.artistName,
+    artistName:
+      post.commission
+        .artistName,
+
     snsId:
-      typeof post.commission.snsId === 'string'
-        ? post.commission.snsId
+      typeof post
+        .commission
+        .snsId === 'string'
+        ? post.commission
+            .snsId
         : undefined,
+
     snsUrl:
-      typeof post.commission.snsUrl === 'string'
-        ? post.commission.snsUrl
+      typeof post
+        .commission
+        .snsUrl === 'string'
+        ? post.commission
+            .snsUrl
         : undefined,
   };
 }
 
-export function getGallerySong(post: GalleryPost): GallerySong | null {
+/* =========================================================
+   SONG HELPERS
+========================================================= */
+
+export function getGallerySong(
+  post: GalleryPost
+): GallerySong | null {
   if (
-    post.category !== 'original' ||
-    !getGalleryTags(post).includes('song-parody')
+    post.category !==
+      'original' ||
+    !getGalleryTags(
+      post
+    ).includes(
+      'song-parody'
+    )
   ) {
     return null;
   }
 
-  const song = post.song;
-  if (!song || typeof song !== 'object') return null;
+  const song =
+    post.song;
+
+  if (
+    !song ||
+    typeof song !==
+      'object'
+  ) {
+    return null;
+  }
 
   const title =
-    typeof song.title === 'string' && song.title.trim()
+    typeof song.title ===
+      'string' &&
+    song.title.trim()
       ? song.title.trim()
       : undefined;
 
   const url =
-    typeof song.url === 'string' && song.url.trim()
+    typeof song.url ===
+      'string' &&
+    song.url.trim()
       ? song.url.trim()
       : undefined;
 
-  if (!title && !url) return null;
-  return { title, url };
+  if (
+    !title &&
+    !url
+  ) {
+    return null;
+  }
+
+  return {
+    title,
+    url,
+  };
 }
 
-export async function fetchGalleryPosts(): Promise<GalleryPost[]> {
-  return fetchList<GalleryPost>(GALLERY_COLLECTION);
+/* =========================================================
+   FETCH / SAVE / SUBSCRIBE
+========================================================= */
+
+export async function fetchGalleryPosts(): Promise<
+  GalleryPost[]
+> {
+  return fetchList<GalleryPost>(
+    GALLERY_COLLECTION
+  );
 }
 
 export async function saveGalleryPosts(
-  previous: GalleryPost[],
-  next: GalleryPost[],
-  uid: string | null,
+  previous:
+    GalleryPost[],
+
+  next:
+    GalleryPost[],
+
+  uid:
+    string | null
 ): Promise<void> {
   await syncList<GalleryPost>(
     GALLERY_COLLECTION,
@@ -243,7 +776,8 @@ export async function saveGalleryPosts(
 }
 
 export function subscribeGallery(
-  onChange: () => void
+  onChange:
+    () => void
 ): () => void {
   return subscribeTable(
     GALLERY_COLLECTION,
