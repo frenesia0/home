@@ -302,12 +302,11 @@ export async function POST(
       await fetchAllCloudinaryImages();
 
     const orphans =
-      cloudinaryImages.filter(
-        image =>
-          !usedPublicIds.has(
-            image.publicId
-          )
-      );
+  cloudinaryImages.filter(
+    image =>
+      !usedPublicIds.has(image.publicId) &&
+      !image.publicId.startsWith('samples/')
+  );
 
     return NextResponse.json({
       ok: true,
