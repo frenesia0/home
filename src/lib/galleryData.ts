@@ -1,6 +1,7 @@
 'use client';
 
 import { fetchList, syncList, subscribeTable } from '@/lib/db';
+import type { CropValue } from '@/components/ui/CropEditor';
 
 export type GalleryCategory = 'original' | 'commission';
 
@@ -38,8 +39,18 @@ export interface GalleryPost {
   // 1投稿に複数画像
   images?: GalleryImage[];
 
-  // 詳細画面で表示する自由メモ
-  memo?: string;
+  /**
+   * Gallery一覧の代表サムネイル設定。
+   * 複数枚投稿でも、好きな画像を代表に選べる。
+   * 0 = 1枚目、1 = 2枚目...
+   */
+  thumbnailIndex?: number;
+
+  /**
+   * 選んだ代表画像の1:1トリミング情報。
+   * 元画像自体は切り取らず、一覧で見せる範囲だけ記録する。
+   */
+  thumbnailCrop?: CropValue;
 
   // COMMISSIONのときだけ使用
   commission?: GalleryCommission;
@@ -86,6 +97,38 @@ export function getGalleryImages(post: GalleryPost): GalleryImage[] {
   }
 
   return [];
+}
+
+/**
+ * サムネイルに使う画像の番号を安全に取得する。
+ * 未設定・範囲外なら1枚目を使う。
+ */
+export function getGalleryThumbnailIndex(post: GalleryPost): number {
+  const images = getGalleryImages(post);
+
+  if (images.length === 0) return 0;
+
+  const index =
+    typeof post.thumbnailIndex === 'number'
+      ? Math.floor(post.thumbnailIndex)
+      : 0;
+
+  if (index < 0 || index >= images.length) return 0;
+
+  return index;
+}
+
+/**
+ * サムネイルに使う代表画像を取得する。
+ */
+export function getGalleryThumbnailImage(
+  post: GalleryPost
+): GalleryImage | null {
+  const images = getGalleryImages(post);
+
+  if (images.length === 0) return null;
+
+  return images[getGalleryThumbnailIndex(post)] ?? images[0] ?? null;
 }
 
 /**
