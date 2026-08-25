@@ -258,6 +258,13 @@ export default function AddIllustrationPage() {
     setSongUrl,
   ] =
     useState('');
+    const [
+    songAudio,
+    setSongAudio,
+  ] =
+    useState<File | null>(
+      null
+    );
 
 
   /* =======================================================
@@ -488,12 +495,15 @@ export default function AddIllustrationPage() {
      SONG RESET
   ======================================================= */
 
-  useEffect(() => {
+    useEffect(() => {
     if (
       !isSongParody
     ) {
       setSongTitle('');
       setSongUrl('');
+      setSongAudio(
+        null
+      );
     }
   }, [
     isSongParody,
@@ -599,9 +609,12 @@ export default function AddIllustrationPage() {
       next ===
       'commission'
     ) {
-      setTags([]);
+            setTags([]);
       setSongTitle('');
       setSongUrl('');
+      setSongAudio(
+        null
+      );
 
       setWatermarkSettings(
         (current) =>
@@ -1018,7 +1031,71 @@ export default function AddIllustrationPage() {
           result.public_id,
       };
     };
+  const uploadAudioToCloudinary =
+    async (
+      file: File
+    ): Promise<string> => {
+      const cloudName =
+        process.env
+          .NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+          ?.trim();
 
+      const uploadPreset =
+        process.env
+          .NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET
+          ?.trim();
+
+      if (
+        !cloudName ||
+        !uploadPreset
+      ) {
+        throw new Error(
+          'Cloudinaryの設定が見つかりません。'
+        );
+      }
+
+      const form =
+        new FormData();
+
+      form.append(
+        'file',
+        file
+      );
+
+      form.append(
+        'upload_preset',
+        uploadPreset
+      );
+
+      const response =
+        await fetch(
+          `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`,
+          {
+            method:
+              'POST',
+
+            body:
+              form,
+          }
+        );
+
+      const result =
+        (await response.json()) as
+          CloudinaryUploadResponse;
+
+      if (
+        !response.ok ||
+        !result.secure_url
+      ) {
+        throw new Error(
+          result.error
+            ?.message ||
+            'MP3のアップロードに失敗しました。'
+        );
+      }
+
+      return result.secure_url;
+    };
 
   /* =======================================================
      SUBMIT
@@ -1170,7 +1247,26 @@ export default function AddIllustrationPage() {
             }
           );
         }
+        /* ---------------------------------------------------
+           SONG AUDIO
+        --------------------------------------------------- */
 
+        let uploadedSongAudioUrl:
+          string | undefined;
+
+        if (
+          isSongParody &&
+          songAudio
+        ) {
+          setUploadProgress(
+            'MP3をアップロード中...'
+          );
+
+          uploadedSongAudioUrl =
+            await uploadAudioToCloudinary(
+              songAudio
+            );
+        }
 
         /* ---------------------------------------------------
            CUSTOM THUMBNAIL
@@ -1257,11 +1353,12 @@ export default function AddIllustrationPage() {
                 }
               : undefined,
 
-          song:
+                    song:
             isSongParody &&
             (
               songTitle.trim() ||
-              songUrl.trim()
+              songUrl.trim() ||
+              uploadedSongAudioUrl
             )
               ? {
                   title:
@@ -1271,6 +1368,9 @@ export default function AddIllustrationPage() {
                   url:
                     songUrl.trim() ||
                     undefined,
+
+                  audioUrl:
+                    uploadedSongAudioUrl,
                 }
               : undefined,
 
@@ -2576,6 +2676,77 @@ export default function AddIllustrationPage() {
                             }
                           />
                         </label>
+                                            <label
+                      style={
+                        fieldStyle
+                      }
+                    >
+                      <span>
+                        MP3
+                      </span>
+
+                      <input
+                        type="file"
+                        accept=".mp3,audio/mpeg"
+                        onChange={(
+                          e
+                        ) => {
+                          const file =
+                            e.target
+                              .files?.[0] ??
+                            null;
+
+                          if (
+                            file &&
+                            file.type &&
+                            file.type !==
+                              'audio/mpeg'
+                          ) {
+                            setSongAudio(
+                              null
+                            );
+
+                            setError(
+                              'MP3ファイルを選択してください。'
+                            );
+
+                            e.currentTarget.value =
+                              '';
+
+                            return;
+                          }
+
+                          setSongAudio(
+                            file
+                          );
+
+                          setError('');
+                        }}
+                        style={{
+                          color:
+                            '#f5f5f5',
+                        }}
+                      />
+
+                      {songAudio && (
+                        <span
+                          style={{
+                            color:
+                              'rgba(255,255,255,.5)',
+
+                            fontSize:
+                              '10px',
+
+                            lineHeight:
+                              1.5,
+                          }}
+                        >
+                          選択中: {
+                            songAudio.name
+                          }
+                        </span>
+                      )}
+                    </label>
                       </div>
                     );
                   }
