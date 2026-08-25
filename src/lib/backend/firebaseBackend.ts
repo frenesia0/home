@@ -540,3 +540,63 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
 
   return downloadUrl;
 },
+        async listFiles() {
+      const res =
+        await stMod.listAll(
+          stMod.ref(
+            storage,
+            'ohome'
+          )
+        );
+
+      return Promise.all(
+        res.items.map(
+          async (it) => {
+            const [
+              ref,
+              meta,
+            ] =
+              await Promise.all(
+                [
+                  stMod.getDownloadURL(
+                    it
+                  ),
+                  stMod.getMetadata(
+                    it
+                  ),
+                ]
+              );
+
+            return {
+              ref,
+              size:
+                meta.size ??
+                0,
+            };
+          }
+        )
+      );
+    },
+
+    async deleteFile(ref) {
+      await stMod.deleteObject(
+        stMod.ref(
+          storage,
+          ref
+        )
+      );
+    },
+
+    async deleteMember(id) {
+      await deleteDoc(
+        doc(
+          db,
+          'profiles',
+          id
+        )
+      );
+    },
+  };
+
+  void deleteDoc;
+}
