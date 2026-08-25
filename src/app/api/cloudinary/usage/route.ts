@@ -25,6 +25,24 @@ type CloudinaryResourcesResponse = {
   };
 };
 
+type CloudinaryUsageValue = {
+  usage?: number;
+  limit?: number;
+  used_percent?: number;
+};
+
+type CloudinaryUsageResponse = {
+  storage?: CloudinaryUsageValue;
+  credits?: CloudinaryUsageValue;
+  bandwidth?: CloudinaryUsageValue;
+  transformations?: CloudinaryUsageValue;
+  resources?: number;
+  plan?: string;
+  error?: {
+    message?: string;
+  };
+};
+
 async function verifyAdminToken(
   token: string
 ): Promise<
@@ -129,7 +147,7 @@ async function verifyAdminToken(
   return { ok: true };
 }
 
-async function fetchCloudinaryUsage() {
+function getCloudinaryConfig() {
   const cloudName =
     process.env.CLOUDINARY_CLOUD_NAME?.trim();
 
@@ -139,7 +157,11 @@ async function fetchCloudinaryUsage() {
   const apiSecret =
     process.env.CLOUDINARY_API_SECRET?.trim();
 
-  if (!cloudName || !apiKey || !apiSecret) {
+  if (
+    !cloudName ||
+    !apiKey ||
+    !apiSecret
+  ) {
     throw new Error(
       'Cloudinaryの管理用設定が不足しています。'
     );
@@ -149,7 +171,25 @@ async function fetchCloudinaryUsage() {
     `${apiKey}:${apiSecret}`
   ).toString('base64');
 
-  let nextCursor: string | undefined;
+  return {
+    cloudName,
+    auth,
+  };
+}
+
+/**
+ * 自分の画像だけを数える。
+ * samples/ はCloudinary初期サンプルなので除外。
+ */
+async function fetchStoredImages() {
+  const {
+    cloudName,
+    auth,
+  } = getCloudinaryConfig();
+
+  let nextCursor:
+    | string
+    | undefined;
 
   let imageCount = 0;
   let totalBytes = 0;
@@ -170,19 +210,20 @@ async function fetchCloudinaryUsage() {
       );
     }
 
-    const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${encodeURIComponent(
-        cloudName
-      )}/resources/image/upload?${params.toString()}`,
-      {
-        method: 'GET',
-        headers: {
-          Authorization:
-            `Basic ${auth}`,
-        },
-        cache: 'no-store',
-      }
-    );
+    const response =
+      await fetch(
+        `https://api.cloudinary.com/v1_1/${encodeURIComponent(
+          cloudName
+        )}/resources/image/upload?${params.toString()}`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization:
+              `Basic ${auth}`,
+          },
+          cache: 'no-store',
+        }
+      );
 
     const result =
       (await response.json()) as CloudinaryResourcesResponse;
@@ -205,8 +246,6 @@ async function fetchCloudinaryUsage() {
         continue;
       }
 
-      // Cloudinaryが最初から用意している
-      // samples フォルダは容量計算から除外
       if (
         publicId.startsWith(
           'samples/'
@@ -237,6 +276,44 @@ async function fetchCloudinaryUsage() {
     imageCount,
     totalBytes,
   };
+}
+
+/**
+ * Cloudinary公式のUsage API。
+ * アカウント側のStorage上限・使用率などを取得。
+ */
+async function fetchOfficialUsage() {
+  const {
+    cloudName,
+    auth,
+  } = getCloudinaryConfig();
+
+  const response =
+    await fetch(
+      `https://api.cloudinary.com/v1_1/${encodeURIComponent(
+        cloudName
+      )}/usage`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization:
+            `Basic ${auth}`,
+        },
+        cache: 'no-store',
+      }
+    );
+
+  const result =
+    (await response.json()) as CloudinaryUsageResponse;
+
+  if (!response.ok) {
+    throw new Error(
+      result.error?.message ??
+        `Cloudinary使用状況を取得できませんでした（HTTP ${response.status}）。`
+    );
+  }
+
+  return result;
 }
 
 export async function GET(
@@ -286,15 +363,61 @@ export async function GET(
       );
     }
 
-    const usage =
-      await fetchCloudinaryUsage();
+    const [
+      stored,
+      official,
+    ] = await Promise.all([
+      fetchStoredImages(),
+      fetchOfficialUsage(),
+    ]);
+
+    const storageUsage =
+      typeof official.storage?.usage ===
+        'number'
+        ? official.storage.usage
+        : null;
+
+    const storageLimit =
+      typeof official.storage?.limit ===
+        'number'
+        ? official.storage.limit
+        : null;
+
+    const storagePercent =
+      typeof official.storage
+        ?.used_percent === 'number'
+        ? official.storage
+            .used_percent
+        : (
+            storageUsage !== null &&
+            storageLimit !== null &&
+            storageLimit > 0
+          )
+          ? (
+              storageUsage /
+              storageLimit
+            ) * 100
+          : null;
 
     return NextResponse.json({
       ok: true,
+
+      // 自分でアップした画像
       imageCount:
-        usage.imageCount,
+        stored.imageCount,
       totalBytes:
-        usage.totalBytes,
+        stored.totalBytes,
+
+      // Cloudinary公式の使用状況
+      storageUsage,
+      storageLimit,
+      storagePercent,
+
+      plan:
+        official.plan ?? null,
+
+      credits:
+        official.credits ?? null,
     });
   } catch (error) {
     console.error(
