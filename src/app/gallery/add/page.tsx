@@ -34,8 +34,8 @@ const DEFAULT_CROP: CropValue = {
 };
 
 /**
- * 入力日付から YYYYMMDD-01 形式の作品IDを作る。
- * 同じ日付の既存IDを確認し、最大番号の次を自動で採番する。
+ * 日付から YYYYMMDD-01 形式の作品IDを作る。
+ * 同じ日の既存IDを確認し、01から順に空いている番号を自動採番する。
  *
  * 例:
  * 2026-08-20 の1件目 → 20260820-01
@@ -47,23 +47,26 @@ function createGalleryId(
 ): string {
   const datePart = date.replaceAll('-', '');
 
-  const usedNumbers = existingPosts
-    .map((post) => {
-      const match = post.id.match(
-        new RegExp(`^${datePart}-(\\d+)$`)
-      );
+  const used = new Set(
+    existingPosts
+      .map((post) => {
+        const match = post.id.match(
+          new RegExp(`^${datePart}-(\\d+)$`)
+        );
 
-      if (!match) return null;
+        if (!match) return null;
 
-      const number = Number(match[1]);
-      return Number.isFinite(number) ? number : null;
-    })
-    .filter((value): value is number => value !== null);
+        const number = Number(match[1]);
+        return Number.isFinite(number) ? number : null;
+      })
+      .filter((value): value is number => value !== null)
+  );
 
-  const nextNumber =
-    usedNumbers.length > 0
-      ? Math.max(...usedNumbers) + 1
-      : 1;
+  let nextNumber = 1;
+
+  while (used.has(nextNumber)) {
+    nextNumber += 1;
+  }
 
   return `${datePart}-${String(nextNumber).padStart(2, '0')}`;
 }
@@ -88,16 +91,21 @@ export default function AddIllustrationPage() {
   const [snsUrl, setSnsUrl] = useState('');
 
   const [images, setImages] = useState<File[]>([]);
-  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [previewUrls, setPreviewUrls] =
+    useState<string[]>([]);
 
   const [thumbnailMode, setThumbnailMode] =
     useState<GalleryThumbnailMode>('post');
-  const [thumbnailIndex, setThumbnailIndex] = useState(0);
+
+  const [thumbnailIndex, setThumbnailIndex] =
+    useState(0);
+
   const [thumbnailCrop, setThumbnailCrop] =
     useState<CropValue>(DEFAULT_CROP);
 
   const [customThumbnail, setCustomThumbnail] =
     useState<File | null>(null);
+
   const [customThumbnailUrl, setCustomThumbnailUrl] =
     useState<string | null>(null);
 
@@ -107,7 +115,8 @@ export default function AddIllustrationPage() {
   const [error, setError] = useState('');
 
   const isSongParody =
-    category === 'original' && tags.includes('song-parody');
+    category === 'original' &&
+    tags.includes('song-parody');
 
   useEffect(() => {
     const urls = images.map((image) =>
@@ -139,14 +148,9 @@ export default function AddIllustrationPage() {
   }, [customThumbnail]);
 
   useEffect(() => {
-    if (
-      thumbnailIndex >=
-      images.length
-    ) {
+    if (thumbnailIndex >= images.length) {
       setThumbnailIndex(0);
-      setThumbnailCrop(
-        DEFAULT_CROP
-      );
+      setThumbnailCrop(DEFAULT_CROP);
     }
   }, [images.length, thumbnailIndex]);
 
@@ -157,35 +161,25 @@ export default function AddIllustrationPage() {
     }
   }, [isSongParody]);
 
-  const thumbnailSrc =
-    useMemo(() => {
-      if (
-        thumbnailMode ===
-        'custom'
-      ) {
-        return customThumbnailUrl;
-      }
+  const thumbnailSrc = useMemo(() => {
+    if (thumbnailMode === 'custom') {
+      return customThumbnailUrl;
+    }
 
-      return (
-        previewUrls[
-          thumbnailIndex
-        ] ?? null
-      );
-    }, [
-      thumbnailMode,
-      customThumbnailUrl,
-      previewUrls,
-      thumbnailIndex,
-    ]);
+    return previewUrls[thumbnailIndex] ?? null;
+  }, [
+    thumbnailMode,
+    customThumbnailUrl,
+    previewUrls,
+    thumbnailIndex,
+  ]);
 
   const changeCategory = (
     next: GalleryCategory
   ) => {
     setCategory(next);
 
-    if (
-      next === 'commission'
-    ) {
+    if (next === 'commission') {
       setTags([]);
       setSongTitle('');
       setSongUrl('');
@@ -198,13 +192,9 @@ export default function AddIllustrationPage() {
     setCharacters((current) =>
       current.includes(character)
         ? current.filter(
-            (item) =>
-              item !== character
+            (item) => item !== character
           )
-        : [
-            ...current,
-            character,
-          ]
+        : [...current, character]
     );
   };
 
@@ -214,8 +204,7 @@ export default function AddIllustrationPage() {
     setTags((current) =>
       current.includes(tag)
         ? current.filter(
-            (item) =>
-              item !== tag
+            (item) => item !== tag
           )
         : [...current, tag]
     );
@@ -232,16 +221,12 @@ export default function AddIllustrationPage() {
     const selected =
       Array.from(files).filter(
         (file) =>
-          file.type.startsWith(
-            'image/'
-          )
+          file.type.startsWith('image/')
       );
 
     setImages(selected);
     setThumbnailIndex(0);
-    setThumbnailCrop(
-      DEFAULT_CROP
-    );
+    setThumbnailCrop(DEFAULT_CROP);
     setError('');
   };
 
@@ -382,6 +367,10 @@ export default function AddIllustrationPage() {
       setUploadProgress('');
 
       try {
+        /*
+         * 先に既存投稿を取得して、その時点で空いている日付IDを決める。
+         * UUIDはもう新規作成しない。
+         */
         const previous =
           await fetchGalleryPosts();
 
@@ -504,6 +493,10 @@ export default function AddIllustrationPage() {
           user.id
         );
 
+        /*
+         * 作品詳細ページへそのまま移動。
+         * 例: /gallery/20260820-01
+         */
         router.push(
           `/gallery/${newId}`
         );
@@ -715,8 +708,7 @@ export default function AddIllustrationPage() {
                               '11px',
                           }}
                         >
-                          {index +
-                            1}
+                          {index + 1}
                         </span>
 
                         <button
@@ -822,12 +814,8 @@ export default function AddIllustrationPage() {
                       <span
                         key={`${file.name}-${index}`}
                       >
-                        {index +
-                          1}
-                        .{' '}
-                        {
-                          file.name
-                        }
+                        {index + 1}.{' '}
+                        {file.name}
                       </span>
                     )
                   )}
@@ -969,9 +957,7 @@ export default function AddIllustrationPage() {
                             }}
                           >
                             <img
-                              src={
-                                url
-                              }
+                              src={url}
                               alt={`${index + 1}枚目`}
                               style={{
                                 width:
@@ -1110,8 +1096,7 @@ export default function AddIllustrationPage() {
                 value={date}
                 onChange={(e) =>
                   setDate(
-                    e.target
-                      .value
+                    e.target.value
                   )
                 }
                 required
@@ -1398,8 +1383,7 @@ export default function AddIllustrationPage() {
                         }
                         onChange={(e) =>
                           setSongTitle(
-                            e.target
-                              .value
+                            e.target.value
                           )
                         }
                         placeholder="曲名"
@@ -1425,8 +1409,7 @@ export default function AddIllustrationPage() {
                         }
                         onChange={(e) =>
                           setSongUrl(
-                            e.target
-                              .value
+                            e.target.value
                           )
                         }
                         placeholder="https://..."
@@ -1480,8 +1463,7 @@ export default function AddIllustrationPage() {
                     }
                     onChange={(e) =>
                       setArtistName(
-                        e.target
-                          .value
+                        e.target.value
                       )
                     }
                     placeholder="作者名"
@@ -1508,8 +1490,7 @@ export default function AddIllustrationPage() {
                     }
                     onChange={(e) =>
                       setSnsId(
-                        e.target
-                          .value
+                        e.target.value
                       )
                     }
                     placeholder="@example"
@@ -1535,8 +1516,7 @@ export default function AddIllustrationPage() {
                     }
                     onChange={(e) =>
                       setSnsUrl(
-                        e.target
-                          .value
+                        e.target.value
                       )
                     }
                     placeholder="https://..."
