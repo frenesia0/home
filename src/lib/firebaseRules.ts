@@ -35,12 +35,12 @@ service cloud.firestore {
 
     // 콘텐츠 컬렉션 목록 — 여기 없는 이름은 아무 권한도 없다
     function isContent(name) {
-      return name in [
-        'posts', 'guestbook', 'characters', 'relations', 'gallery', 'roadview',
-        'trpg_logs', 'trpg_log_bodies', 'trpg_chars', 'dotori', 'playlog', 'rp_rooms', 'threads',
-        'diary', 'memos', 'commissions', 'applicants', 'moods'
-      ];
-    }
+  return name in [
+    'posts', 'guestbook', 'characters', 'relations', 'gallery', 'illustrations', 'roadview',
+    'trpg_logs', 'trpg_log_bodies', 'trpg_chars', 'dotori', 'playlog', 'rp_rooms', 'threads',
+    'diary', 'memos', 'commissions', 'applicants', 'moods'
+  ];
+}
 
     // ── 소유자(관리자) 지정 — 아직 없을 때 딱 한 번 ──────────────
     match /meta/owner {
