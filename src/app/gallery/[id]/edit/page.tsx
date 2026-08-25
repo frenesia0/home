@@ -14,8 +14,12 @@ import { backend } from '@/lib/backend';
 import {
   fetchGalleryPosts,
   getGalleryCharacters,
+  createGalleryWatermark,
+  getDefaultWatermarkOpacity,
   getGalleryImages,
   getGallerySong,
+  normalizeGalleryWatermark,
+  normalizeWatermarkText,
   saveGalleryPosts,
   type GalleryCategory,
   type GalleryCharacter,
@@ -23,12 +27,15 @@ import {
   type GalleryPost,
   type GalleryTag,
   type GalleryThumbnailMode,
+  type GalleryWatermark,
+  type GalleryWatermarkColor,
 } from '@/lib/galleryData';
 import {
   CropEditor,
   CropImg,
   type CropValue,
 } from '@/components/ui/CropEditor';
+import { WatermarkedImage } from '@/components/gallery/WatermarkedImage';
 
 type CloudinaryUploadResponse = {
   secure_url?: string;
@@ -53,6 +60,44 @@ const DEFAULT_CROP: CropValue = {
   y: 0,
   scale: 1,
 };
+
+
+const ORIGINAL_WATERMARK_ID = '@frenesia0';
+const DEFAULT_GRID_SIZE = 180;
+
+function clampOpacity(value: number) {
+  return Math.min(100, Math.max(0, Math.round(value)));
+}
+
+function clampGridSize(value: number) {
+  return Math.min(500, Math.max(60, Math.round(value / 10) * 10));
+}
+
+function defaultWatermarkFor(
+  category: GalleryCategory,
+  snsId: string
+): GalleryWatermark {
+  const text =
+    category === 'commission'
+      ? normalizeWatermarkText(snsId)
+      : ORIGINAL_WATERMARK_ID;
+
+  return {
+    ...createGalleryWatermark('white', text),
+    gridSize: DEFAULT_GRID_SIZE,
+  };
+}
+
+function watermarkForExisting(
+  image: GalleryImage,
+  category: GalleryCategory,
+  snsId: string
+): GalleryWatermark {
+  if (image.watermark) {
+    return normalizeGalleryWatermark(image.watermark);
+  }
+  return defaultWatermarkFor(category, snsId);
+}
 
 export default function EditIllustrationPage() {
   const router = useRouter();
@@ -95,6 +140,8 @@ export default function EditIllustrationPage() {
     useState<File[]>([]);
   const [newImageUrls, setNewImageUrls] =
     useState<string[]>([]);
+  const [newImageWatermarks, setNewImageWatermarks] =
+    useState<GalleryWatermark[]>([]);
 
   const [thumbnailMode, setThumbnailMode] =
     useState<GalleryThumbnailMode>('post');
@@ -193,7 +240,16 @@ export default function EditIllustrationPage() {
         const imgs =
           getGalleryImages(found);
 
-        setExistingImages(imgs);
+        setExistingImages(
+          imgs.map((image) => ({
+            ...image,
+            watermark: watermarkForExisting(
+              image,
+              found.category,
+              found.commission?.snsId ?? ''
+            ),
+          }))
+        );
 
         setThumbnailMode(
           found.thumbnailMode ??
@@ -401,6 +457,13 @@ export default function EditIllustrationPage() {
       ...selected,
     ]);
 
+    setNewImageWatermarks((current) => [
+      ...current,
+      ...selected.map(() =>
+        defaultWatermarkFor(category, snsId)
+      ),
+    ]);
+
     setError('');
   };
 
@@ -506,6 +569,9 @@ export default function EditIllustrationPage() {
       );
 
     setNewImages(next);
+    setNewImageWatermarks((current) =>
+      current.filter((_, i) => i !== index)
+    );
     setThumbnailCrop(
       DEFAULT_CROP
     );
@@ -529,6 +595,71 @@ export default function EditIllustrationPage() {
           index: 0,
         });
       }
+    }
+  };
+
+  const updateExistingWatermark = (
+    index: number,
+    patch: Partial<GalleryWatermark>
+  ) => {
+    setExistingImages((current) =>
+      current.map((image, i) =>
+        i === index
+          ? {
+              ...image,
+              watermark: {
+                ...watermarkForExisting(image, category, snsId),
+                ...patch,
+              },
+            }
+          : image
+      )
+    );
+  };
+
+  const updateNewWatermark = (
+    index: number,
+    patch: Partial<GalleryWatermark>
+  ) => {
+    setNewImageWatermarks((current) =>
+      current.map((watermark, i) =>
+        i === index
+          ? { ...watermark, ...patch }
+          : watermark
+      )
+    );
+  };
+
+  const changeWatermarkColor = (
+    kind: 'existing' | 'new',
+    index: number,
+    color: GalleryWatermarkColor
+  ) => {
+    const patch: Partial<GalleryWatermark> =
+      color === 'none'
+        ? { color: 'none', opacity: 0, grid: false }
+        : {
+            color,
+            opacity: getDefaultWatermarkOpacity(color),
+            grid: true,
+          };
+
+    if (kind === 'existing') {
+      updateExistingWatermark(index, patch);
+    } else {
+      updateNewWatermark(index, patch);
+    }
+  };
+
+  const updateWatermark = (
+    kind: 'existing' | 'new',
+    index: number,
+    patch: Partial<GalleryWatermark>
+  ) => {
+    if (kind === 'existing') {
+      updateExistingWatermark(index, patch);
+    } else {
+      updateNewWatermark(index, patch);
     }
   };
 
@@ -799,16 +930,30 @@ export default function EditIllustrationPage() {
               newImages[i]
             );
 
-          uploadedNewImages.push(
-            uploaded
+          const watermark = normalizeGalleryWatermark(
+            newImageWatermarks[i] ??
+              defaultWatermarkFor(category, snsId)
           );
+
+          uploadedNewImages.push({
+            ...uploaded,
+            watermark: {
+              ...watermark,
+              opacity: clampOpacity(watermark.opacity),
+              gridSize: clampGridSize(watermark.gridSize),
+              text: normalizeWatermarkText(watermark.text),
+            },
+          });
           newlyUploadedCloudinaryIds.push(
             uploaded.publicId
           );
         }
 
         const finalImages = [
-          ...existingImages,
+          ...existingImages.map((image) => ({
+            ...image,
+            watermark: normalizeGalleryWatermark(image.watermark),
+          })),
           ...uploadedNewImages,
         ];
 
@@ -1081,6 +1226,171 @@ export default function EditIllustrationPage() {
       }
     };
 
+
+  const renderWatermarkEditor = (
+    kind: 'existing' | 'new',
+    index: number,
+    label: string,
+    watermark: GalleryWatermark
+  ) => {
+    const disabled = watermark.color === 'none';
+    const gridDisabled = disabled || !watermark.grid;
+
+    return (
+      <div
+        key={`${kind}-${index}-watermark`}
+        style={{
+          padding: '16px',
+          border: '1px solid rgba(255,255,255,.14)',
+          borderRadius: '10px',
+          background: 'rgba(255,255,255,.025)',
+          display: 'grid',
+          gap: '18px',
+        }}
+      >
+        <strong style={{ fontSize: '12px', letterSpacing: '.08em' }}>
+          {label}
+        </strong>
+
+        <div style={{ display: 'grid', gap: '8px' }}>
+          <span style={{ color: 'rgba(255,255,255,.5)', fontSize: '10px', letterSpacing: '.12em' }}>
+            COLOR
+          </span>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '7px' }}>
+            {([
+              ['white', 'WHITE'],
+              ['black', 'BLACK'],
+              ['none', 'NONE'],
+            ] as const).map(([value, text]) => {
+              const active = watermark.color === value;
+              return (
+                <button
+                  type="button"
+                  key={value}
+                  onClick={() => changeWatermarkColor(kind, index, value)}
+                  style={{
+                    minHeight: '38px',
+                    borderRadius: '8px',
+                    border: active
+                      ? '1px solid rgba(255,255,255,.9)'
+                      : '1px solid rgba(255,255,255,.2)',
+                    background: active
+                      ? 'rgba(255,255,255,.14)'
+                      : 'rgba(255,255,255,.035)',
+                    color: '#f5f5f5',
+                    cursor: 'pointer',
+                    fontSize: '11px',
+                    fontWeight: active ? 700 : 500,
+                  }}
+                >
+                  {text}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gap: '9px', opacity: disabled ? 0.35 : 1 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: 'rgba(255,255,255,.5)', fontSize: '10px', letterSpacing: '.12em' }}>
+              OPACITY
+            </span>
+            <strong style={{ fontSize: '12px' }}>{watermark.opacity}%</strong>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '38px 1fr 38px', gap: '8px', alignItems: 'center' }}>
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => updateWatermark(kind, index, { opacity: clampOpacity(watermark.opacity - 1) })}
+              style={{ height: '36px' }}
+            >−</button>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              disabled={disabled}
+              value={watermark.opacity}
+              onChange={(e) => updateWatermark(kind, index, { opacity: clampOpacity(Number(e.target.value)) })}
+              style={{ width: '100%' }}
+            />
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => updateWatermark(kind, index, { opacity: clampOpacity(watermark.opacity + 1) })}
+              style={{ height: '36px' }}
+            >＋</button>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gap: '9px', opacity: gridDisabled ? 0.35 : 1 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: 'rgba(255,255,255,.5)', fontSize: '10px', letterSpacing: '.12em' }}>
+              GRID SIZE
+            </span>
+            <strong style={{ fontSize: '12px' }}>{watermark.gridSize}</strong>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '38px 1fr 38px', gap: '8px', alignItems: 'center' }}>
+            <button
+              type="button"
+              disabled={gridDisabled}
+              onClick={() => updateWatermark(kind, index, { gridSize: clampGridSize(watermark.gridSize - 10) })}
+              style={{ height: '36px' }}
+            >−</button>
+            <input
+              type="range"
+              min="60"
+              max="500"
+              step="10"
+              disabled={gridDisabled}
+              value={watermark.gridSize}
+              onChange={(e) => updateWatermark(kind, index, { gridSize: clampGridSize(Number(e.target.value)) })}
+              style={{ width: '100%' }}
+            />
+            <button
+              type="button"
+              disabled={gridDisabled}
+              onClick={() => updateWatermark(kind, index, { gridSize: clampGridSize(watermark.gridSize + 10) })}
+              style={{ height: '36px' }}
+            >＋</button>
+          </div>
+        </div>
+
+        <label style={{ display: 'grid', gap: '8px', opacity: disabled ? 0.35 : 1 }}>
+          <span style={{ color: 'rgba(255,255,255,.5)', fontSize: '10px', letterSpacing: '.12em' }}>
+            ID
+          </span>
+          <input
+            type="text"
+            disabled={disabled}
+            value={watermark.text}
+            onChange={(e) => updateWatermark(kind, index, { text: e.target.value })}
+            onBlur={() => updateWatermark(kind, index, { text: normalizeWatermarkText(watermark.text) })}
+            placeholder={category === 'commission' ? '@artist' : ORIGINAL_WATERMARK_ID}
+            style={inputStyle}
+          />
+        </label>
+
+        <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', opacity: disabled ? 0.35 : 1 }}>
+          <span style={{ display: 'grid', gap: '3px' }}>
+            <strong style={{ fontSize: '11px', letterSpacing: '.08em' }}>
+              DIAGONAL GRID
+            </strong>
+            <span style={{ color: 'rgba(255,255,255,.4)', fontSize: '10px' }}>
+              大きな斜め格子を画像全体に表示
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            disabled={disabled}
+            checked={watermark.grid}
+            onChange={(e) => updateWatermark(kind, index, { grid: e.target.checked })}
+          />
+        </label>
+      </div>
+    );
+  };
+
   const fieldStyle = {
     display: 'grid',
     gap: '8px',
@@ -1329,21 +1639,15 @@ export default function EditIllustrationPage() {
                           'rgba(0,0,0,.2)',
                       }}
                     >
-                      <img
-                        src={
-                          image.url
-                        }
+                      <WatermarkedImage
+                        src={image.url}
                         alt={`existing ${index + 1}`}
-                        style={{
-                          width:
-                            '100%',
-                          height:
-                            '100%',
-                          objectFit:
-                            'contain',
-                          display:
-                            'block',
-                        }}
+                        watermark={watermarkForExisting(
+                          image,
+                          category,
+                          snsId
+                        )}
+                        fit="contain"
                       />
 
                       <span
@@ -1420,19 +1724,14 @@ export default function EditIllustrationPage() {
                           'rgba(0,0,0,.2)',
                       }}
                     >
-                      <img
+                      <WatermarkedImage
                         src={url}
                         alt={`new ${index + 1}`}
-                        style={{
-                          width:
-                            '100%',
-                          height:
-                            '100%',
-                          objectFit:
-                            'contain',
-                          display:
-                            'block',
-                        }}
+                        watermark={
+                          newImageWatermarks[index] ??
+                          defaultWatermarkFor(category, snsId)
+                        }
+                        fit="contain"
                       />
 
                       <span
@@ -1518,6 +1817,44 @@ export default function EditIllustrationPage() {
                   }}
                 />
               </label>
+            </fieldset>
+
+            <fieldset
+              style={{
+                marginTop: '22px',
+                border: '1px solid rgba(255,255,255,.18)',
+                borderRadius: '10px',
+                padding: '18px',
+                display: 'grid',
+                gap: '16px',
+              }}
+            >
+              <legend style={{ padding: '0 8px' }}>
+                WATERMARK
+              </legend>
+
+              <p style={{ margin: 0, color: 'rgba(255,255,255,.48)', fontSize: '11px', lineHeight: 1.7 }}>
+                画像ごとに透かしを編集できます。WHITEは25%、BLACKは5%が初期値です。
+              </p>
+
+              {existingImages.map((image, index) =>
+                renderWatermarkEditor(
+                  'existing',
+                  index,
+                  `IMAGE ${index + 1}`,
+                  watermarkForExisting(image, category, snsId)
+                )
+              )}
+
+              {newImages.map((file, index) =>
+                renderWatermarkEditor(
+                  'new',
+                  index,
+                  `NEW IMAGE ${index + 1} — ${file.name}`,
+                  newImageWatermarks[index] ??
+                    defaultWatermarkFor(category, snsId)
+                )
+              )}
             </fieldset>
 
             <fieldset
