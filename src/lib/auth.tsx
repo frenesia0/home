@@ -1,6 +1,6 @@
 'use client';
-// 인증 컨텍스트 (v2.0) — 백엔드 어댑터(Supabase / Firebase)에 위임한다.
-// 백엔드 설정이 없으면(개발·오프라인) 브라우저 안의 로컬 계정으로 동작한다.
+// 認証コンテキスト (v2.0) — バックエンドアダプター（Supabase / Firebase）へ処理を委譲する。
+// バックエンド設定がない場合（開発・オフライン）は、ブラウザ内のローカルアカウントで動作する。
 
 import React, {
   createContext,
@@ -104,7 +104,7 @@ const SETUP_KEY =
 const ADMIN_UID =
   process.env.NEXT_PUBLIC_ADMIN_UID?.trim() ?? '';
 
-/** 현재 가입코드 */
+/** 現在の招待コード */
 export function inviteCode(): string {
   return (
     getSetting<string>(
@@ -143,11 +143,11 @@ export function markSetupDone() {
       })
     );
   } catch {
-    /* 무시 */
+    /* 無視 */
   }
 }
 
-/* ---------- 로컬 계정 ---------- */
+/* ---------- ローカルアカウント ---------- */
 
 const MOCK_ACCOUNTS: Record<
   string,
@@ -160,7 +160,7 @@ const MOCK_ACCOUNTS: Record<
     password: '0000',
     user: {
       id: 'admin',
-      nickname: '관리자',
+      nickname: '管理者',
       role: 'admin',
     },
   },
@@ -169,7 +169,7 @@ const MOCK_ACCOUNTS: Record<
     password: '0000',
     user: {
       id: 'guest',
-      nickname: '지인회원',
+      nickname: '知人メンバー',
       role: 'member',
     },
   },
@@ -193,7 +193,7 @@ function mockRegistry(): Record<
   }
 }
 
-/** 회원 프로필 조회 */
+/** メンバープロフィール取得 */
 export function mockMemberInfo(
   id: string
 ): User | null {
@@ -217,7 +217,7 @@ export interface SetupInput {
   guestPw?: string;
 }
 
-/** 로컬 계정 설치 */
+/** ローカルアカウント初期設定 */
 export function completeSetup(
   v: SetupInput
 ): {
@@ -234,7 +234,7 @@ export function completeSetup(
     return {
       ok: false,
       error:
-        '관리자 아이디와 비밀번호를 입력해 주세요.',
+        '管理者IDとパスワードを入力してください。',
     };
   }
 
@@ -250,7 +250,7 @@ export function completeSetup(
         id,
         nickname:
           v.adminNick?.trim() ||
-          '관리자',
+          '管理者',
         role: 'admin',
       },
     };
@@ -264,7 +264,7 @@ export function completeSetup(
 
         user: {
           id: 'guest',
-          nickname: '게스트',
+          nickname: 'ゲスト',
           role: 'member',
         },
       };
@@ -284,12 +284,12 @@ export function completeSetup(
     return {
       ok: false,
       error:
-        '설정을 저장하지 못했습니다.',
+        '設定を保存できませんでした。',
     };
   }
 }
 
-/* ---------- 컨텍스트 ---------- */
+/* ---------- コンテキスト ---------- */
 
 export function AuthProvider({
   children,
@@ -328,6 +328,42 @@ export function AuthProvider({
         )
       : user?.role === 'admin';
 
+  /**
+   * サーバーモードでは、Vercelに登録した管理者UIDと一致する
+   * 1アカウントだけをログイン状態として受け入れる。
+   *
+   * 別アカウントでFirebase認証自体が成功しても、
+   * ここで即ログアウトしてO.HOMEにはログイン状態を残さない。
+   */
+  const acceptServerUser = useCallback(
+    async (next: User | null): Promise<boolean> => {
+      if (!next) {
+        setUser(null);
+        return false;
+      }
+
+      if (!ADMIN_UID || next.id !== ADMIN_UID) {
+        setUser(null);
+
+        try {
+          await be?.signOut();
+        } catch {
+          /* 無視 */
+        }
+
+        return false;
+      }
+
+      setUser({
+        ...next,
+        role: 'admin',
+      });
+
+      return true;
+    },
+    [be]
+  );
+
   useEffect(() => {
     if (
       !server ||
@@ -345,7 +381,7 @@ export function AuthProvider({
           );
         }
       } catch {
-        /* 무시 */
+        /* 無視 */
       }
 
       return;
@@ -355,22 +391,22 @@ export function AuthProvider({
 
     void be
       .currentUser()
-      .then(u => {
-        if (alive) {
-          setUser(
-            u as User | null
-          );
-        }
+      .then(async u => {
+        if (!alive) return;
+
+        await acceptServerUser(
+          u as User | null
+        );
       });
 
     const off =
       be.onAuthChange(
         u => {
-          if (alive) {
-            setUser(
-              u as User | null
-            );
-          }
+          if (!alive) return;
+
+          void acceptServerUser(
+            u as User | null
+          );
         }
       );
 
@@ -381,6 +417,7 @@ export function AuthProvider({
   }, [
     server,
     be,
+    acceptServerUser,
   ]);
 
   const login =
@@ -399,16 +436,34 @@ export function AuthProvider({
               password
             );
 
-          return r.ok
-            ? {
-                ok: true,
-              }
-            : {
-                ok: false,
-                error:
-                  r.error ??
-                  '로그인에 실패했습니다.',
-              };
+          if (!r.ok) {
+            return {
+              ok: false,
+              error:
+                r.error ??
+                'ログインに失敗しました。',
+            };
+          }
+
+          const current =
+            await be.currentUser();
+
+          const allowed =
+            await acceptServerUser(
+              current as User | null
+            );
+
+          if (!allowed) {
+            return {
+              ok: false,
+              error:
+                'このアカウントではログインできません。',
+            };
+          }
+
+          return {
+            ok: true,
+          };
         }
 
         const acc =
@@ -426,7 +481,7 @@ export function AuthProvider({
           return {
             ok: false,
             error:
-              '아이디 또는 비밀번호가 올바르지 않습니다.',
+              'IDまたはパスワードが正しくありません。',
           };
         }
 
@@ -442,7 +497,7 @@ export function AuthProvider({
             )
           );
         } catch {
-          /* 무시 */
+          /* 無視 */
         }
 
         return {
@@ -452,6 +507,7 @@ export function AuthProvider({
       [
         server,
         be,
+        acceptServerUser,
       ]
     );
 
@@ -465,7 +521,7 @@ export function AuthProvider({
           return {
             ok: false,
             error:
-              'Google 로그인에는 Firebase 연결이 필요합니다.',
+              'GoogleログインにはFirebase接続が必要です。',
           };
         }
 
@@ -475,7 +531,7 @@ export function AuthProvider({
           return {
             ok: false,
             error:
-              '현재 연결된 백엔드에서는 Google 로그인을 사용할 수 없습니다.',
+              '現在のバックエンドではGoogleログインを使用できません。',
           };
         }
 
@@ -487,7 +543,7 @@ export function AuthProvider({
             ok: false,
             error:
               r.error ??
-              'Google 로그인에 실패했습니다.',
+              'Googleログインに失敗しました。',
           };
         }
 
@@ -495,16 +551,24 @@ export function AuthProvider({
           const u =
             await be.currentUser();
 
-          if (u) {
-            setUser(
-              u as User
+          const allowed =
+            await acceptServerUser(
+              u as User | null
             );
+
+          if (!allowed) {
+            return {
+              ok: false,
+              error:
+                'このアカウントではログインできません。',
+            };
           }
         } catch {
-          /*
-           * onAuthChange でも更新されるので、
-           * ここで取得に失敗してもログイン自体は成立する
-           */
+          return {
+            ok: false,
+            error:
+              'ログイン状態を確認できませんでした。',
+          };
         }
 
         return {
@@ -514,10 +578,11 @@ export function AuthProvider({
       [
         server,
         be,
+        acceptServerUser,
       ]
     );
 
-  /* ---------- 회원가입 ---------- */
+  /* ---------- 会員登録 ---------- */
 
   const signup =
     useCallback(
@@ -535,7 +600,7 @@ export function AuthProvider({
           return {
             ok: false,
             error:
-              '아이디·비밀번호·닉네임을 모두 입력해 주세요.',
+              'ID・パスワード・ニックネームをすべて入力してください。',
           };
         }
 
@@ -545,7 +610,7 @@ export function AuthProvider({
           return {
             ok: false,
             error:
-              '가입코드가 올바르지 않습니다.',
+              '招待コードが正しくありません。',
           };
         }
 
@@ -553,37 +618,10 @@ export function AuthProvider({
           server &&
           be
         ) {
-          const r =
-            await be.signUp(
-              id.trim(),
-              password,
-              nickname.trim()
-            );
-
-          if (!r.ok) {
-            return {
-              ok: false,
-              error:
-                r.error ??
-                '가입에 실패했습니다.',
-            };
-          }
-
-          try {
-            const u =
-              await be.currentUser();
-
-            if (u) {
-              setUser(
-                u
-              );
-            }
-          } catch {
-            /* 무시 */
-          }
-
           return {
-            ok: true,
+            ok: false,
+            error:
+              'このサイトでは新規会員登録を受け付けていません。',
           };
         }
 
@@ -594,7 +632,7 @@ export function AuthProvider({
           return {
             ok: false,
             error:
-              '이미 사용 중인 아이디입니다.',
+              'すでに使用されているIDです。',
           };
         }
 
@@ -617,7 +655,7 @@ export function AuthProvider({
             JSON.stringify(reg)
           );
         } catch {
-          /* 무시 */
+          /* 無視 */
         }
 
         return {
@@ -630,7 +668,7 @@ export function AuthProvider({
       ]
     );
 
-  /* ---------- 아이디 찾기 ---------- */
+  /* ---------- ID確認 ---------- */
 
   const findId =
     useCallback(
@@ -647,7 +685,7 @@ export function AuthProvider({
           return {
             ok: false,
             error:
-              '이메일을 입력해 주세요.',
+              'メールアドレスを入力してください。',
           };
         }
 
@@ -655,7 +693,7 @@ export function AuthProvider({
           return {
             ok: false,
             error:
-              '이메일이 곧 아이디입니다 — 그대로 로그인해 주세요.',
+              'メールアドレスがそのままIDです。そのままログインしてください。',
           };
         }
 
@@ -679,7 +717,7 @@ export function AuthProvider({
           : {
               ok: false,
               error:
-                '이 이메일로 가입된 계정이 없습니다.',
+                'このメールアドレスで登録されたアカウントはありません。',
             };
       },
       [
@@ -687,7 +725,7 @@ export function AuthProvider({
       ]
     );
 
-  /* ---------- 비밀번호 재설정 ---------- */
+  /* ---------- パスワード再設定 ---------- */
 
   const resetPassword =
     useCallback(
@@ -704,7 +742,7 @@ export function AuthProvider({
           return {
             ok: false,
             error:
-              '이메일을 입력해 주세요.',
+              'メールアドレスを入力してください。',
           };
         }
 
@@ -748,7 +786,7 @@ export function AuthProvider({
           return {
             ok: false,
             error:
-              '이 이메일로 가입된 계정이 없습니다.',
+              'このメールアドレスで登録されたアカウントはありません。',
           };
         }
 
@@ -768,7 +806,7 @@ export function AuthProvider({
             JSON.stringify(reg)
           );
         } catch {
-          /* 무시 */
+          /* 無視 */
         }
 
         return {
@@ -782,7 +820,7 @@ export function AuthProvider({
       ]
     );
 
-  /* ---------- 프로필 ---------- */
+  /* ---------- プロフィール ---------- */
 
   const updateProfile =
     useCallback(
@@ -799,7 +837,7 @@ export function AuthProvider({
           return {
             ok: false,
             error:
-              '로그인이 필요합니다.',
+              'ログインが必要です。',
           };
         }
 
@@ -867,7 +905,7 @@ export function AuthProvider({
           return {
             ok: false,
             error:
-              '계정을 찾을 수 없습니다.',
+              'アカウントが見つかりません。',
           };
         }
 
@@ -879,7 +917,7 @@ export function AuthProvider({
           return {
             ok: false,
             error:
-              '현재 비밀번호가 올바르지 않습니다.',
+              '現在のパスワードが正しくありません。',
           };
         }
 
@@ -929,7 +967,7 @@ export function AuthProvider({
             )
           );
         } catch {
-          /* 무시 */
+          /* 無視 */
         }
 
         setUser(
@@ -947,7 +985,7 @@ export function AuthProvider({
       ]
     );
 
-  /* ---------- 로그아웃 ---------- */
+  /* ---------- ログアウト ---------- */
 
   const logout =
     useCallback(
@@ -974,7 +1012,7 @@ export function AuthProvider({
             MOCK_KEY
           );
         } catch {
-          /* 무시 */
+          /* 無視 */
         }
       },
       [
