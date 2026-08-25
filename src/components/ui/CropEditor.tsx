@@ -428,6 +428,18 @@ export function CropEditor({
       (MAX_SCALE - 1)) *
     100;
 
+  const changeZoomBy = (delta: number) => {
+    setCrop((current) =>
+      clamp({
+        ...current,
+        scale:
+          Math.round(
+            (current.scale + delta) * 10
+          ) / 10,
+      })
+    );
+  };
+
   return (
     <Modal
       open={open}
@@ -524,6 +536,26 @@ export function CropEditor({
           %
         </span>
 
+        <button
+          type="button"
+          className="btn btn-ghost"
+          aria-label="10%縮小"
+          title="10%縮小"
+          onClick={() =>
+            changeZoomBy(-0.1)
+          }
+          disabled={crop.scale <= 1}
+          style={{
+            width: 34,
+            height: 30,
+            padding: 0,
+            fontSize: 17,
+            lineHeight: 1,
+          }}
+        >
+          −
+        </button>
+
         <div
           ref={zoomRef}
           onPointerDown={
@@ -577,6 +609,29 @@ export function CropEditor({
         </div>
 
         <button
+          type="button"
+          className="btn btn-ghost"
+          aria-label="10%拡大"
+          title="10%拡大"
+          onClick={() =>
+            changeZoomBy(0.1)
+          }
+          disabled={
+            crop.scale >= MAX_SCALE
+          }
+          style={{
+            width: 34,
+            height: 30,
+            padding: 0,
+            fontSize: 17,
+            lineHeight: 1,
+          }}
+        >
+          ＋
+        </button>
+
+        <button
+          type="button"
           className="btn btn-ghost"
           style={{
             padding:
