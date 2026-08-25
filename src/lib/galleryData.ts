@@ -13,7 +13,8 @@ export type GalleryTag =
   | 'reference'
   | 'song-parody'
   | 'manga'
-  | 'rakugaki';
+  | 'rakugaki'
+  | 'tachie';
 
 export interface GalleryImage {
   url: string;
@@ -194,6 +195,7 @@ export function getGalleryTags(post: GalleryPost): GalleryTag[] {
     }
     if (item === 'manga') converted.push('manga');
     if (item === 'rakugaki') converted.push('rakugaki');
+    if (item === 'tachie') converted.push('tachie');
   }
 
   return Array.from(new Set(converted));
