@@ -19,39 +19,46 @@ export interface GalleryImage {
   publicId: string;
 }
 
+export interface GalleryCommission {
+  artistName: string;
+  snsId?: string;
+  snsUrl?: string;
+}
+
 export interface GalleryPost {
   id: string;
   title?: string;
   date: string;
   category: GalleryCategory;
 
-  // 新形式：キャラクターとタグを分離
+  // キャラクターとタグは別管理
   characters?: GalleryCharacter[];
   tags?: GalleryTag[];
 
-  // 新形式：1投稿に複数画像を持てる
+  // 1投稿に複数画像
   images?: GalleryImage[];
 
-  // 旧形式との互換用。既存投稿を壊さないため当面残す
+  // 詳細画面で表示する自由メモ
+  memo?: string;
+
+  // COMMISSIONのときだけ使用
+  commission?: GalleryCommission;
+
+  // 旧形式との互換用
   imageUrl?: string;
   cloudinaryPublicId?: string;
-
-  // 旧形式との互換用。以前は shiki / solas / reference / song-inspired を
-  // すべて同じ tags 配列に入れていたため、読み取り時に分離する
   legacyTags?: string[];
 
   authorId: string;
   visibility: 'public';
   createdAt: string;
 
-  // backend側のListItem型と互換にするためのインデックスシグネチャ
+  // backend側のListItem型と互換にする
   [key: string]: unknown;
 }
 
 /**
- * 新旧どちらの形式でも、投稿内の画像を同じ形で取得する。
- * 既存投稿は imageUrl / cloudinaryPublicId、
- * 新規投稿は images[] を使う。
+ * 新旧どちらの形式でも画像を取得する。
  */
 export function getGalleryImages(post: GalleryPost): GalleryImage[] {
   if (Array.isArray(post.images) && post.images.length > 0) {
@@ -83,8 +90,7 @@ export function getGalleryImages(post: GalleryPost): GalleryImage[] {
 
 /**
  * 新旧どちらの形式でもキャラクター情報を取得する。
- * 旧形式では item.tags に shiki / solas が混在していたため、
- * それをキャラクターとして読み替える。
+ * 旧形式では tags に shiki / solas が混在していたため読み替える。
  */
 export function getGalleryCharacters(post: GalleryPost): GalleryCharacter[] {
   if (Array.isArray(post.characters)) {
@@ -94,8 +100,9 @@ export function getGalleryCharacters(post: GalleryPost): GalleryCharacter[] {
     );
   }
 
-  const legacy = Array.isArray((post as { tags?: unknown }).tags)
-    ? ((post as { tags?: unknown[] }).tags ?? [])
+  const rawTags = (post as { tags?: unknown }).tags;
+  const legacy = Array.isArray(rawTags)
+    ? rawTags
     : Array.isArray(post.legacyTags)
       ? post.legacyTags
       : [];
@@ -109,31 +116,21 @@ export function getGalleryCharacters(post: GalleryPost): GalleryCharacter[] {
 /**
  * 新旧どちらの形式でもタグ情報を取得する。
  * 旧形式の song-inspired は song-parody として読み替える。
+ * COMMISSIONではタグを表示・検索対象にしない。
  */
 export function getGalleryTags(post: GalleryPost): GalleryTag[] {
-  if (Array.isArray(post.tags)) {
-    const hasNewOnly = post.tags.every(
-      (tag) =>
-        tag === 'reference' ||
-        tag === 'song-parody' ||
-        tag === 'manga' ||
-        tag === 'rakugaki'
-    );
+  if (post.category === 'commission') return [];
 
-    if (hasNewOnly) {
-      return post.tags;
-    }
-  }
-
-  const legacy = Array.isArray((post as { tags?: unknown }).tags)
-    ? ((post as { tags?: unknown[] }).tags ?? [])
+  const rawTags = (post as { tags?: unknown }).tags;
+  const source = Array.isArray(rawTags)
+    ? rawTags
     : Array.isArray(post.legacyTags)
       ? post.legacyTags
       : [];
 
   const converted: GalleryTag[] = [];
 
-  for (const item of legacy) {
+  for (const item of source) {
     if (item === 'reference') converted.push('reference');
     if (item === 'song-inspired' || item === 'song-parody') {
       converted.push('song-parody');
@@ -143,6 +140,33 @@ export function getGalleryTags(post: GalleryPost): GalleryTag[] {
   }
 
   return Array.from(new Set(converted));
+}
+
+/**
+ * COMMISSION情報を安全に取得する。
+ */
+export function getGalleryCommission(
+  post: GalleryPost
+): GalleryCommission | null {
+  if (
+    post.category !== 'commission' ||
+    !post.commission ||
+    typeof post.commission.artistName !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    artistName: post.commission.artistName,
+    snsId:
+      typeof post.commission.snsId === 'string'
+        ? post.commission.snsId
+        : undefined,
+    snsUrl:
+      typeof post.commission.snsUrl === 'string'
+        ? post.commission.snsUrl
+        : undefined,
+  };
 }
 
 /** Gallery一覧をFirestoreから取得する */
