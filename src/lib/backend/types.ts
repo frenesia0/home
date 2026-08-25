@@ -104,7 +104,7 @@ export const COLLECTION_OF: Record<string, string> = {
   'ohome.guest.v1': 'guestbook',
   'ohome.chars.v1': 'characters',
   'ohome.rels.v1': 'relations',
-  'ohome.backup.v1': 'gallery',
+  'ohome.backup.v1': 'legacy_gallery',
   'ohome.road.v1': 'roadview',
   'ohome.trpg.v1': 'trpg_logs',
 
