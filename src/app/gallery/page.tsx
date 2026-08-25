@@ -1,11 +1,18 @@
-'use client';
+＾'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+
 import {
   useRouter,
   useSearchParams,
 } from 'next/navigation';
+
 import { useAuth } from '@/lib/auth';
+
 import {
   fetchGalleryPosts,
   getGalleryCharacters,
@@ -19,32 +26,63 @@ import {
   type GalleryPost,
   type GalleryTag,
 } from '@/lib/galleryData';
+
 import { CropImg } from '@/components/ui/CropEditor';
 
-type CharacterFilter = 'all' | GalleryCharacter;
-type TagFilter = 'all' | GalleryTag;
-type SortOrder = 'newest' | 'oldest';
+type CharacterFilter =
+  | 'all'
+  | GalleryCharacter;
 
-function optimizeCloudinaryUrl(url: string) {
-  if (!url.includes('/upload/')) return url;
+type TagFilter =
+  | 'all'
+  | GalleryTag;
+
+type SortOrder =
+  | 'newest'
+  | 'oldest';
+
+const PAGE_SIZE = 20;
+
+function optimizeCloudinaryUrl(
+  url: string
+) {
+  if (
+    !url.includes('/upload/')
+  ) {
+    return url;
+  }
 
   return url.replace(
     '/upload/',
-    '/upload/f_auto,q_auto:best,c_limit,w_1200/'
+    '/upload/f_auto,q_auto:best,c_limit,w_1000/'
   );
 }
 
-function characterLabel(character: GalleryCharacter) {
+function characterLabel(
+  character: GalleryCharacter
+) {
   return character.toUpperCase();
 }
 
-function tagLabel(tag: GalleryTag) {
-  if (tag === 'song-parody') return 'SONG PARODY';
+function tagLabel(
+  tag: GalleryTag
+) {
+  if (
+    tag === 'song-parody'
+  ) {
+    return 'SONG PARODY';
+  }
+
   return tag.toUpperCase();
 }
 
-function isCategory(value: string | null): value is GalleryCategory {
-  return value === 'original' || value === 'commission';
+function isCategory(
+  value: string | null
+): value is GalleryCategory {
+  return (
+    value === 'original' ||
+    value === 'commission'
+  );
 }
 
 function isCharacterFilter(
@@ -73,122 +111,221 @@ function isTagFilter(
 function isSortOrder(
   value: string | null
 ): value is SortOrder {
-  return value === 'newest' || value === 'oldest';
+  return (
+    value === 'newest' ||
+    value === 'oldest'
+  );
 }
 
-/**
- * 初期値と同じ条件はURLへ書かない。
- * ORIGINAL / ALL CHARACTER / ALL TAG / NEWEST は省略する。
- */
 function buildGalleryQuery(
   category: GalleryCategory,
   character: CharacterFilter,
   tag: TagFilter,
   sortOrder: SortOrder
 ) {
-  const params = new URLSearchParams();
+  const params =
+    new URLSearchParams();
 
-  if (category !== 'original') {
-    params.set('category', category);
+  if (
+    category !== 'original'
+  ) {
+    params.set(
+      'category',
+      category
+    );
   }
 
-  if (character !== 'all') {
-    params.set('character', character);
+  if (
+    character !== 'all'
+  ) {
+    params.set(
+      'character',
+      character
+    );
   }
 
   if (
     category === 'original' &&
     tag !== 'all'
   ) {
-    params.set('tag', tag);
+    params.set(
+      'tag',
+      tag
+    );
   }
 
-  if (sortOrder !== 'newest') {
-    params.set('sort', sortOrder);
+  if (
+    sortOrder !== 'newest'
+  ) {
+    params.set(
+      'sort',
+      sortOrder
+    );
   }
 
   return params.toString();
 }
 
 export default function GalleryPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const { isAdmin } = useAuth();
+  const router =
+    useRouter();
+
+  const searchParams =
+    useSearchParams();
+
+  const { isAdmin } =
+    useAuth();
 
   const initialCategory =
-    isCategory(searchParams.get('category'))
-      ? searchParams.get('category') as GalleryCategory
+    isCategory(
+      searchParams.get(
+        'category'
+      )
+    )
+      ? (
+          searchParams.get(
+            'category'
+          ) as GalleryCategory
+        )
       : 'original';
 
   const initialCharacter =
-    isCharacterFilter(searchParams.get('character'))
-      ? searchParams.get('character') as CharacterFilter
+    isCharacterFilter(
+      searchParams.get(
+        'character'
+      )
+    )
+      ? (
+          searchParams.get(
+            'character'
+          ) as CharacterFilter
+        )
       : 'all';
 
   const initialTag =
-    isTagFilter(searchParams.get('tag'))
-      ? searchParams.get('tag') as TagFilter
+    isTagFilter(
+      searchParams.get(
+        'tag'
+      )
+    )
+      ? (
+          searchParams.get(
+            'tag'
+          ) as TagFilter
+        )
       : 'all';
 
   const initialSort =
-    isSortOrder(searchParams.get('sort'))
-      ? searchParams.get('sort') as SortOrder
+    isSortOrder(
+      searchParams.get(
+        'sort'
+      )
+    )
+      ? (
+          searchParams.get(
+            'sort'
+          ) as SortOrder
+        )
       : 'newest';
 
-  const [category, setCategory] =
-    useState<GalleryCategory>(initialCategory);
+  const [
+    category,
+    setCategory,
+  ] =
+    useState<GalleryCategory>(
+      initialCategory
+    );
 
-  const [character, setCharacter] =
-    useState<CharacterFilter>(initialCharacter);
+  const [
+    character,
+    setCharacter,
+  ] =
+    useState<CharacterFilter>(
+      initialCharacter
+    );
 
-  const [tag, setTag] =
-    useState<TagFilter>(initialTag);
+  const [
+    tag,
+    setTag,
+  ] =
+    useState<TagFilter>(
+      initialTag
+    );
 
-  const [sortOrder, setSortOrder] =
-    useState<SortOrder>(initialSort);
+  const [
+    sortOrder,
+    setSortOrder,
+  ] =
+    useState<SortOrder>(
+      initialSort
+    );
 
-  const [illustrations, setIllustrations] =
-    useState<GalleryPost[]>([]);
+  const [
+    illustrations,
+    setIllustrations,
+  ] =
+    useState<GalleryPost[]>(
+      []
+    );
 
-  const [loading, setLoading] =
+  const [
+    loading,
+    setLoading,
+  ] =
     useState(true);
 
-  const [error, setError] =
+  const [
+    error,
+    setError,
+  ] =
     useState('');
+
+  const [
+    page,
+    setPage,
+  ] =
+    useState(1);
 
   useEffect(() => {
     let alive = true;
 
-    const load = async () => {
-      try {
-        const posts =
-          await fetchGalleryPosts();
+    const load =
+      async () => {
+        try {
+          const posts =
+            await fetchGalleryPosts();
 
-        if (alive) {
-          setIllustrations(posts);
-          setError('');
+          if (alive) {
+            setIllustrations(
+              posts
+            );
+
+            setError('');
+          }
+        } catch (err) {
+          if (alive) {
+            setError(
+              err instanceof
+                Error
+                ? err.message
+                : 'ギャラリーを読み込めませんでした。'
+            );
+          }
+        } finally {
+          if (alive) {
+            setLoading(false);
+          }
         }
-      } catch (err) {
-        if (alive) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : 'ギャラリーを読み込めませんでした。'
-          );
-        }
-      } finally {
-        if (alive) {
-          setLoading(false);
-        }
-      }
-    };
+      };
 
     void load();
 
     const off =
-      subscribeGallery(() => {
-        void load();
-      });
+      subscribeGallery(
+        () => {
+          void load();
+        }
+      );
 
     return () => {
       alive = false;
@@ -221,6 +358,19 @@ export default function GalleryPage() {
     router,
   ]);
 
+  /**
+   * フィルター条件を変更したら
+   * 必ず1ページ目へ戻る。
+   */
+  useEffect(() => {
+    setPage(1);
+  }, [
+    category,
+    character,
+    tag,
+    sortOrder,
+  ]);
+
   const filtered =
     useMemo(() => {
       return illustrations
@@ -229,39 +379,49 @@ export default function GalleryPage() {
             item.category ===
             category
         )
-        .filter(item => {
-          if (
-            character === 'all'
-          ) {
-            return true;
-          }
+        .filter(
+          item => {
+            if (
+              character ===
+              'all'
+            ) {
+              return true;
+            }
 
-          return getGalleryCharacters(
-            item
-          ).includes(character);
-        })
-        .filter(item => {
-          if (
-            category ===
-              'commission' ||
-            tag === 'all'
-          ) {
-            return true;
+            return getGalleryCharacters(
+              item
+            ).includes(
+              character
+            );
           }
+        )
+        .filter(
+          item => {
+            if (
+              category ===
+                'commission' ||
+              tag === 'all'
+            ) {
+              return true;
+            }
 
-          return getGalleryTags(
-            item
-          ).includes(tag);
-        })
-        .sort((a, b) =>
-          sortOrder ===
-          'newest'
-            ? b.date.localeCompare(
-                a.date
-              )
-            : a.date.localeCompare(
-                b.date
-              )
+            return getGalleryTags(
+              item
+            ).includes(
+              tag
+            );
+          }
+        )
+        .sort(
+          (a, b) =>
+            sortOrder ===
+            'newest'
+              ? b.date.localeCompare(
+                  a.date
+                )
+              : a.date.localeCompare(
+                  b.date
+                )
         );
     }, [
       illustrations,
@@ -270,6 +430,56 @@ export default function GalleryPage() {
       tag,
       sortOrder,
     ]);
+
+  const pageCount =
+    Math.max(
+      1,
+      Math.ceil(
+        filtered.length /
+          PAGE_SIZE
+      )
+    );
+
+  const currentPage =
+    Math.min(
+      page,
+      pageCount
+    );
+
+  const pagedFiltered =
+    useMemo(() => {
+      const start =
+        (currentPage -
+          1) *
+        PAGE_SIZE;
+
+      return filtered.slice(
+        start,
+        start +
+          PAGE_SIZE
+      );
+    }, [
+      filtered,
+      currentPage,
+    ]);
+
+  /**
+   * 削除などで総ページ数が減った場合、
+   * 存在しないページに残らないようにする。
+   */
+  useEffect(() => {
+    if (
+      page >
+      pageCount
+    ) {
+      setPage(
+        pageCount
+      );
+    }
+  }, [
+    page,
+    pageCount,
+  ]);
 
   const currentQuery =
     useMemo(
@@ -288,53 +498,86 @@ export default function GalleryPage() {
       ]
     );
 
-  const openIllustration = (
-    id: string
-  ) => {
-    const base =
-      `/gallery/${encodeURIComponent(
-        id
-      )}`;
+  const openIllustration =
+    (id: string) => {
+      const base =
+        `/gallery/${encodeURIComponent(
+          id
+        )}`;
 
-    router.push(
-      currentQuery
-        ? `${base}?${currentQuery}`
-        : base
-    );
-  };
+      router.push(
+        currentQuery
+          ? `${base}?${currentQuery}`
+          : base
+      );
+    };
 
-  const pillStyle = (
-    active: boolean
-  ) => ({
-    padding: '8px 14px',
-    borderRadius: '999px',
-    border:
-      '1px solid rgba(255,255,255,.2)',
-    background: active
-      ? 'rgba(255,255,255,.92)'
-      : 'rgba(255,255,255,.06)',
-    color: active
-      ? '#17191d'
-      : '#f5f5f5',
-    cursor: 'pointer',
-    fontSize: '12px',
-    transition:
-      'all .18s ease',
-  });
+  const changePage =
+    (nextPage: number) => {
+      setPage(
+        Math.min(
+          pageCount,
+          Math.max(
+            1,
+            nextPage
+          )
+        )
+      );
+
+      window.scrollTo({
+        top: 120,
+        behavior:
+          'smooth',
+      });
+    };
+
+  const pillStyle =
+    (active: boolean) => ({
+      padding:
+        '8px 14px',
+      borderRadius:
+        '999px',
+      border:
+        '1px solid rgba(255,255,255,.2)',
+      background:
+        active
+          ? 'rgba(255,255,255,.92)'
+          : 'rgba(255,255,255,.06)',
+      color:
+        active
+          ? '#17191d'
+          : '#f5f5f5',
+      cursor:
+        'pointer',
+      fontSize:
+        '12px',
+      transition:
+        'all .18s ease',
+    });
 
   return (
     <main
+      className="gallery-page"
       style={{
-        maxWidth: '1200px',
-        margin: '0 auto',
+        maxWidth:
+          '1200px',
+        margin:
+          '0 auto',
         padding:
           '56px 32px 80px',
-        color: '#f5f5f5',
+        color:
+          '#f5f5f5',
       }}
     >
+      {/* =====================
+          HEADER
+      ====================== */}
+
       <div
+        className="gallery-heading"
         style={{
-          display: 'flex',
+          display:
+            'flex',
           justifyContent:
             'space-between',
           alignItems:
@@ -369,12 +612,14 @@ export default function GalleryPage() {
                 '.04em',
             }}
           >
-            shiki & solas visual archive
+            shiki & solas
+            visual archive
           </p>
         </div>
 
         {isAdmin && (
           <div
+            className="gallery-admin-actions"
             style={{
               display:
                 'flex',
@@ -448,9 +693,14 @@ export default function GalleryPage() {
         )}
       </div>
 
+      {/* =====================
+          SORT
+      ====================== */}
+
       <div
         style={{
-          display: 'flex',
+          display:
+            'flex',
           justifyContent:
             'flex-end',
           marginBottom:
@@ -513,10 +763,16 @@ export default function GalleryPage() {
         </button>
       </div>
 
+      {/* =====================
+          CATEGORY
+      ====================== */}
+
       <section
         style={{
-          display: 'flex',
-          flexWrap: 'wrap',
+          display:
+            'flex',
+          flexWrap:
+            'wrap',
           gap: '8px',
           marginBottom:
             '18px',
@@ -527,7 +783,10 @@ export default function GalleryPage() {
             setCategory(
               'original'
             );
-            setTag('all');
+
+            setTag(
+              'all'
+            );
           }}
           style={pillStyle(
             category ===
@@ -542,7 +801,10 @@ export default function GalleryPage() {
             setCategory(
               'commission'
             );
-            setTag('all');
+
+            setTag(
+              'all'
+            );
           }}
           style={pillStyle(
             category ===
@@ -552,6 +814,10 @@ export default function GalleryPage() {
           COMMISSION
         </button>
       </section>
+
+      {/* =====================
+          CHARACTER
+      ====================== */}
 
       <section
         style={{
@@ -626,6 +892,10 @@ export default function GalleryPage() {
           </button>
         </div>
       </section>
+
+      {/* =====================
+          TAG
+      ====================== */}
 
       {category ===
         'original' && (
@@ -755,6 +1025,10 @@ export default function GalleryPage() {
         />
       )}
 
+      {/* =====================
+          LOADING
+      ====================== */}
+
       {loading && (
         <p
           style={{
@@ -770,6 +1044,10 @@ export default function GalleryPage() {
         </p>
       )}
 
+      {/* =====================
+          ERROR
+      ====================== */}
+
       {error && (
         <p
           style={{
@@ -783,19 +1061,18 @@ export default function GalleryPage() {
         </p>
       )}
 
+      {/* =====================
+          WORK GRID
+      ====================== */}
+
       {!loading &&
-        !error && (
+        !error &&
+        filtered.length >
+          0 && (
           <div
-            style={{
-              display:
-                'grid',
-              gridTemplateColumns:
-                'repeat(auto-fill, minmax(220px, 1fr))',
-              gap:
-                '28px 22px',
-            }}
+            className="gallery-grid"
           >
-            {filtered.map(
+            {pagedFiltered.map(
               item => {
                 const images =
                   getGalleryImages(
@@ -834,33 +1111,38 @@ export default function GalleryPage() {
                     tabIndex={
                       0
                     }
+                    className="gallery-work"
                     onClick={() =>
                       openIllustration(
                         item.id
                       )
                     }
-                    onKeyDown={event => {
-                      if (
-                        event.key ===
-                          'Enter' ||
-                        event.key ===
-                          ' '
-                      ) {
-                        event.preventDefault();
+                    onKeyDown={
+                      event => {
+                        if (
+                          event.key ===
+                            'Enter' ||
+                          event.key ===
+                            ' '
+                        ) {
+                          event.preventDefault();
 
-                        openIllustration(
-                          item.id
-                        );
+                          openIllustration(
+                            item.id
+                          );
+                        }
                       }
-                    }}
+                    }
                     style={{
                       cursor:
                         'pointer',
                       outline:
                         'none',
+                      minWidth: 0,
                     }}
                   >
                     <div
+                      className="gallery-thumbnail"
                       style={{
                         position:
                           'relative',
@@ -967,12 +1249,17 @@ export default function GalleryPage() {
                     </p>
 
                     <p
+                      className="gallery-work-meta"
                       style={{
                         margin: 0,
                         fontSize:
                           '11px',
+                        lineHeight:
+                          1.55,
                         color:
                           'rgba(255,255,255,.7)',
+                        overflowWrap:
+                          'anywhere',
                       }}
                     >
                       {item.category ===
@@ -1007,8 +1294,12 @@ export default function GalleryPage() {
                               '5px 0 0',
                             fontSize:
                               '11px',
+                            lineHeight:
+                              1.5,
                             color:
                               'rgba(255,255,255,.58)',
+                            overflowWrap:
+                              'anywhere',
                           }}
                         >
                           Artist:{' '}
@@ -1027,6 +1318,10 @@ export default function GalleryPage() {
             )}
           </div>
         )}
+
+      {/* =====================
+          EMPTY
+      ====================== */}
 
       {!loading &&
         !error &&
@@ -1049,6 +1344,285 @@ export default function GalleryPage() {
             NO WORKS YET
           </p>
         )}
+
+      {/* =====================
+          PAGINATION
+      ====================== */}
+
+      {!loading &&
+        !error &&
+        filtered.length >
+          0 &&
+        pageCount > 1 && (
+          <nav
+            className="gallery-pagination"
+            aria-label="ギャラリーページ送り"
+          >
+            <button
+              type="button"
+              disabled={
+                currentPage <=
+                1
+              }
+              onClick={() =>
+                changePage(
+                  currentPage -
+                    1
+                )
+              }
+            >
+              ←
+            </button>
+
+            <span>
+              {
+                currentPage
+              }
+              {' / '}
+              {
+                pageCount
+              }
+            </span>
+
+            <button
+              type="button"
+              disabled={
+                currentPage >=
+                pageCount
+              }
+              onClick={() =>
+                changePage(
+                  currentPage +
+                    1
+                )
+              }
+            >
+              →
+            </button>
+          </nav>
+        )}
+
+      {/* =====================
+          RESPONSIVE STYLE
+      ====================== */}
+
+      <style jsx global>{`
+        .gallery-grid {
+          display: grid;
+          grid-template-columns:
+            repeat(
+              4,
+              minmax(0, 1fr)
+            );
+          gap: 30px 22px;
+        }
+
+        .gallery-work {
+          min-width: 0;
+        }
+
+        .gallery-thumbnail {
+          transition:
+            transform 0.18s ease,
+            opacity 0.18s ease;
+        }
+
+        @media (hover: hover) {
+          .gallery-work:hover
+            .gallery-thumbnail {
+            transform:
+              translateY(-2px);
+            opacity: 0.92;
+          }
+        }
+
+        .gallery-pagination {
+          margin-top: 46px;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 14px;
+        }
+
+        .gallery-pagination
+          button {
+          min-width: 46px;
+          height: 40px;
+          padding: 0 13px;
+          border-radius: 8px;
+          border:
+            1px solid
+            rgba(
+              255,
+              255,
+              255,
+              0.2
+            );
+          background:
+            rgba(
+              255,
+              255,
+              255,
+              0.04
+            );
+          color: #f5f5f5;
+          cursor: pointer;
+          font-size: 14px;
+          transition:
+            opacity 0.15s ease,
+            background 0.15s ease;
+        }
+
+        .gallery-pagination
+          button:not(
+            :disabled
+          ):hover {
+          background:
+            rgba(
+              255,
+              255,
+              255,
+              0.09
+            );
+        }
+
+        .gallery-pagination
+          button:disabled {
+          cursor: default;
+          opacity: 0.25;
+        }
+
+        .gallery-pagination
+          span {
+          min-width: 74px;
+          text-align: center;
+          font-size: 11px;
+          letter-spacing:
+            0.12em;
+          color:
+            rgba(
+              255,
+              255,
+              255,
+              0.55
+            );
+        }
+
+        /* タブレット */
+        @media (
+          max-width: 900px
+        ) {
+          .gallery-grid {
+            grid-template-columns:
+              repeat(
+                3,
+                minmax(
+                  0,
+                  1fr
+                )
+              );
+            gap: 25px 18px;
+          }
+        }
+
+        /* スマホ */
+        @media (
+          max-width: 620px
+        ) {
+          .gallery-page {
+            padding:
+              40px 18px
+              70px !important;
+          }
+
+          .gallery-heading {
+            gap:
+              18px !important;
+          }
+
+          .gallery-heading h1 {
+            font-size:
+              30px !important;
+          }
+
+          .gallery-admin-actions {
+            gap:
+              8px !important;
+          }
+
+          .gallery-admin-actions
+            button {
+            padding:
+              9px 12px !important;
+            font-size:
+              10px !important;
+          }
+
+          .gallery-grid {
+            grid-template-columns:
+              repeat(
+                2,
+                minmax(
+                  0,
+                  1fr
+                )
+              );
+            gap: 25px 14px;
+          }
+
+          .gallery-thumbnail {
+            margin-bottom:
+              8px !important;
+          }
+
+          .gallery-work
+            > p {
+            font-size:
+              9.5px !important;
+          }
+
+          .gallery-work-meta {
+            line-height:
+              1.45 !important;
+          }
+
+          .gallery-thumbnail
+            [aria-label$='枚の画像'] {
+            top:
+              7px !important;
+            right:
+              7px !important;
+            min-width:
+              25px !important;
+            height:
+              25px !important;
+            font-size:
+              10px !important;
+          }
+
+          .gallery-pagination {
+            margin-top:
+              38px;
+          }
+        }
+
+        /* かなり狭いスマホでも2列を維持 */
+        @media (
+          max-width: 390px
+        ) {
+          .gallery-page {
+            padding-left:
+              14px !important;
+            padding-right:
+              14px !important;
+          }
+
+          .gallery-grid {
+            gap:
+              22px 10px;
+          }
+        }
+      `}</style>
     </main>
   );
 }
