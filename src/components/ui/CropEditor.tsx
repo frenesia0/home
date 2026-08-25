@@ -1,11 +1,21 @@
 'use client';
-// サムネイル用トリミングエディター。
-// 元画像そのものは変更せず、表示範囲と拡大率だけを保存する。
+
+// 썸네일 크롭 편집기 (6.1 v1.8)
+// 드래그(이동) + 확대/축소, 규격 고정 비율, 3분할 가이드
+// 원본은 건드리지 않고 크롭 좌표만 저장.
+// 확대 범위: 1x ~ 15x (100% ~ 1500%)
+
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal } from './Modal';
 import { useBlobUrl } from '@/lib/blobStore';
 
-export interface CropValue { x: number; y: number; scale: number }
+/** x·y = 프레임 크기 대비 중심 오프셋 비율, scale = 배율 */
+export interface CropValue {
+  x: number;
+  y: number;
+  scale: number;
+}
+
 export type CropAspect = '3:4' | '4:3' | '16:9' | '1:1';
 
 const RATIO: Record<CropAspect, number> = {
@@ -15,6 +25,13 @@ const RATIO: Record<CropAspect, number> = {
   '1:1': 1,
 };
 
+/** 최대 확대 배율。15 = 1500% */
+const MAX_SCALE = 15;
+
+/**
+ * 커버 배치 스타일
+ * 원본 비율을 유지하면서 프레임을 채운다.
+ */
 export function coverImgStyle(
   crop: CropValue | undefined,
   wide: boolean
@@ -28,11 +45,21 @@ export function coverImgStyle(
     transform: 'translate(-50%,-50%)',
     maxWidth: 'none',
     ...(wide
-      ? { height: `${c.scale * 100}%`, width: 'auto' }
-      : { width: `${c.scale * 100}%`, height: 'auto' }),
+      ? {
+          height: `${c.scale * 100}%`,
+          width: 'auto',
+        }
+      : {
+          width: `${c.scale * 100}%`,
+          height: 'auto',
+        }),
   };
 }
 
+/**
+ * 프레임 채움 크롭 이미지.
+ * 컨테이너와 원본 비율을 측정해 cover 방향을 자동 결정한다.
+ */
 export function CropImg({
   src,
   crop,
@@ -59,12 +86,16 @@ export function CropImg({
     compute();
 
     const el = wrapRef.current;
-    if (!el || typeof ResizeObserver === 'undefined') return;
+
+    if (!el || typeof ResizeObserver === 'undefined') {
+      return;
+    }
 
     const ro = new ResizeObserver(compute);
     ro.observe(el);
 
     return () => ro.disconnect();
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [src]);
 
@@ -84,10 +115,12 @@ export function CropImg({
         draggable={false}
         onLoad={(e) => {
           const im = e.currentTarget;
+
           natRef.current = {
             w: im.naturalWidth,
             h: im.naturalHeight,
           };
+
           compute();
         }}
         style={
@@ -100,6 +133,10 @@ export function CropImg({
   );
 }
 
+/**
+ * 파일 참조 + 크롭을 적용해 표시하는 썸네일.
+ * 파일이 없으면 플레이스홀더를 표시한다.
+ */
 export function CroppedBlobImg({
   fileRef,
   crop,
@@ -150,11 +187,16 @@ export function CropEditor({
   onApply: (crop: CropValue) => void;
 }) {
   const [crop, setCrop] = useState<CropValue>(
-    initial ?? { x: 0, y: 0, scale: 1 }
+    initial ?? {
+      x: 0,
+      y: 0,
+      scale: 1,
+    }
   );
 
   const frameRef = useRef<HTMLDivElement>(null);
   const zoomRef = useRef<HTMLDivElement>(null);
+
   const [natR, setNatR] = useState<number | null>(null);
 
   const frameR =
@@ -185,9 +227,13 @@ export function CropEditor({
     }
   }, [open, initial]);
 
+  /**
+   * 이미지가 프레임을 항상 채우도록 위치와 확대율을 제한한다.
+   * 확대율은 1x ~ 15x.
+   */
   const clamp = (c: CropValue): CropValue => {
     const scale = Math.min(
-      3,
+      MAX_SCALE,
       Math.max(1, c.scale)
     );
 
@@ -231,7 +277,12 @@ export function CropEditor({
     };
   };
 
-  const onPan = (e: React.PointerEvent) => {
+  /**
+   * 이미지 드래그 이동
+   */
+  const onPan = (
+    e: React.PointerEvent
+  ) => {
     e.preventDefault();
 
     const r =
@@ -239,10 +290,13 @@ export function CropEditor({
 
     const sx = e.clientX;
     const sy = e.clientY;
+
     const bx = crop.x;
     const by = crop.y;
 
-    const mv = (ev: PointerEvent) => {
+    const mv = (
+      ev: PointerEvent
+    ) => {
       setCrop((c) =>
         clamp({
           ...c,
@@ -263,6 +317,7 @@ export function CropEditor({
         'pointermove',
         mv
       );
+
       window.removeEventListener(
         'pointerup',
         up
@@ -273,12 +328,16 @@ export function CropEditor({
       'pointermove',
       mv
     );
+
     window.addEventListener(
       'pointerup',
       up
     );
   };
 
+  /**
+   * 줌 슬라이더 위치 → 1x ~ 15x
+   */
   const setZoomFromPointer = (
     clientX: number
   ) => {
@@ -297,7 +356,9 @@ export function CropEditor({
     setCrop((c) =>
       clamp({
         ...c,
-        scale: 1 + t * 2,
+        scale:
+          1 +
+          t * (MAX_SCALE - 1),
       })
     );
   };
@@ -306,16 +367,23 @@ export function CropEditor({
     e: React.PointerEvent
   ) => {
     e.preventDefault();
+
     setZoomFromPointer(e.clientX);
 
-    const mv = (ev: PointerEvent) =>
-      setZoomFromPointer(ev.clientX);
+    const mv = (
+      ev: PointerEvent
+    ) => {
+      setZoomFromPointer(
+        ev.clientX
+      );
+    };
 
     const up = () => {
       window.removeEventListener(
         'pointermove',
         mv
       );
+
       window.removeEventListener(
         'pointerup',
         up
@@ -326,25 +394,34 @@ export function CropEditor({
       'pointermove',
       mv
     );
+
     window.addEventListener(
       'pointerup',
       up
     );
   };
 
+  /**
+   * 현재 확대율을 슬라이더상의 0~100% 위치로 변환
+   */
+  const zoomPercent =
+    ((crop.scale - 1) /
+      (MAX_SCALE - 1)) *
+    100;
+
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="サムネイル範囲を調整"
-      desc={`比率 ${aspectText} — ドラッグで位置調整、スライダーやホイールで拡大できます。元画像は切り取られません。`}
+      title="썸네일 영역 지정"
+      desc={`크롭 비율 ${aspectText} — 드래그로 이동, 슬라이더/휠로 확대 · 최대 15×`}
       actions={
         <>
           <button
             className="btn btn-ghost"
             onClick={onClose}
           >
-            キャンセル
+            CANCEL
           </button>
 
           <button
@@ -353,7 +430,7 @@ export function CropEditor({
               onApply(crop)
             }
           >
-            適用
+            APPLY
           </button>
         </>
       }
@@ -362,7 +439,8 @@ export function CropEditor({
         ref={frameRef}
         className="crop-frame"
         style={{
-          aspectRatio: String(frameR),
+          aspectRatio:
+            String(frameR),
           width: `min(100%, ${Math.round(
             480 * frameR
           )}px)`,
@@ -370,13 +448,19 @@ export function CropEditor({
         }}
         onPointerDown={onPan}
         onWheel={(e) => {
+          e.preventDefault();
+
           setCrop((c) =>
             clamp({
               ...c,
+
+              // ホイールは細かく調整できるようにする
               scale:
                 c.scale -
-                Math.sign(e.deltaY) *
-                  0.08,
+                Math.sign(
+                  e.deltaY
+                ) *
+                  0.15,
             })
           );
         }}
@@ -395,7 +479,8 @@ export function CropEditor({
               e.currentTarget;
 
             if (
-              im.naturalHeight > 0
+              im.naturalHeight >
+              0
             ) {
               setNatR(
                 im.naturalWidth /
@@ -412,38 +497,45 @@ export function CropEditor({
         <span
           style={{
             fontSize: 11,
-            color: 'var(--faint)',
+            color:
+              'var(--faint)',
+            minWidth: 72,
           }}
         >
-          拡大 {crop.scale.toFixed(2)}×
+          확대{' '}
+          {crop.scale.toFixed(
+            2
+          )}
+          ×
         </span>
 
         <div
           ref={zoomRef}
-          onPointerDown={onZoomDrag}
+          onPointerDown={
+            onZoomDrag
+          }
           style={{
             flex: 1,
-            maxWidth: 220,
+            maxWidth: 260,
             height: 4,
             borderRadius: 4,
-            background: '#d7dae0',
-            position: 'relative',
+            background:
+              '#d7dae0',
+            position:
+              'relative',
             cursor:
               'var(--cur-pointer,pointer)',
           }}
         >
           <i
             style={{
-              position: 'absolute',
+              position:
+                'absolute',
               left: 0,
               top: 0,
               height: '100%',
               borderRadius: 4,
-              width: `${
-                ((crop.scale - 1) /
-                  2) *
-                100
-              }%`,
+              width: `${zoomPercent}%`,
               background:
                 'var(--accent)',
             }}
@@ -451,17 +543,16 @@ export function CropEditor({
 
           <i
             style={{
-              position: 'absolute',
+              position:
+                'absolute',
               top: '50%',
-              left: `${
-                ((crop.scale - 1) /
-                  2) *
-                100
-              }%`,
+              left: `${zoomPercent}%`,
               width: 14,
               height: 14,
-              borderRadius: '50%',
-              background: '#fff',
+              borderRadius:
+                '50%',
+              background:
+                '#fff',
               transform:
                 'translate(-50%,-50%)',
               boxShadow:
@@ -473,7 +564,8 @@ export function CropEditor({
         <button
           className="btn btn-ghost"
           style={{
-            padding: '5px 11px',
+            padding:
+              '5px 11px',
             fontSize: 11,
           }}
           onClick={() =>
@@ -484,7 +576,7 @@ export function CropEditor({
             })
           }
         >
-          リセット
+          초기화
         </button>
       </div>
     </Modal>
