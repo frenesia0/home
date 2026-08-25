@@ -118,6 +118,9 @@ export default function EditIllustrationPage() {
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [removedImagePublicIds, setRemovedImagePublicIds] =
+    useState<string[]>([]);
 
   const isSongParody =
     category === 'original' &&
@@ -401,9 +404,67 @@ export default function EditIllustrationPage() {
     setError('');
   };
 
+  const deleteCloudinaryImages = async (
+    publicIds: string[]
+  ) => {
+    const uniqueIds = Array.from(
+      new Set(
+        publicIds
+          .map((value) => value.trim())
+          .filter(Boolean)
+      )
+    );
+
+    if (uniqueIds.length === 0) return;
+
+    const be = backend();
+    const token = await be?.getIdToken?.();
+
+    if (!token) {
+      throw new Error(
+        '削除用のログイン認証を取得できませんでした。いったんログインし直してください。'
+      );
+    }
+
+    const response = await fetch(
+      '/api/cloudinary/delete',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          publicIds: uniqueIds,
+        }),
+      }
+    );
+
+    const result = (await response.json()) as {
+      error?: string;
+    };
+
+    if (!response.ok) {
+      throw new Error(
+        result.error ||
+          'Cloudinary画像の削除に失敗しました。'
+      );
+    }
+  };
+
   const removeExistingImage = (
     index: number
   ) => {
+    const removing = existingImages[index];
+
+    if (removing?.publicId) {
+      setRemovedImagePublicIds((current) =>
+        current.includes(removing.publicId)
+          ? current
+          : [...current, removing.publicId]
+      );
+    }
+
     const next =
       existingImages.filter(
         (_, i) => i !== index
@@ -562,6 +623,85 @@ export default function EditIllustrationPage() {
       );
     };
 
+  const handleDeletePost = async () => {
+    if (
+      !isAdmin ||
+      !user ||
+      !post ||
+      deleting ||
+      saving
+    ) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'この作品を完全に削除しますか？\n\n投稿画像・専用サムネイル・登録済み音源も削除され、元に戻せません。'
+    );
+
+    if (!confirmed) return;
+
+    setDeleting(true);
+    setError('');
+    setProgress('作品を削除しています...');
+
+    try {
+      const imagePublicIds = getGalleryImages(post)
+        .map((image) => image.publicId)
+        .filter(Boolean);
+
+      if (post.customThumbnail?.publicId) {
+        imagePublicIds.push(
+          post.customThumbnail.publicId
+        );
+      }
+
+      const oldAudio =
+        (
+          post.song as
+            | SongWithAudio
+            | undefined
+        )?.audioUrl ?? '';
+
+      // 先に外部ファイルを削除。失敗したら投稿データは残して再試行できるようにする。
+      await deleteCloudinaryImages(
+        imagePublicIds
+      );
+
+      if (oldAudio) {
+        const be = backend();
+        if (!be) {
+          throw new Error(
+            'Firebase Storageへ接続できません。'
+          );
+        }
+
+        await be.deleteFile(oldAudio);
+      }
+
+      const nextPosts = originalPosts.filter(
+        (item) => item.id !== post.id
+      );
+
+      await saveGalleryPosts(
+        originalPosts,
+        nextPosts,
+        user.id
+      );
+
+      router.push('/gallery');
+      router.refresh();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : '作品の削除に失敗しました。'
+      );
+    } finally {
+      setDeleting(false);
+      setProgress('');
+    }
+  };
+
   const handleSave =
     async (
       event: React.FormEvent<HTMLFormElement>
@@ -638,6 +778,8 @@ export default function EditIllustrationPage() {
       setError('');
 
       let newlyUploadedAudio = '';
+      const newlyUploadedCloudinaryIds: string[] = [];
+      let saveCompleted = false;
 
       try {
         const uploadedNewImages:
@@ -659,6 +801,9 @@ export default function EditIllustrationPage() {
 
           uploadedNewImages.push(
             uploaded
+          );
+          newlyUploadedCloudinaryIds.push(
+            uploaded.publicId
           );
         }
 
@@ -712,6 +857,10 @@ export default function EditIllustrationPage() {
             await uploadToCloudinary(
               newCustomThumbnail
             );
+
+          newlyUploadedCloudinaryIds.push(
+            finalCustomThumbnail.publicId
+          );
         }
 
         let finalAudioUrl =
@@ -822,6 +971,35 @@ export default function EditIllustrationPage() {
           user.id
         );
 
+        saveCompleted = true;
+
+        const oldCustomThumbnailId =
+          post.customThumbnail?.publicId ?? '';
+
+        const customThumbnailWasRemovedOrReplaced =
+          !!oldCustomThumbnailId &&
+          (
+            thumbnailMode !== 'custom' ||
+            !!newCustomThumbnail
+          );
+
+        const cloudinaryIdsToDelete = [
+          ...removedImagePublicIds,
+          ...(customThumbnailWasRemovedOrReplaced
+            ? [oldCustomThumbnailId]
+            : []),
+        ];
+
+        if (cloudinaryIdsToDelete.length > 0) {
+          setProgress(
+            '使わなくなった画像を削除中...'
+          );
+
+          await deleteCloudinaryImages(
+            cloudinaryIdsToDelete
+          );
+        }
+
         const oldAudio =
           (
             post.song as
@@ -865,6 +1043,33 @@ export default function EditIllustrationPage() {
 
         router.refresh();
       } catch (err) {
+        if (!saveCompleted) {
+          if (
+            newlyUploadedCloudinaryIds.length > 0
+          ) {
+            try {
+              await deleteCloudinaryImages(
+                newlyUploadedCloudinaryIds
+              );
+            } catch {
+              // 保存失敗時の後始末失敗は、元のエラー表示を優先する。
+            }
+          }
+
+          if (newlyUploadedAudio) {
+            try {
+              const be = backend();
+              if (be) {
+                await be.deleteFile(
+                  newlyUploadedAudio
+                );
+              }
+            } catch {
+              // 同上。
+            }
+          }
+        }
+
         setError(
           err instanceof Error
             ? err.message
@@ -2171,8 +2376,40 @@ export default function EditIllustrationPage() {
             )}
 
             <button
+              type="button"
+              onClick={handleDeletePost}
+              disabled={saving || deleting}
+              style={{
+                width: '100%',
+                minHeight: '46px',
+                padding: '12px 18px',
+                border:
+                  '1px solid rgba(255,120,120,.5)',
+                borderRadius: '10px',
+                background:
+                  'rgba(160,35,35,.15)',
+                color: '#ffb0b0',
+                fontSize: '12px',
+                fontWeight: 700,
+                letterSpacing: '.06em',
+                cursor:
+                  saving || deleting
+                    ? 'wait'
+                    : 'pointer',
+                opacity:
+                  saving || deleting
+                    ? 0.6
+                    : 1,
+              }}
+            >
+              {deleting
+                ? 'DELETING...'
+                : 'DELETE ILLUSTRATION'}
+            </button>
+
+            <button
               type="submit"
-              disabled={saving}
+              disabled={saving || deleting}
               style={{
                 width: '100%',
                 minHeight:
@@ -2194,11 +2431,11 @@ export default function EditIllustrationPage() {
                 letterSpacing:
                   '.08em',
                 cursor:
-                  saving
+                  saving || deleting
                     ? 'wait'
                     : 'pointer',
                 opacity:
-                  saving
+                  saving || deleting
                     ? 0.65
                     : 1,
               }}
