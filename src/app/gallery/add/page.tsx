@@ -224,9 +224,16 @@ export default function AddIllustrationPage() {
           file.type.startsWith('image/')
       );
 
-    setImages(selected);
-    setThumbnailIndex(0);
-    setThumbnailCrop(DEFAULT_CROP);
+    setImages((current) => [
+      ...current,
+      ...selected,
+    ]);
+
+    if (images.length === 0) {
+      setThumbnailIndex(0);
+      setThumbnailCrop(DEFAULT_CROP);
+    }
+
     setError('');
   };
 
@@ -780,11 +787,12 @@ export default function AddIllustrationPage() {
                 type="file"
                 accept="image/*"
                 multiple
-                onChange={(e) =>
+                onChange={(e) => {
                   handleImageChange(
                     e.target.files
-                  )
-                }
+                  );
+                  e.currentTarget.value = '';
+                }}
                 style={{
                   color:
                     '#f5f5f5',
