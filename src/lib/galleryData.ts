@@ -27,6 +27,11 @@ export interface GalleryCommission {
   snsUrl?: string;
 }
 
+export interface GallerySong {
+  title?: string;
+  url?: string;
+}
+
 export type GalleryThumbnailMode = 'post' | 'custom';
 
 export interface GalleryPost {
@@ -35,28 +40,20 @@ export interface GalleryPost {
   date: string;
   category: GalleryCategory;
 
-  // キャラクターとタグは別管理
   characters?: GalleryCharacter[];
   tags?: GalleryTag[];
 
-  // 1投稿に複数画像
   images?: GalleryImage[];
 
-  // Gallery一覧のサムネイル方式
-  // post: 投稿画像から選択 / custom: サムネイル専用画像
   thumbnailMode?: GalleryThumbnailMode;
-
-  // post方式で使う投稿画像。0 = 1枚目、1 = 2枚目...
   thumbnailIndex?: number;
-
-  // サムネイルの1:1表示範囲
   thumbnailCrop?: CropValue;
-
-  // custom方式で使う一覧専用画像。投稿本文の画像枚数には含めない
   customThumbnail?: GalleryImage;
 
-  // COMMISSIONのときだけ使用
   commission?: GalleryCommission;
+
+  // SONG PARODYのときだけ使用。どちらも任意
+  song?: GallerySong;
 
   // 旧形式との互換用
   imageUrl?: string;
@@ -67,21 +64,11 @@ export interface GalleryPost {
   visibility: 'public';
   createdAt: string;
 
-  // backend側のListItem型と互換にする
   [key: string]: unknown;
 }
 
-/**
- * 新Gallery専用のFirestoreコレクション名。
- *
- * 旧O.HOMEの「絵バックアップ」は gallery コレクションを使用しているため、
- * 新しい /gallery 機能は illustrations に分離する。
- */
 export const GALLERY_COLLECTION = 'illustrations';
 
-/**
- * 新旧どちらの形式でも画像を取得する。
- */
 export function getGalleryImages(post: GalleryPost): GalleryImage[] {
   if (Array.isArray(post.images) && post.images.length > 0) {
     return post.images.filter(
@@ -99,24 +86,17 @@ export function getGalleryImages(post: GalleryPost): GalleryImage[] {
     typeof post.cloudinaryPublicId === 'string' &&
     post.cloudinaryPublicId.length > 0
   ) {
-    return [
-      {
-        url: post.imageUrl,
-        publicId: post.cloudinaryPublicId,
-      },
-    ];
+    return [{
+      url: post.imageUrl,
+      publicId: post.cloudinaryPublicId,
+    }];
   }
 
   return [];
 }
 
-/**
- * サムネイルに使う画像の番号を安全に取得する。
- * 未設定・範囲外なら1枚目を使う。
- */
 export function getGalleryThumbnailIndex(post: GalleryPost): number {
   const images = getGalleryImages(post);
-
   if (images.length === 0) return 0;
 
   const index =
@@ -125,14 +105,9 @@ export function getGalleryThumbnailIndex(post: GalleryPost): number {
       : 0;
 
   if (index < 0 || index >= images.length) return 0;
-
   return index;
 }
 
-/**
- * サムネイルに使う代表画像を取得する。
- * 専用画像が選ばれている場合はそちらを優先する。
- */
 export function getGalleryThumbnailImage(
   post: GalleryPost
 ): GalleryImage | null {
@@ -148,16 +123,11 @@ export function getGalleryThumbnailImage(
   }
 
   const images = getGalleryImages(post);
-
   if (images.length === 0) return null;
 
   return images[getGalleryThumbnailIndex(post)] ?? images[0] ?? null;
 }
 
-/**
- * 新旧どちらの形式でもキャラクター情報を取得する。
- * 旧形式では tags に shiki / solas が混在していたため読み替える。
- */
 export function getGalleryCharacters(post: GalleryPost): GalleryCharacter[] {
   if (Array.isArray(post.characters)) {
     return post.characters.filter(
@@ -179,11 +149,6 @@ export function getGalleryCharacters(post: GalleryPost): GalleryCharacter[] {
   );
 }
 
-/**
- * 新旧どちらの形式でもタグ情報を取得する。
- * 旧形式の song-inspired は song-parody として読み替える。
- * COMMISSIONではタグを表示・検索対象にしない。
- */
 export function getGalleryTags(post: GalleryPost): GalleryTag[] {
   if (post.category === 'commission') return [];
 
@@ -211,9 +176,6 @@ export function getGalleryTags(post: GalleryPost): GalleryTag[] {
   return Array.from(new Set(converted));
 }
 
-/**
- * COMMISSION情報を安全に取得する。
- */
 export function getGalleryCommission(
   post: GalleryPost
 ): GalleryCommission | null {
@@ -238,12 +200,35 @@ export function getGalleryCommission(
   };
 }
 
-/** 新Gallery一覧をFirestoreから取得する */
+export function getGallerySong(post: GalleryPost): GallerySong | null {
+  if (
+    post.category !== 'original' ||
+    !getGalleryTags(post).includes('song-parody')
+  ) {
+    return null;
+  }
+
+  const song = post.song;
+  if (!song || typeof song !== 'object') return null;
+
+  const title =
+    typeof song.title === 'string' && song.title.trim()
+      ? song.title.trim()
+      : undefined;
+
+  const url =
+    typeof song.url === 'string' && song.url.trim()
+      ? song.url.trim()
+      : undefined;
+
+  if (!title && !url) return null;
+  return { title, url };
+}
+
 export async function fetchGalleryPosts(): Promise<GalleryPost[]> {
   return fetchList<GalleryPost>(GALLERY_COLLECTION);
 }
 
-/** 新Gallery一覧の変更をFirestoreへ同期する */
 export async function saveGalleryPosts(
   previous: GalleryPost[],
   next: GalleryPost[],
@@ -257,7 +242,6 @@ export async function saveGalleryPosts(
   );
 }
 
-/** 新Galleryコレクションの変更を購読する */
 export function subscribeGallery(
   onChange: () => void
 ): () => void {
