@@ -1,9 +1,23 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth';
 import {
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+
+import {
+  useRouter,
+} from 'next/navigation';
+
+import {
+  useAuth,
+} from '@/lib/auth';
+
+import {
+  createGalleryWatermark,
+  getDefaultWatermarkOpacity,
+  normalizeWatermarkText,
   fetchGalleryPosts,
   saveGalleryPosts,
   type GalleryCategory,
@@ -12,20 +26,34 @@ import {
   type GalleryPost,
   type GalleryTag,
   type GalleryThumbnailMode,
+  type GalleryWatermark,
+  type GalleryWatermarkColor,
 } from '@/lib/galleryData';
+
 import {
   CropEditor,
   CropImg,
   type CropValue,
 } from '@/components/ui/CropEditor';
 
+
+/* =========================================================
+   TYPES
+========================================================= */
+
 type CloudinaryUploadResponse = {
   secure_url?: string;
   public_id?: string;
+
   error?: {
     message?: string;
   };
 };
+
+
+/* =========================================================
+   CONSTANTS
+========================================================= */
 
 const DEFAULT_CROP: CropValue = {
   x: 0,
@@ -33,219 +61,888 @@ const DEFAULT_CROP: CropValue = {
   scale: 1,
 };
 
-/**
- * 日付から YYYYMMDD-01 形式の作品IDを作る。
- * 同じ日の既存IDを確認し、01から順に空いている番号を自動採番する。
- *
- * 例:
- * 2026-08-20 の1件目 → 20260820-01
- * 2026-08-20 の2件目 → 20260820-02
- */
+const ORIGINAL_ID =
+  '@frenesia0';
+
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
 function createGalleryId(
   date: string,
   existingPosts: GalleryPost[]
 ): string {
-  const datePart = date.replaceAll('-', '');
+  const datePart =
+    date.replaceAll('-', '');
 
-  const used = new Set(
-    existingPosts
-      .map((post) => {
-        const match = post.id.match(
-          new RegExp(`^${datePart}-(\\d+)$`)
-        );
+  const used =
+    new Set(
+      existingPosts
+        .map((post) => {
+          const match =
+            post.id.match(
+              new RegExp(
+                `^${datePart}-(\\d+)$`
+              )
+            );
 
-        if (!match) return null;
+          if (!match) {
+            return null;
+          }
 
-        const number = Number(match[1]);
-        return Number.isFinite(number) ? number : null;
-      })
-      .filter((value): value is number => value !== null)
-  );
+          const number =
+            Number(match[1]);
+
+          return Number.isFinite(number)
+            ? number
+            : null;
+        })
+        .filter(
+          (
+            value
+          ): value is number =>
+            value !== null
+        )
+    );
 
   let nextNumber = 1;
 
-  while (used.has(nextNumber)) {
+  while (
+    used.has(nextNumber)
+  ) {
     nextNumber += 1;
   }
 
-  return `${datePart}-${String(nextNumber).padStart(2, '0')}`;
+  return `${datePart}-${String(
+    nextNumber
+  ).padStart(2, '0')}`;
 }
 
+
+function clampOpacity(
+  value: number
+): number {
+  return Math.min(
+    100,
+    Math.max(
+      0,
+      Math.round(value)
+    )
+  );
+}
+
+
+function makeWatermark(
+  category: GalleryCategory,
+  snsId = ''
+): GalleryWatermark {
+  return createGalleryWatermark(
+    'white',
+    category === 'commission'
+      ? normalizeWatermarkText(
+          snsId
+        )
+      : ORIGINAL_ID
+  );
+}
+
+
+/* =========================================================
+   WATERMARK PREVIEW
+========================================================= */
+
+function WatermarkPreview({
+  watermark,
+}: {
+  watermark: GalleryWatermark;
+}) {
+  if (
+    watermark.color === 'none'
+  ) {
+    return null;
+  }
+
+  const rgb =
+    watermark.color === 'black'
+      ? '0,0,0'
+      : '255,255,255';
+
+  const opacity =
+    clampOpacity(
+      watermark.opacity
+    ) / 100;
+
+  /*
+   * 格子線は文字より少しだけ控えめにする。
+   * 設定値そのものは同じopacityで、
+   * 視覚上だけ線を細くしている。
+   */
+  const lineColor =
+    `rgba(${rgb}, ${opacity})`;
+
+  const textColor =
+    `rgba(${rgb}, ${opacity})`;
+
+  return (
+    <>
+      {watermark.grid && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: 'none',
+
+            /*
+             * 大きな斜めダイヤ格子。
+             *
+             * 2本の repeating-linear-gradient を
+             * 交差させている。
+             */
+            backgroundImage: `
+              repeating-linear-gradient(
+                45deg,
+                transparent 0,
+                transparent 88px,
+                ${lineColor} 89px,
+                ${lineColor} 90px,
+                transparent 91px,
+                transparent 180px
+              ),
+              repeating-linear-gradient(
+                -45deg,
+                transparent 0,
+                transparent 88px,
+                ${lineColor} 89px,
+                ${lineColor} 90px,
+                transparent 91px,
+                transparent 180px
+              )
+            `,
+            zIndex: 2,
+          }}
+        />
+      )}
+
+      {watermark.text && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            right: '4%',
+            bottom: '4%',
+            zIndex: 3,
+            pointerEvents: 'none',
+
+            color: textColor,
+
+            fontSize:
+              'clamp(11px, 4vw, 22px)',
+
+            fontWeight: 500,
+
+            letterSpacing:
+              '.01em',
+
+            lineHeight: 1,
+
+            whiteSpace:
+              'nowrap',
+
+            textShadow:
+              watermark.color ===
+              'white'
+                ? '0 1px 3px rgba(0,0,0,.08)'
+                : '0 1px 3px rgba(255,255,255,.05)',
+          }}
+        >
+          {watermark.text}
+        </div>
+      )}
+    </>
+  );
+}
+
+
+/* =========================================================
+   PAGE
+========================================================= */
+
 export default function AddIllustrationPage() {
-  const router = useRouter();
-  const { isAdmin, user } = useAuth();
+  const router =
+    useRouter();
 
-  const [date, setDate] = useState('');
-  const [category, setCategory] =
-    useState<GalleryCategory>('original');
-  const [characters, setCharacters] =
-    useState<GalleryCharacter[]>([]);
-  const [tags, setTags] =
-    useState<GalleryTag[]>([]);
+  const {
+    isAdmin,
+    user,
+  } = useAuth();
 
-  const [songTitle, setSongTitle] = useState('');
-  const [songUrl, setSongUrl] = useState('');
 
-  const [artistName, setArtistName] = useState('');
-  const [snsId, setSnsId] = useState('');
-  const [snsUrl, setSnsUrl] = useState('');
+  /* ---------------------------------------------------------
+     BASIC DATA
+  --------------------------------------------------------- */
 
-  const [images, setImages] = useState<File[]>([]);
-  const [previewUrls, setPreviewUrls] =
+  const [
+    date,
+    setDate,
+  ] = useState('');
+
+  const [
+    category,
+    setCategory,
+  ] =
+    useState<GalleryCategory>(
+      'original'
+    );
+
+  const [
+    characters,
+    setCharacters,
+  ] =
+    useState<
+      GalleryCharacter[]
+    >([]);
+
+  const [
+    tags,
+    setTags,
+  ] =
+    useState<
+      GalleryTag[]
+    >([]);
+
+
+  /* ---------------------------------------------------------
+     SONG
+  --------------------------------------------------------- */
+
+  const [
+    songTitle,
+    setSongTitle,
+  ] = useState('');
+
+  const [
+    songUrl,
+    setSongUrl,
+  ] = useState('');
+
+
+  /* ---------------------------------------------------------
+     COMMISSION
+  --------------------------------------------------------- */
+
+  const [
+    artistName,
+    setArtistName,
+  ] = useState('');
+
+  const [
+    snsId,
+    setSnsId,
+  ] = useState('');
+
+  const [
+    snsUrl,
+    setSnsUrl,
+  ] = useState('');
+
+
+  /* ---------------------------------------------------------
+     IMAGES
+  --------------------------------------------------------- */
+
+  const [
+    images,
+    setImages,
+  ] =
+    useState<File[]>([]);
+
+  const [
+    previewUrls,
+    setPreviewUrls,
+  ] =
     useState<string[]>([]);
 
-  const [thumbnailMode, setThumbnailMode] =
-    useState<GalleryThumbnailMode>('post');
+  /*
+   * images[index] と
+   * watermarkSettings[index]
+   * が必ず対応する。
+   */
+  const [
+    watermarkSettings,
+    setWatermarkSettings,
+  ] =
+    useState<
+      GalleryWatermark[]
+    >([]);
 
-  const [thumbnailIndex, setThumbnailIndex] =
+
+  /* ---------------------------------------------------------
+     THUMBNAIL
+  --------------------------------------------------------- */
+
+  const [
+    thumbnailMode,
+    setThumbnailMode,
+  ] =
+    useState<GalleryThumbnailMode>(
+      'post'
+    );
+
+  const [
+    thumbnailIndex,
+    setThumbnailIndex,
+  ] =
     useState(0);
 
-  const [thumbnailCrop, setThumbnailCrop] =
-    useState<CropValue>(DEFAULT_CROP);
+  const [
+    thumbnailCrop,
+    setThumbnailCrop,
+  ] =
+    useState<CropValue>(
+      DEFAULT_CROP
+    );
 
-  const [customThumbnail, setCustomThumbnail] =
-    useState<File | null>(null);
+  const [
+    customThumbnail,
+    setCustomThumbnail,
+  ] =
+    useState<File | null>(
+      null
+    );
 
-  const [customThumbnailUrl, setCustomThumbnailUrl] =
-    useState<string | null>(null);
+  const [
+    customThumbnailUrl,
+    setCustomThumbnailUrl,
+  ] =
+    useState<string | null>(
+      null
+    );
 
-  const [cropOpen, setCropOpen] = useState(false);
-  const [posting, setPosting] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState('');
-  const [error, setError] = useState('');
+  const [
+    cropOpen,
+    setCropOpen,
+  ] =
+    useState(false);
+
+
+  /* ---------------------------------------------------------
+     STATUS
+  --------------------------------------------------------- */
+
+  const [
+    posting,
+    setPosting,
+  ] =
+    useState(false);
+
+  const [
+    uploadProgress,
+    setUploadProgress,
+  ] =
+    useState('');
+
+  const [
+    error,
+    setError,
+  ] =
+    useState('');
+
+
+  /* =========================================================
+     DERIVED
+  ========================================================= */
 
   const isSongParody =
     category === 'original' &&
-    tags.includes('song-parody');
-
-  useEffect(() => {
-    const urls = images.map((image) =>
-      URL.createObjectURL(image)
+    tags.includes(
+      'song-parody'
     );
 
-    setPreviewUrls(urls);
+
+  /* =========================================================
+     PREVIEW URLS
+  ========================================================= */
+
+  useEffect(() => {
+    const urls =
+      images.map(
+        (image) =>
+          URL.createObjectURL(
+            image
+          )
+      );
+
+    setPreviewUrls(
+      urls
+    );
 
     return () => {
-      urls.forEach((url) =>
-        URL.revokeObjectURL(url)
+      urls.forEach(
+        (url) =>
+          URL.revokeObjectURL(
+            url
+          )
       );
     };
   }, [images]);
 
+
   useEffect(() => {
-    if (!customThumbnail) {
-      setCustomThumbnailUrl(null);
+    if (
+      !customThumbnail
+    ) {
+      setCustomThumbnailUrl(
+        null
+      );
+
       return;
     }
 
     const url =
-      URL.createObjectURL(customThumbnail);
+      URL.createObjectURL(
+        customThumbnail
+      );
 
-    setCustomThumbnailUrl(url);
+    setCustomThumbnailUrl(
+      url
+    );
 
     return () =>
-      URL.revokeObjectURL(url);
-  }, [customThumbnail]);
-
-  useEffect(() => {
-    if (thumbnailIndex >= images.length) {
-      setThumbnailIndex(0);
-      setThumbnailCrop(DEFAULT_CROP);
-    }
-  }, [images.length, thumbnailIndex]);
-
-  useEffect(() => {
-    if (!isSongParody) {
-      setSongTitle('');
-      setSongUrl('');
-    }
-  }, [isSongParody]);
-
-  const thumbnailSrc = useMemo(() => {
-    if (thumbnailMode === 'custom') {
-      return customThumbnailUrl;
-    }
-
-    return previewUrls[thumbnailIndex] ?? null;
+      URL.revokeObjectURL(
+        url
+      );
   }, [
-    thumbnailMode,
-    customThumbnailUrl,
-    previewUrls,
+    customThumbnail,
+  ]);
+
+
+  /* =========================================================
+     THUMBNAIL SAFETY
+  ========================================================= */
+
+  useEffect(() => {
+    if (
+      thumbnailIndex >=
+      images.length
+    ) {
+      setThumbnailIndex(
+        0
+      );
+
+      setThumbnailCrop(
+        DEFAULT_CROP
+      );
+    }
+  }, [
+    images.length,
     thumbnailIndex,
   ]);
 
-  const changeCategory = (
-    next: GalleryCategory
-  ) => {
-    setCategory(next);
 
-    if (next === 'commission') {
-      setTags([]);
+  /* =========================================================
+     SONG RESET
+  ========================================================= */
+
+  useEffect(() => {
+    if (
+      !isSongParody
+    ) {
       setSongTitle('');
       setSongUrl('');
     }
+  }, [
+    isSongParody,
+  ]);
+
+
+  /* =========================================================
+     COMMISSION ID AUTO LINK
+  ========================================================= */
+
+  /*
+   * COMMISSIONの場合、
+   * SNS IDを変更したら、
+   * まだ自分でウォーターマーク文字を変更していない画像は
+   * SNS IDへ追従させる。
+   *
+   * ORIGINALへ戻した場合は
+   * @frenesia0 に戻す。
+   */
+  useEffect(() => {
+    setWatermarkSettings(
+      (current) =>
+        current.map(
+          (watermark) => {
+            if (
+              category ===
+              'original'
+            ) {
+              const isAutoText =
+                !watermark.text ||
+                watermark.text ===
+                  normalizeWatermarkText(
+                    snsId
+                  );
+
+              if (
+                !isAutoText &&
+                watermark.text !==
+                  ORIGINAL_ID
+              ) {
+                return watermark;
+              }
+
+              return {
+                ...watermark,
+                text:
+                  ORIGINAL_ID,
+              };
+            }
+
+            /*
+             * COMMISSION
+             */
+            if (
+              watermark.text ===
+                ORIGINAL_ID ||
+              !watermark.text
+            ) {
+              return {
+                ...watermark,
+                text:
+                  normalizeWatermarkText(
+                    snsId
+                  ),
+              };
+            }
+
+            return watermark;
+          }
+        )
+    );
+  }, [
+    category,
+    snsId,
+  ]);
+
+
+  /* =========================================================
+     THUMBNAIL SOURCE
+  ========================================================= */
+
+  const thumbnailSrc =
+    useMemo(() => {
+      if (
+        thumbnailMode ===
+        'custom'
+      ) {
+        return (
+          customThumbnailUrl
+        );
+      }
+
+      return (
+        previewUrls[
+          thumbnailIndex
+        ] ?? null
+      );
+    }, [
+      thumbnailMode,
+      customThumbnailUrl,
+      previewUrls,
+      thumbnailIndex,
+    ]);
+
+
+  /* =========================================================
+     CATEGORY
+  ========================================================= */
+
+  const changeCategory = (
+    next:
+      GalleryCategory
+  ) => {
+    setCategory(
+      next
+    );
+
+    if (
+      next ===
+      'commission'
+    ) {
+      setTags([]);
+      setSongTitle('');
+      setSongUrl('');
+
+      setWatermarkSettings(
+        (current) =>
+          current.map(
+            (watermark) => ({
+              ...watermark,
+
+              text:
+                normalizeWatermarkText(
+                  snsId
+                ),
+            })
+          )
+      );
+    } else {
+      setWatermarkSettings(
+        (current) =>
+          current.map(
+            (watermark) => ({
+              ...watermark,
+              text:
+                ORIGINAL_ID,
+            })
+          )
+      );
+    }
   };
+
+
+  /* =========================================================
+     CHARACTER / TAG
+  ========================================================= */
 
   const toggleCharacter = (
-    character: GalleryCharacter
+    character:
+      GalleryCharacter
   ) => {
-    setCharacters((current) =>
-      current.includes(character)
-        ? current.filter(
-            (item) => item !== character
-          )
-        : [...current, character]
+    setCharacters(
+      (current) =>
+        current.includes(
+          character
+        )
+          ? current.filter(
+              (item) =>
+                item !==
+                character
+            )
+          : [
+              ...current,
+              character,
+            ]
     );
   };
+
 
   const toggleTag = (
-    tag: GalleryTag
+    tag:
+      GalleryTag
   ) => {
-    setTags((current) =>
-      current.includes(tag)
-        ? current.filter(
-            (item) => item !== tag
-          )
-        : [...current, tag]
+    setTags(
+      (current) =>
+        current.includes(
+          tag
+        )
+          ? current.filter(
+              (item) =>
+                item !== tag
+            )
+          : [
+              ...current,
+              tag,
+            ]
     );
   };
 
+
+  /* =========================================================
+     IMAGE ADD
+  ========================================================= */
+
   const handleImageChange = (
-    files: FileList | null
+    files:
+      FileList | null
   ) => {
     if (!files) {
-      setImages([]);
       return;
     }
 
     const selected =
-      Array.from(files).filter(
+      Array.from(
+        files
+      ).filter(
         (file) =>
-          file.type.startsWith('image/')
+          file.type.startsWith(
+            'image/'
+          )
       );
 
-    setImages((current) => [
-      ...current,
-      ...selected,
-    ]);
+    if (
+      selected.length === 0
+    ) {
+      return;
+    }
 
-    if (images.length === 0) {
-      setThumbnailIndex(0);
-      setThumbnailCrop(DEFAULT_CROP);
+    const wasEmpty =
+      images.length === 0;
+
+    setImages(
+      (current) => [
+        ...current,
+        ...selected,
+      ]
+    );
+
+    /*
+     * 新しく追加した画像のぶんだけ
+     * ウォーターマーク設定を作る。
+     */
+    setWatermarkSettings(
+      (current) => [
+        ...current,
+
+        ...selected.map(
+          () =>
+            makeWatermark(
+              category,
+              snsId
+            )
+        ),
+      ]
+    );
+
+    if (wasEmpty) {
+      setThumbnailIndex(
+        0
+      );
+
+      setThumbnailCrop(
+        DEFAULT_CROP
+      );
     }
 
     setError('');
   };
 
+
+  /* =========================================================
+     IMAGE REMOVE
+  ========================================================= */
+
   const removeImage = (
     index: number
   ) => {
-    setImages((current) =>
-      current.filter(
-        (_, i) => i !== index
-      )
+    setImages(
+      (current) =>
+        current.filter(
+          (_, i) =>
+            i !== index
+        )
+    );
+
+    setWatermarkSettings(
+      (current) =>
+        current.filter(
+          (_, i) =>
+            i !== index
+        )
+    );
+
+    /*
+     * 削除した画像より後ろを
+     * サムネイルにしていた場合は
+     * indexを1つ前へずらす。
+     */
+    setThumbnailIndex(
+      (current) => {
+        if (
+          current === index
+        ) {
+          return 0;
+        }
+
+        if (
+          current > index
+        ) {
+          return current - 1;
+        }
+
+        return current;
+      }
+    );
+
+    setThumbnailCrop(
+      DEFAULT_CROP
     );
   };
+
+
+  /* =========================================================
+     WATERMARK UPDATE
+  ========================================================= */
+
+  const updateWatermark = (
+    index: number,
+    patch:
+      Partial<GalleryWatermark>
+  ) => {
+    setWatermarkSettings(
+      (current) =>
+        current.map(
+          (
+            watermark,
+            i
+          ) =>
+            i === index
+              ? {
+                  ...watermark,
+                  ...patch,
+                }
+              : watermark
+        )
+    );
+  };
+
+
+  const changeWatermarkColor = (
+    index: number,
+    color:
+      GalleryWatermarkColor
+  ) => {
+    updateWatermark(
+      index,
+      {
+        color,
+
+        opacity:
+          getDefaultWatermarkOpacity(
+            color
+          ),
+
+        grid:
+          color === 'none'
+            ? false
+            : true,
+      }
+    );
+  };
+
+
+  const changeWatermarkOpacity = (
+    index: number,
+    value: number
+  ) => {
+    updateWatermark(
+      index,
+      {
+        opacity:
+          clampOpacity(
+            value
+          ),
+      }
+    );
+  };
+
+
+  /* =========================================================
+     CLOUDINARY
+  ========================================================= */
 
   const uploadToCloudinary =
     async (
@@ -287,13 +984,17 @@ export default function AddIllustrationPage() {
         await fetch(
           `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
           {
-            method: 'POST',
-            body: form,
+            method:
+              'POST',
+
+            body:
+              form,
           }
         );
 
       const result =
-        (await response.json()) as CloudinaryUploadResponse;
+        (await response.json()) as
+          CloudinaryUploadResponse;
 
       if (
         !response.ok ||
@@ -301,21 +1002,30 @@ export default function AddIllustrationPage() {
         !result.public_id
       ) {
         throw new Error(
-          result.error?.message ||
+          result.error
+            ?.message ||
             '画像のアップロードに失敗しました。'
         );
       }
 
       return {
-        url: result.secure_url,
+        url:
+          result.secure_url,
+
         publicId:
           result.public_id,
       };
     };
 
+
+  /* =========================================================
+     SUBMIT
+  ========================================================= */
+
   const handleSubmit =
     async (
-      e: React.FormEvent<HTMLFormElement>
+      e:
+        React.FormEvent<HTMLFormElement>
     ) => {
       e.preventDefault();
 
@@ -326,6 +1036,7 @@ export default function AddIllustrationPage() {
         setError(
           '管理者としてログインしてください。'
         );
+
         return;
       }
 
@@ -335,6 +1046,7 @@ export default function AddIllustrationPage() {
         setError(
           '画像を1枚以上選択してください。'
         );
+
         return;
       }
 
@@ -342,6 +1054,7 @@ export default function AddIllustrationPage() {
         setError(
           '日付を選択してください。'
         );
+
         return;
       }
 
@@ -353,6 +1066,7 @@ export default function AddIllustrationPage() {
         setError(
           'COMMISSIONでは作者名を入力してください。'
         );
+
         return;
       }
 
@@ -364,20 +1078,19 @@ export default function AddIllustrationPage() {
         setError(
           'サムネイル専用画像を選択してください。'
         );
+
         return;
       }
 
-      if (posting) return;
+      if (posting) {
+        return;
+      }
 
       setPosting(true);
       setError('');
       setUploadProgress('');
 
       try {
-        /*
-         * 先に既存投稿を取得して、その時点で空いている日付IDを決める。
-         * UUIDはもう新規作成しない。
-         */
         const previous =
           await fetchGalleryPosts();
 
@@ -404,9 +1117,22 @@ export default function AddIllustrationPage() {
               images[i]
             );
 
-          uploadedImages.push(
-            uploaded
-          );
+          /*
+           * ここで画像と
+           * ウォーターマーク設定を合体。
+           */
+          uploadedImages.push({
+            ...uploaded,
+
+            watermark:
+              watermarkSettings[
+                i
+              ] ??
+              makeWatermark(
+                category,
+                snsId
+              ),
+          });
         }
 
         let uploadedCustomThumbnail:
@@ -433,43 +1159,57 @@ export default function AddIllustrationPage() {
 
         const newPost:
           GalleryPost = {
-          id: newId,
+          id:
+            newId,
+
           date,
+
           category,
+
           characters,
+
           tags:
             category ===
             'original'
               ? tags
               : [],
+
           images:
             uploadedImages,
+
           thumbnailMode,
+
           thumbnailIndex:
             thumbnailMode ===
             'post'
               ? thumbnailIndex
               : undefined,
+
           thumbnailCrop,
+
           customThumbnail:
             thumbnailMode ===
             'custom'
               ? uploadedCustomThumbnail
               : undefined,
+
           commission:
             category ===
             'commission'
               ? {
                   artistName:
                     artistName.trim(),
+
                   snsId:
                     snsId.trim() ||
                     undefined,
+
                   snsUrl:
                     snsUrl.trim() ||
                     undefined,
                 }
               : undefined,
+
           song:
             isSongParody &&
             (
@@ -480,15 +1220,22 @@ export default function AddIllustrationPage() {
                   title:
                     songTitle.trim() ||
                     undefined,
+
                   url:
                     songUrl.trim() ||
                     undefined,
                 }
               : undefined,
-          authorId: user.id,
-          visibility: 'public',
+
+          authorId:
+            user.id,
+
+          visibility:
+            'public',
+
           createdAt:
-            new Date().toISOString(),
+            new Date()
+              .toISOString(),
         };
 
         await saveGalleryPosts(
@@ -500,10 +1247,6 @@ export default function AddIllustrationPage() {
           user.id
         );
 
-        /*
-         * 作品詳細ページへそのまま移動。
-         * 例: /gallery/20260820-01
-         */
         router.push(
           `/gallery/${newId}`
         );
@@ -521,40 +1264,93 @@ export default function AddIllustrationPage() {
       }
     };
 
+
+  /* =========================================================
+     STYLES
+  ========================================================= */
+
   const fieldStyle = {
-    display: 'grid',
-    gap: '8px',
+    display:
+      'grid',
+
+    gap:
+      '8px',
   };
 
+
   const inputStyle = {
-    width: '100%',
-    padding: '12px 14px',
-    borderRadius: '8px',
+    width:
+      '100%',
+
+    padding:
+      '12px 14px',
+
+    borderRadius:
+      '8px',
+
     border:
       '1px solid rgba(255,255,255,.25)',
+
     background:
       'rgba(255,255,255,.08)',
-    color: '#f5f5f5',
+
+    color:
+      '#f5f5f5',
+
     boxSizing:
       'border-box' as const,
   };
 
+
   const choiceStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '7px',
-    cursor: 'pointer',
+    display:
+      'flex',
+
+    alignItems:
+      'center',
+
+    gap:
+      '7px',
+
+    cursor:
+      'pointer',
   };
+
+
+  const fieldsetStyle = {
+    border:
+      '1px solid rgba(255,255,255,.18)',
+
+    borderRadius:
+      '10px',
+
+    padding:
+      '18px',
+  };
+
+
+  /* =========================================================
+     ACCESS DENIED
+  ========================================================= */
 
   if (!isAdmin) {
     return (
       <main
         style={{
-          maxWidth: '720px',
-          margin: '0 auto',
-          padding: '80px 32px',
-          color: '#f5f5f5',
-          textAlign: 'center',
+          maxWidth:
+            '720px',
+
+          margin:
+            '0 auto',
+
+          padding:
+            '80px 32px',
+
+          color:
+            '#f5f5f5',
+
+          textAlign:
+            'center',
         }}
       >
         <h1>
@@ -578,22 +1374,37 @@ export default function AddIllustrationPage() {
     );
   }
 
+
+  /* =========================================================
+     RENDER
+  ========================================================= */
+
   return (
     <>
       <main
+        className="gallery-add-page"
         style={{
-          maxWidth: '1040px',
-          margin: '0 auto',
+          maxWidth:
+            '1100px',
+
+          margin:
+            '0 auto',
+
           padding:
-            '56px 32px 80px',
-          color: '#f5f5f5',
+            '56px 32px 100px',
+
+          color:
+            '#f5f5f5',
         }}
       >
         <h1
           style={{
             margin:
               '0 0 8px',
-            fontSize: '32px',
+
+            fontSize:
+              '32px',
+
             letterSpacing:
               '.08em',
           }}
@@ -605,39 +1416,62 @@ export default function AddIllustrationPage() {
           style={{
             margin:
               '0 0 36px',
+
             color:
               'rgba(255,255,255,.6)',
-            fontSize: '13px',
+
+            fontSize:
+              '13px',
           }}
         >
           新しい作品をギャラリーに追加します。
         </p>
 
+
         <form
           onSubmit={
             handleSubmit
           }
+          className="gallery-add-form"
           style={{
-            display: 'grid',
+            display:
+              'grid',
+
             gridTemplateColumns:
-              'minmax(300px, 440px) 1fr',
-            gap: '40px',
+              'minmax(320px, 480px) 1fr',
+
+            gap:
+              '40px',
+
             alignItems:
               'start',
           }}
         >
+
+          {/* =================================================
+              LEFT
+          ================================================= */}
+
           <section>
+
+            {/* IMAGE PREVIEW */}
+
             <div
               style={{
                 minHeight:
                   '360px',
+
                 borderRadius:
                   '12px',
+
                 border:
                   '1px solid rgba(255,255,255,.2)',
+
                 background:
                   'rgba(255,255,255,.06)',
-                padding: '14px',
+
+                padding:
+                  '14px',
               }}
             >
               {previewUrls.length >
@@ -646,110 +1480,169 @@ export default function AddIllustrationPage() {
                   style={{
                     display:
                       'grid',
+
                     gridTemplateColumns:
                       previewUrls.length ===
                       1
                         ? '1fr'
                         : 'repeat(2, minmax(0, 1fr))',
-                    gap: '10px',
+
+                    gap:
+                      '10px',
                   }}
                 >
                   {previewUrls.map(
                     (
                       url,
                       index
-                    ) => (
-                      <div
-                        key={`${url}-${index}`}
-                        style={{
-                          position:
-                            'relative',
-                          borderRadius:
-                            '8px',
-                          overflow:
-                            'hidden',
-                          background:
-                            'rgba(0,0,0,.2)',
-                          aspectRatio:
-                            '1 / 1',
-                        }}
-                      >
-                        <img
-                          src={url}
-                          alt={`preview ${index + 1}`}
-                          style={{
-                            width:
-                              '100%',
-                            height:
-                              '100%',
-                            objectFit:
-                              'contain',
-                            display:
-                              'block',
-                          }}
-                        />
+                    ) => {
+                      const watermark =
+                        watermarkSettings[
+                          index
+                        ] ??
+                        makeWatermark(
+                          category,
+                          snsId
+                        );
 
-                        <span
+                      return (
+                        <div
+                          key={`${url}-${index}`}
                           style={{
                             position:
-                              'absolute',
-                            top: '8px',
-                            left: '8px',
-                            minWidth:
-                              '26px',
-                            height:
-                              '26px',
-                            padding:
-                              '0 7px',
-                            display:
-                              'grid',
-                            placeItems:
-                              'center',
-                            borderRadius:
-                              '999px',
-                            background:
-                              'rgba(0,0,0,.7)',
-                            color:
-                              '#fff',
-                            fontSize:
-                              '11px',
-                          }}
-                        >
-                          {index + 1}
-                        </span>
+                              'relative',
 
-                        <button
-                          type="button"
-                          onClick={() =>
-                            removeImage(
-                              index
-                            )
-                          }
-                          style={{
-                            position:
-                              'absolute',
-                            top: '8px',
-                            right: '8px',
-                            width:
-                              '28px',
-                            height:
-                              '28px',
                             borderRadius:
-                              '999px',
-                            border:
-                              '1px solid rgba(255,255,255,.35)',
+                              '8px',
+
+                            overflow:
+                              'hidden',
+
                             background:
-                              'rgba(0,0,0,.72)',
-                            color:
-                              '#fff',
-                            cursor:
-                              'pointer',
+                              'rgba(0,0,0,.2)',
+
+                            aspectRatio:
+                              '1 / 1',
                           }}
                         >
-                          ×
-                        </button>
-                      </div>
-                    )
+                          <img
+                            src={
+                              url
+                            }
+                            alt={`preview ${index + 1}`}
+                            style={{
+                              width:
+                                '100%',
+
+                              height:
+                                '100%',
+
+                              objectFit:
+                                'contain',
+
+                              display:
+                                'block',
+                            }}
+                          />
+
+                          <WatermarkPreview
+                            watermark={
+                              watermark
+                            }
+                          />
+
+                          <span
+                            style={{
+                              position:
+                                'absolute',
+
+                              top:
+                                '8px',
+
+                              left:
+                                '8px',
+
+                              zIndex:
+                                5,
+
+                              minWidth:
+                                '26px',
+
+                              height:
+                                '26px',
+
+                              padding:
+                                '0 7px',
+
+                              display:
+                                'grid',
+
+                              placeItems:
+                                'center',
+
+                              borderRadius:
+                                '999px',
+
+                              background:
+                                'rgba(0,0,0,.72)',
+
+                              color:
+                                '#fff',
+
+                              fontSize:
+                                '11px',
+                            }}
+                          >
+                            {index + 1}
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              removeImage(
+                                index
+                              )
+                            }
+                            style={{
+                              position:
+                                'absolute',
+
+                              top:
+                                '8px',
+
+                              right:
+                                '8px',
+
+                              zIndex:
+                                5,
+
+                              width:
+                                '28px',
+
+                              height:
+                                '28px',
+
+                              borderRadius:
+                                '999px',
+
+                              border:
+                                '1px solid rgba(255,255,255,.35)',
+
+                              background:
+                                'rgba(0,0,0,.72)',
+
+                              color:
+                                '#fff',
+
+                              cursor:
+                                'pointer',
+                            }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    }
                   )}
                 </div>
               ) : (
@@ -757,12 +1650,16 @@ export default function AddIllustrationPage() {
                   style={{
                     minHeight:
                       '330px',
+
                     display:
                       'grid',
+
                     placeItems:
                       'center',
+
                     color:
                       'rgba(255,255,255,.4)',
+
                     fontSize:
                       '12px',
                   }}
@@ -772,9 +1669,13 @@ export default function AddIllustrationPage() {
               )}
             </div>
 
+
+            {/* IMAGE SELECT */}
+
             <label
               style={{
                 ...fieldStyle,
+
                 marginTop:
                   '14px',
               }}
@@ -787,59 +1688,631 @@ export default function AddIllustrationPage() {
                 type="file"
                 accept="image/*"
                 multiple
-                onChange={(e) => {
+                onChange={(
+                  e
+                ) => {
                   handleImageChange(
                     e.target.files
                   );
-                  e.currentTarget.value = '';
+
+                  e.currentTarget.value =
+                    '';
                 }}
                 style={{
                   color:
                     '#f5f5f5',
                 }}
               />
+            </label>
 
-              {images.length >
-                0 && (
-                <div
+
+            {/* =================================================
+                WATERMARK SETTINGS
+            ================================================= */}
+
+            {images.length >
+              0 && (
+              <fieldset
+                style={{
+                  ...fieldsetStyle,
+
+                  marginTop:
+                    '24px',
+
+                  display:
+                    'grid',
+
+                  gap:
+                    '18px',
+                }}
+              >
+                <legend
                   style={{
-                    display:
-                      'grid',
-                    gap: '4px',
-                    color:
-                      'rgba(255,255,255,.58)',
-                    fontSize:
-                      '12px',
-                    lineHeight:
-                      1.5,
+                    padding:
+                      '0 8px',
+
+                    letterSpacing:
+                      '.08em',
                   }}
                 >
-                  {images.map(
-                    (
-                      file,
-                      index
-                    ) => (
-                      <span
-                        key={`${file.name}-${index}`}
+                  WATERMARK
+                </legend>
+
+                <p
+                  style={{
+                    margin:
+                      '0',
+
+                    color:
+                      'rgba(255,255,255,.5)',
+
+                    fontSize:
+                      '11px',
+
+                    lineHeight:
+                      1.7,
+                  }}
+                >
+                  画像ごとにウォーターマークを設定できます。
+                  WHITEは25%、BLACKは5%が初期値です。
+                </p>
+
+                {images.map(
+                  (
+                    file,
+                    index
+                  ) => {
+                    const watermark =
+                      watermarkSettings[
+                        index
+                      ] ??
+                      makeWatermark(
+                        category,
+                        snsId
+                      );
+
+                    const disabled =
+                      watermark.color ===
+                      'none';
+
+                    return (
+                      <div
+                        key={`${file.name}-watermark-${index}`}
+                        style={{
+                          padding:
+                            '16px',
+
+                          border:
+                            '1px solid rgba(255,255,255,.14)',
+
+                          borderRadius:
+                            '10px',
+
+                          background:
+                            'rgba(255,255,255,.025)',
+
+                          display:
+                            'grid',
+
+                          gap:
+                            '16px',
+                        }}
                       >
-                        {index + 1}.{' '}
-                        {file.name}
-                      </span>
-                    )
-                  )}
-                </div>
-              )}
-            </label>
+                        <div
+                          style={{
+                            display:
+                              'flex',
+
+                            justifyContent:
+                              'space-between',
+
+                            alignItems:
+                              'center',
+
+                            gap:
+                              '12px',
+                          }}
+                        >
+                          <strong
+                            style={{
+                              fontSize:
+                                '12px',
+
+                              letterSpacing:
+                                '.08em',
+                            }}
+                          >
+                            IMAGE {index + 1}
+                          </strong>
+
+                          <span
+                            title={
+                              file.name
+                            }
+                            style={{
+                              maxWidth:
+                                '220px',
+
+                              overflow:
+                                'hidden',
+
+                              textOverflow:
+                                'ellipsis',
+
+                              whiteSpace:
+                                'nowrap',
+
+                              color:
+                                'rgba(255,255,255,.42)',
+
+                              fontSize:
+                                '10px',
+                            }}
+                          >
+                            {file.name}
+                          </span>
+                        </div>
+
+
+                        {/* COLOR */}
+
+                        <div
+                          style={{
+                            display:
+                              'grid',
+
+                            gap:
+                              '8px',
+                          }}
+                        >
+                          <span
+                            style={{
+                              color:
+                                'rgba(255,255,255,.55)',
+
+                              fontSize:
+                                '10px',
+
+                              letterSpacing:
+                                '.1em',
+                            }}
+                          >
+                            COLOR
+                          </span>
+
+                          <div
+                            style={{
+                              display:
+                                'grid',
+
+                              gridTemplateColumns:
+                                'repeat(3, 1fr)',
+
+                              gap:
+                                '7px',
+                            }}
+                          >
+                            {(
+                              [
+                                [
+                                  'white',
+                                  'WHITE',
+                                ],
+                                [
+                                  'black',
+                                  'BLACK',
+                                ],
+                                [
+                                  'none',
+                                  'NONE',
+                                ],
+                              ] as const
+                            ).map(
+                              ([
+                                value,
+                                label,
+                              ]) => {
+                                const active =
+                                  watermark.color ===
+                                  value;
+
+                                return (
+                                  <button
+                                    key={
+                                      value
+                                    }
+                                    type="button"
+                                    onClick={() =>
+                                      changeWatermarkColor(
+                                        index,
+                                        value
+                                      )
+                                    }
+                                    style={{
+                                      minHeight:
+                                        '38px',
+
+                                      borderRadius:
+                                        '8px',
+
+                                      border:
+                                        active
+                                          ? '1px solid rgba(255,255,255,.9)'
+                                          : '1px solid rgba(255,255,255,.2)',
+
+                                      background:
+                                        active
+                                          ? 'rgba(255,255,255,.14)'
+                                          : 'rgba(255,255,255,.035)',
+
+                                      color:
+                                        '#f5f5f5',
+
+                                      cursor:
+                                        'pointer',
+
+                                      fontSize:
+                                        '11px',
+
+                                      fontWeight:
+                                        active
+                                          ? 700
+                                          : 500,
+
+                                      letterSpacing:
+                                        '.06em',
+                                    }}
+                                  >
+                                    {label}
+                                  </button>
+                                );
+                              }
+                            )}
+                          </div>
+                        </div>
+
+
+                        {/* OPACITY */}
+
+                        <div
+                          style={{
+                            display:
+                              'grid',
+
+                            gap:
+                              '8px',
+
+                            opacity:
+                              disabled
+                                ? 0.38
+                                : 1,
+                          }}
+                        >
+                          <div
+                            style={{
+                              display:
+                                'flex',
+
+                              justifyContent:
+                                'space-between',
+
+                              alignItems:
+                                'center',
+                            }}
+                          >
+                            <span
+                              style={{
+                                color:
+                                  'rgba(255,255,255,.55)',
+
+                                fontSize:
+                                  '10px',
+
+                                letterSpacing:
+                                  '.1em',
+                              }}
+                            >
+                              OPACITY
+                            </span>
+
+                            <strong
+                              style={{
+                                fontSize:
+                                  '12px',
+                              }}
+                            >
+                              {watermark.opacity}%
+                            </strong>
+                          </div>
+
+                          <div
+                            style={{
+                              display:
+                                'grid',
+
+                              gridTemplateColumns:
+                                '38px 1fr 38px',
+
+                              gap:
+                                '8px',
+
+                              alignItems:
+                                'center',
+                            }}
+                          >
+                            <button
+                              type="button"
+                              disabled={
+                                disabled
+                              }
+                              onClick={() =>
+                                changeWatermarkOpacity(
+                                  index,
+                                  watermark.opacity -
+                                    1
+                                )
+                              }
+                              style={{
+                                height:
+                                  '36px',
+
+                                borderRadius:
+                                  '8px',
+
+                                border:
+                                  '1px solid rgba(255,255,255,.2)',
+
+                                background:
+                                  'rgba(255,255,255,.05)',
+
+                                color:
+                                  '#fff',
+
+                                cursor:
+                                  disabled
+                                    ? 'default'
+                                    : 'pointer',
+                              }}
+                            >
+                              −
+                            </button>
+
+                            <input
+                              type="range"
+                              min="0"
+                              max="100"
+                              step="1"
+                              disabled={
+                                disabled
+                              }
+                              value={
+                                watermark.opacity
+                              }
+                              onChange={(
+                                e
+                              ) =>
+                                changeWatermarkOpacity(
+                                  index,
+                                  Number(
+                                    e.target.value
+                                  )
+                                )
+                              }
+                              style={{
+                                width:
+                                  '100%',
+                              }}
+                            />
+
+                            <button
+                              type="button"
+                              disabled={
+                                disabled
+                              }
+                              onClick={() =>
+                                changeWatermarkOpacity(
+                                  index,
+                                  watermark.opacity +
+                                    1
+                                )
+                              }
+                              style={{
+                                height:
+                                  '36px',
+
+                                borderRadius:
+                                  '8px',
+
+                                border:
+                                  '1px solid rgba(255,255,255,.2)',
+
+                                background:
+                                  'rgba(255,255,255,.05)',
+
+                                color:
+                                  '#fff',
+
+                                cursor:
+                                  disabled
+                                    ? 'default'
+                                    : 'pointer',
+                              }}
+                            >
+                              ＋
+                            </button>
+                          </div>
+                        </div>
+
+
+                        {/* ID */}
+
+                        <label
+                          style={{
+                            display:
+                              'grid',
+
+                            gap:
+                              '8px',
+
+                            opacity:
+                              disabled
+                                ? 0.38
+                                : 1,
+                          }}
+                        >
+                          <span
+                            style={{
+                              color:
+                                'rgba(255,255,255,.55)',
+
+                              fontSize:
+                                '10px',
+
+                              letterSpacing:
+                                '.1em',
+                            }}
+                          >
+                            ID
+                          </span>
+
+                          <input
+                            type="text"
+                            disabled={
+                              disabled
+                            }
+                            value={
+                              watermark.text
+                            }
+                            onChange={(
+                              e
+                            ) =>
+                              updateWatermark(
+                                index,
+                                {
+                                  text:
+                                    e.target.value,
+                                }
+                              )
+                            }
+                            onBlur={() =>
+                              updateWatermark(
+                                index,
+                                {
+                                  text:
+                                    normalizeWatermarkText(
+                                      watermark.text
+                                    ),
+                                }
+                              )
+                            }
+                            placeholder={
+                              category ===
+                              'commission'
+                                ? '@artist'
+                                : ORIGINAL_ID
+                            }
+                            style={
+                              inputStyle
+                            }
+                          />
+                        </label>
+
+
+                        {/* GRID */}
+
+                        <label
+                          style={{
+                            display:
+                              'flex',
+
+                            alignItems:
+                              'center',
+
+                            justifyContent:
+                              'space-between',
+
+                            gap:
+                              '12px',
+
+                            opacity:
+                              disabled
+                                ? 0.38
+                                : 1,
+                          }}
+                        >
+                          <span
+                            style={{
+                              display:
+                                'grid',
+
+                              gap:
+                                '3px',
+                            }}
+                          >
+                            <strong
+                              style={{
+                                fontSize:
+                                  '11px',
+
+                                letterSpacing:
+                                  '.08em',
+                              }}
+                            >
+                              DIAGONAL GRID
+                            </strong>
+
+                            <span
+                              style={{
+                                color:
+                                  'rgba(255,255,255,.45)',
+
+                                fontSize:
+                                  '10px',
+                              }}
+                            >
+                              大きな斜め格子を画像全体に表示
+                            </span>
+                          </span>
+
+                          <input
+                            type="checkbox"
+                            disabled={
+                              disabled
+                            }
+                            checked={
+                              watermark.grid
+                            }
+                            onChange={(
+                              e
+                            ) =>
+                              updateWatermark(
+                                index,
+                                {
+                                  grid:
+                                    e.target.checked,
+                                }
+                              )
+                            }
+                          />
+                        </label>
+                      </div>
+                    );
+                  }
+                )}
+              </fieldset>
+            )}
+
+
+            {/* =================================================
+                THUMBNAIL
+            ================================================= */}
 
             <fieldset
               style={{
+                ...fieldsetStyle,
+
                 marginTop:
                   '24px',
-                border:
-                  '1px solid rgba(255,255,255,.18)',
-                borderRadius:
-                  '10px',
-                padding: '18px',
               }}
             >
               <legend
@@ -855,9 +2328,13 @@ export default function AddIllustrationPage() {
                 style={{
                   display:
                     'flex',
-                  gap: '20px',
+
+                  gap:
+                    '20px',
+
                   flexWrap:
                     'wrap',
+
                   marginBottom:
                     '16px',
                 }}
@@ -878,11 +2355,13 @@ export default function AddIllustrationPage() {
                       setThumbnailMode(
                         'post'
                       );
+
                       setThumbnailCrop(
                         DEFAULT_CROP
                       );
                     }}
                   />
+
                   投稿画像から選ぶ
                 </label>
 
@@ -902,14 +2381,17 @@ export default function AddIllustrationPage() {
                       setThumbnailMode(
                         'custom'
                       );
+
                       setThumbnailCrop(
                         DEFAULT_CROP
                       );
                     }}
                   />
+
                   専用画像を使う
                 </label>
               </div>
+
 
               {thumbnailMode ===
                 'post' && (
@@ -920,10 +2402,13 @@ export default function AddIllustrationPage() {
                       style={{
                         display:
                           'grid',
+
                         gridTemplateColumns:
                           'repeat(auto-fill, minmax(74px, 1fr))',
+
                         gap:
                           '10px',
+
                         marginBottom:
                           '14px',
                       }}
@@ -940,6 +2425,7 @@ export default function AddIllustrationPage() {
                               setThumbnailIndex(
                                 index
                               );
+
                               setThumbnailCrop(
                                 DEFAULT_CROP
                               );
@@ -950,30 +2436,41 @@ export default function AddIllustrationPage() {
                                 index
                                   ? '2px solid #fff'
                                   : '1px solid rgba(255,255,255,.25)',
+
                               borderRadius:
                                 '8px',
+
                               overflow:
                                 'hidden',
+
                               padding:
                                 0,
+
                               aspectRatio:
                                 '1 / 1',
+
                               background:
                                 'rgba(255,255,255,.05)',
+
                               cursor:
                                 'pointer',
                             }}
                           >
                             <img
-                              src={url}
+                              src={
+                                url
+                              }
                               alt={`${index + 1}枚目`}
                               style={{
                                 width:
                                   '100%',
+
                                 height:
                                   '100%',
+
                                 objectFit:
                                   'cover',
+
                                 display:
                                   'block',
                               }}
@@ -987,6 +2484,7 @@ export default function AddIllustrationPage() {
                       style={{
                         color:
                           'rgba(255,255,255,.5)',
+
                         fontSize:
                           '12px',
                       }}
@@ -996,6 +2494,7 @@ export default function AddIllustrationPage() {
                   )}
                 </>
               )}
+
 
               {thumbnailMode ===
                 'custom' && (
@@ -1011,7 +2510,9 @@ export default function AddIllustrationPage() {
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={(e) => {
+                    onChange={(
+                      e
+                    ) => {
                       setCustomThumbnail(
                         e.target
                           .files?.[0] ??
@@ -1030,6 +2531,7 @@ export default function AddIllustrationPage() {
                 </label>
               )}
 
+
               {thumbnailSrc && (
                 <div
                   style={{
@@ -1041,18 +2543,25 @@ export default function AddIllustrationPage() {
                     style={{
                       position:
                         'relative',
+
                       width:
                         'min(220px, 100%)',
+
                       aspectRatio:
                         '1 / 1',
+
                       overflow:
                         'hidden',
+
                       borderRadius:
                         '10px',
+
                       background:
                         'rgba(255,255,255,.08)',
+
                       border:
                         '1px solid rgba(255,255,255,.2)',
+
                       marginBottom:
                         '10px',
                     }}
@@ -1084,12 +2593,23 @@ export default function AddIllustrationPage() {
             </fieldset>
           </section>
 
+
+          {/* =================================================
+              RIGHT
+          ================================================= */}
+
           <section
             style={{
-              display: 'grid',
-              gap: '26px',
+              display:
+                'grid',
+
+              gap:
+                '26px',
             }}
           >
+
+            {/* DATE */}
+
             <label
               style={
                 fieldStyle
@@ -1101,8 +2621,12 @@ export default function AddIllustrationPage() {
 
               <input
                 type="date"
-                value={date}
-                onChange={(e) =>
+                value={
+                  date
+                }
+                onChange={(
+                  e
+                ) =>
                   setDate(
                     e.target.value
                   )
@@ -1110,21 +2634,20 @@ export default function AddIllustrationPage() {
                 required
                 style={{
                   ...inputStyle,
+
                   maxWidth:
                     '220px',
                 }}
               />
             </label>
 
+
+            {/* CATEGORY */}
+
             <fieldset
-              style={{
-                border:
-                  '1px solid rgba(255,255,255,.18)',
-                borderRadius:
-                  '10px',
-                padding:
-                  '18px',
-              }}
+              style={
+                fieldsetStyle
+              }
             >
               <legend
                 style={{
@@ -1139,7 +2662,9 @@ export default function AddIllustrationPage() {
                 style={{
                   display:
                     'flex',
-                  gap: '24px',
+
+                  gap:
+                    '24px',
                 }}
               >
                 <label
@@ -1149,6 +2674,7 @@ export default function AddIllustrationPage() {
                 >
                   <input
                     type="radio"
+                    name="gallery-category"
                     checked={
                       category ===
                       'original'
@@ -1159,6 +2685,7 @@ export default function AddIllustrationPage() {
                       )
                     }
                   />
+
                   ORIGINAL
                 </label>
 
@@ -1169,6 +2696,7 @@ export default function AddIllustrationPage() {
                 >
                   <input
                     type="radio"
+                    name="gallery-category"
                     checked={
                       category ===
                       'commission'
@@ -1179,20 +2707,19 @@ export default function AddIllustrationPage() {
                       )
                     }
                   />
+
                   COMMISSION
                 </label>
               </div>
             </fieldset>
 
+
+            {/* CHARACTER */}
+
             <fieldset
-              style={{
-                border:
-                  '1px solid rgba(255,255,255,.18)',
-                borderRadius:
-                  '10px',
-                padding:
-                  '18px',
-              }}
+              style={
+                fieldsetStyle
+              }
             >
               <legend
                 style={{
@@ -1207,9 +2734,12 @@ export default function AddIllustrationPage() {
                 style={{
                   display:
                     'flex',
+
                   flexWrap:
                     'wrap',
-                  gap: '24px',
+
+                  gap:
+                    '24px',
                 }}
               >
                 <label
@@ -1219,15 +2749,18 @@ export default function AddIllustrationPage() {
                 >
                   <input
                     type="checkbox"
-                    checked={characters.includes(
-                      'shiki'
-                    )}
+                    checked={
+                      characters.includes(
+                        'shiki'
+                      )
+                    }
                     onChange={() =>
                       toggleCharacter(
                         'shiki'
                       )
                     }
                   />
+
                   SHIKI
                 </label>
 
@@ -1238,32 +2771,33 @@ export default function AddIllustrationPage() {
                 >
                   <input
                     type="checkbox"
-                    checked={characters.includes(
-                      'solas'
-                    )}
+                    checked={
+                      characters.includes(
+                        'solas'
+                      )
+                    }
                     onChange={() =>
                       toggleCharacter(
                         'solas'
                       )
                     }
                   />
+
                   SOLAS
                 </label>
               </div>
             </fieldset>
 
+
+            {/* ORIGINAL */}
+
             {category ===
               'original' && (
               <>
                 <fieldset
-                  style={{
-                    border:
-                      '1px solid rgba(255,255,255,.18)',
-                    borderRadius:
-                      '10px',
-                    padding:
-                      '18px',
-                  }}
+                  style={
+                    fieldsetStyle
+                  }
                 >
                   <legend
                     style={{
@@ -1278,34 +2812,38 @@ export default function AddIllustrationPage() {
                     style={{
                       display:
                         'flex',
+
                       flexWrap:
                         'wrap',
+
                       gap:
                         '24px',
                     }}
                   >
-                    {[
+                    {(
                       [
-                        'reference',
-                        'REFERENCE',
-                      ],
-                      [
-                        'song-parody',
-                        'SONG PARODY',
-                      ],
-                      [
-                        'manga',
-                        'MANGA',
-                      ],
-                      [
-                        'rakugaki',
-                        'RAKUGAKI',
-                      ],
-                      [
-                        'tachie',
-                        'TACHIE',
-                      ],
-                    ].map(
+                        [
+                          'reference',
+                          'REFERENCE',
+                        ],
+                        [
+                          'song-parody',
+                          'SONG PARODY',
+                        ],
+                        [
+                          'manga',
+                          'MANGA',
+                        ],
+                        [
+                          'rakugaki',
+                          'RAKUGAKI',
+                        ],
+                        [
+                          'tachie',
+                          'TACHIE',
+                        ],
+                      ] as const
+                    ).map(
                       ([
                         value,
                         label,
@@ -1320,15 +2858,18 @@ export default function AddIllustrationPage() {
                         >
                           <input
                             type="checkbox"
-                            checked={tags.includes(
-                              value as GalleryTag
-                            )}
+                            checked={
+                              tags.includes(
+                                value
+                              )
+                            }
                             onChange={() =>
                               toggleTag(
-                                value as GalleryTag
+                                value
                               )
                             }
                           />
+
                           {label}
                         </label>
                       )
@@ -1336,17 +2877,15 @@ export default function AddIllustrationPage() {
                   </div>
                 </fieldset>
 
+
                 {isSongParody && (
                   <fieldset
                     style={{
-                      border:
-                        '1px solid rgba(255,255,255,.18)',
-                      borderRadius:
-                        '10px',
-                      padding:
-                        '18px',
+                      ...fieldsetStyle,
+
                       display:
                         'grid',
+
                       gap:
                         '16px',
                     }}
@@ -1364,10 +2903,13 @@ export default function AddIllustrationPage() {
                       style={{
                         margin:
                           '-2px 0 2px',
+
                         color:
                           'rgba(255,255,255,.5)',
+
                         fontSize:
                           '11px',
+
                         lineHeight:
                           1.6,
                       }}
@@ -1389,7 +2931,9 @@ export default function AddIllustrationPage() {
                         value={
                           songTitle
                         }
-                        onChange={(e) =>
+                        onChange={(
+                          e
+                        ) =>
                           setSongTitle(
                             e.target.value
                           )
@@ -1415,7 +2959,9 @@ export default function AddIllustrationPage() {
                         value={
                           songUrl
                         }
-                        onChange={(e) =>
+                        onChange={(
+                          e
+                        ) =>
                           setSongUrl(
                             e.target.value
                           )
@@ -1431,19 +2977,20 @@ export default function AddIllustrationPage() {
               </>
             )}
 
+
+            {/* COMMISSION */}
+
             {category ===
               'commission' && (
               <fieldset
                 style={{
-                  border:
-                    '1px solid rgba(255,255,255,.18)',
-                  borderRadius:
-                    '10px',
-                  padding:
-                    '18px',
+                  ...fieldsetStyle,
+
                   display:
                     'grid',
-                  gap: '16px',
+
+                  gap:
+                    '16px',
                 }}
               >
                 <legend
@@ -1469,7 +3016,9 @@ export default function AddIllustrationPage() {
                     value={
                       artistName
                     }
-                    onChange={(e) =>
+                    onChange={(
+                      e
+                    ) =>
                       setArtistName(
                         e.target.value
                       )
@@ -1496,7 +3045,9 @@ export default function AddIllustrationPage() {
                     value={
                       snsId
                     }
-                    onChange={(e) =>
+                    onChange={(
+                      e
+                    ) =>
                       setSnsId(
                         e.target.value
                       )
@@ -1506,6 +3057,21 @@ export default function AddIllustrationPage() {
                       inputStyle
                     }
                   />
+
+                  <span
+                    style={{
+                      color:
+                        'rgba(255,255,255,.42)',
+
+                      fontSize:
+                        '10px',
+
+                      lineHeight:
+                        1.5,
+                    }}
+                  >
+                    新しい画像のウォーターマークIDにも使用します。
+                  </span>
                 </label>
 
                 <label
@@ -1522,7 +3088,9 @@ export default function AddIllustrationPage() {
                     value={
                       snsUrl
                     }
-                    onChange={(e) =>
+                    onChange={(
+                      e
+                    ) =>
                       setSnsUrl(
                         e.target.value
                       )
@@ -1536,17 +3104,29 @@ export default function AddIllustrationPage() {
               </fieldset>
             )}
 
+
+            {/* STATUS */}
+
             {uploadProgress && (
-              <p>
-                {
-                  uploadProgress
-                }
+              <p
+                style={{
+                  margin:
+                    0,
+
+                  color:
+                    'rgba(255,255,255,.7)',
+                }}
+              >
+                {uploadProgress}
               </p>
             )}
 
             {error && (
               <p
                 style={{
+                  margin:
+                    0,
+
                   color:
                     '#ff8d8d',
                 }}
@@ -1555,23 +3135,57 @@ export default function AddIllustrationPage() {
               </p>
             )}
 
+
+            {/* SUBMIT */}
+
             <button
               type="submit"
-              disabled={posting}
+              disabled={
+                posting
+              }
               style={{
-                width: '100%',
-                minHeight: '48px',
-                marginTop: '6px',
-                padding: '14px 20px',
-                border: '1px solid rgba(255,255,255,.35)',
-                borderRadius: '10px',
-                background: '#f1f1f1',
-                color: '#17191d',
-                fontSize: '13px',
-                fontWeight: 700,
-                letterSpacing: '.08em',
-                cursor: posting ? 'wait' : 'pointer',
-                opacity: posting ? 0.65 : 1,
+                width:
+                  '100%',
+
+                minHeight:
+                  '48px',
+
+                marginTop:
+                  '6px',
+
+                padding:
+                  '14px 20px',
+
+                border:
+                  '1px solid rgba(255,255,255,.35)',
+
+                borderRadius:
+                  '10px',
+
+                background:
+                  '#f1f1f1',
+
+                color:
+                  '#17191d',
+
+                fontSize:
+                  '13px',
+
+                fontWeight:
+                  700,
+
+                letterSpacing:
+                  '.08em',
+
+                cursor:
+                  posting
+                    ? 'wait'
+                    : 'pointer',
+
+                opacity:
+                  posting
+                    ? 0.65
+                    : 1,
               }}
             >
               {posting
@@ -1582,23 +3196,65 @@ export default function AddIllustrationPage() {
         </form>
       </main>
 
+
+      {/* =====================================================
+          CROP EDITOR
+      ===================================================== */}
+
       {thumbnailSrc && (
         <CropEditor
-          open={cropOpen}
-          src={thumbnailSrc}
-          aspect="1:1"
-          initial={thumbnailCrop}
-          onClose={() =>
-            setCropOpen(false)
+          open={
+            cropOpen
           }
-          onApply={(crop) => {
+          src={
+            thumbnailSrc
+          }
+          aspect="1:1"
+          initial={
+            thumbnailCrop
+          }
+          onClose={() =>
+            setCropOpen(
+              false
+            )
+          }
+          onApply={(
+            crop
+          ) => {
             setThumbnailCrop(
               crop
             );
-            setCropOpen(false);
+
+            setCropOpen(
+              false
+            );
           }}
         />
       )}
+
+
+      {/* =====================================================
+          RESPONSIVE
+      ===================================================== */}
+
+      <style jsx>{`
+        @media (
+          max-width: 760px
+        ) {
+          .gallery-add-page {
+            padding:
+              36px 18px 120px !important;
+          }
+
+          .gallery-add-form {
+            grid-template-columns:
+              1fr !important;
+
+            gap:
+              28px !important;
+          }
+        }
+      `}</style>
     </>
   );
 }
