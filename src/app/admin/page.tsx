@@ -1,14 +1,34 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { backend } from '@/lib/backend';
 
+type UsageValue = {
+  usage?: number;
+  limit?: number;
+  used_percent?: number;
+};
+
 type UsageSuccess = {
   ok: true;
+
+  // samples/ を除いた、君自身の画像
   imageCount: number;
   totalBytes: number;
+
+  // Cloudinary公式Usage API
+  storageUsage: number | null;
+  storageLimit: number | null;
+  storagePercent: number | null;
+
+  plan?: string | null;
+  credits?: UsageValue | null;
 };
 
 type UsageError = {
@@ -19,8 +39,15 @@ type UsageResponse =
   | UsageSuccess
   | UsageError;
 
-function formatBytes(bytes: number) {
-  if (!Number.isFinite(bytes) || bytes <= 0) {
+function formatBytes(
+  bytes: number | null | undefined
+) {
+  if (
+    bytes === null ||
+    bytes === undefined ||
+    !Number.isFinite(bytes) ||
+    bytes <= 0
+  ) {
     return '0 B';
   }
 
@@ -28,11 +55,19 @@ function formatBytes(bytes: number) {
     return `${bytes} B`;
   }
 
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`;
+  if (
+    bytes <
+    1024 * 1024
+  ) {
+    return `${(
+      bytes / 1024
+    ).toFixed(1)} KB`;
   }
 
-  if (bytes < 1024 * 1024 * 1024) {
+  if (
+    bytes <
+    1024 * 1024 * 1024
+  ) {
     return `${(
       bytes /
       1024 /
@@ -46,6 +81,49 @@ function formatBytes(bytes: number) {
     1024 /
     1024
   ).toFixed(2)} GB`;
+}
+
+function formatPercent(
+  value: number | null | undefined
+) {
+  if (
+    value === null ||
+    value === undefined ||
+    !Number.isFinite(value)
+  ) {
+    return null;
+  }
+
+  if (value === 0) {
+    return '0%';
+  }
+
+  if (value < 0.01) {
+    return '<0.01%';
+  }
+
+  if (value < 1) {
+    return `${value.toFixed(2)}%`;
+  }
+
+  return `${value.toFixed(1)}%`;
+}
+
+function clampPercent(
+  value: number | null | undefined
+) {
+  if (
+    value === null ||
+    value === undefined ||
+    !Number.isFinite(value)
+  ) {
+    return 0;
+  }
+
+  return Math.min(
+    100,
+    Math.max(0, value)
+  );
 }
 
 async function getAdminToken() {
@@ -84,17 +162,6 @@ export default function AdminPage() {
       null
     );
 
-  const formattedUsage =
-    useMemo(
-      () =>
-        usage
-          ? formatBytes(
-              usage.totalBytes
-            )
-          : '-',
-      [usage]
-    );
-
   useEffect(() => {
     if (!isAdmin) {
       setLoading(false);
@@ -104,59 +171,62 @@ export default function AdminPage() {
 
     let alive = true;
 
-    const load = async () => {
-      setLoading(true);
-      setError('');
+    const load =
+      async () => {
+        setLoading(true);
+        setError('');
 
-      try {
-        const token =
-          await getAdminToken();
+        try {
+          const token =
+            await getAdminToken();
 
-        const response =
-          await fetch(
-            '/api/cloudinary/usage',
-            {
-              method: 'GET',
-              headers: {
-                Authorization:
-                  `Bearer ${token}`,
-              },
-              cache: 'no-store',
-            }
-          );
+          const response =
+            await fetch(
+              '/api/cloudinary/usage',
+              {
+                method: 'GET',
+                headers: {
+                  Authorization:
+                    `Bearer ${token}`,
+                },
+                cache:
+                  'no-store',
+              }
+            );
 
-        const data =
-          (await response.json()) as UsageResponse;
+          const data =
+            (await response.json()) as
+              UsageResponse;
 
-        if (
-          !response.ok ||
-          !('ok' in data) ||
-          !data.ok
-        ) {
-          throw new Error(
-            'error' in data
-              ? data.error
-              : 'Cloudinaryの使用容量を取得できませんでした。'
-          );
+          if (
+            !response.ok ||
+            !('ok' in data) ||
+            !data.ok
+          ) {
+            throw new Error(
+              'error' in data
+                ? data.error
+                : 'Cloudinaryの使用容量を取得できませんでした。'
+            );
+          }
+
+          if (alive) {
+            setUsage(data);
+          }
+        } catch (err) {
+          if (alive) {
+            setError(
+              err instanceof Error
+                ? err.message
+                : 'Cloudinaryの使用容量を取得できませんでした。'
+            );
+          }
+        } finally {
+          if (alive) {
+            setLoading(false);
+          }
         }
-
-        if (alive) {
-          setUsage(data);
-        }
-      } catch (err) {
-        if (alive) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : 'Cloudinaryの使用容量を取得できませんでした。'
-          );
-        }
-      } finally {
-        if (alive) {
-          setLoading(false);
-        }
-      }
-    };
+      };
 
     void load();
 
@@ -164,6 +234,61 @@ export default function AdminPage() {
       alive = false;
     };
   }, [isAdmin]);
+
+  const hasStorageLimit =
+    !!usage &&
+    usage.storageLimit !== null &&
+    usage.storageLimit > 0;
+
+  const storagePercent =
+    useMemo(() => {
+      if (!usage) {
+        return null;
+      }
+
+      if (
+        usage.storagePercent !== null
+      ) {
+        return usage.storagePercent;
+      }
+
+      if (
+        usage.storageUsage !== null &&
+        usage.storageLimit !== null &&
+        usage.storageLimit > 0
+      ) {
+        return (
+          usage.storageUsage /
+          usage.storageLimit
+        ) * 100;
+      }
+
+      return null;
+    }, [usage]);
+
+  const creditPercent =
+    usage?.credits?.used_percent ??
+    (
+      usage?.credits?.usage !==
+        undefined &&
+      usage?.credits?.limit !==
+        undefined &&
+      usage.credits.limit > 0
+        ? (
+            usage.credits.usage /
+            usage.credits.limit
+          ) * 100
+        : null
+    );
+
+  const barPercent =
+    hasStorageLimit
+      ? clampPercent(
+          storagePercent
+        )
+      : clampPercent(
+          creditPercent
+        );
 
   if (!isAdmin) {
     return (
@@ -174,7 +299,8 @@ export default function AdminPage() {
           padding:
             '80px 32px',
           color: '#f5f5f5',
-          textAlign: 'center',
+          textAlign:
+            'center',
         }}
       >
         <h1
@@ -285,19 +411,51 @@ export default function AdminPage() {
               'rgba(255,255,255,.035)',
           }}
         >
-          <p
+          <div
             style={{
-              margin:
-                '0 0 12px',
-              fontSize: 10,
-              letterSpacing:
-                '.16em',
-              color:
-                'rgba(255,255,255,.42)',
+              display:
+                'flex',
+              justifyContent:
+                'space-between',
+              alignItems:
+                'center',
+              gap: 12,
+              marginBottom: 14,
             }}
           >
-            CLOUDINARY STORAGE
-          </p>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 10,
+                letterSpacing:
+                  '.16em',
+                color:
+                  'rgba(255,255,255,.42)',
+              }}
+            >
+              CLOUDINARY STORAGE
+            </p>
+
+            {usage?.plan && (
+              <span
+                style={{
+                  padding:
+                    '4px 8px',
+                  border:
+                    '1px solid rgba(255,255,255,.14)',
+                  borderRadius:
+                    999,
+                  fontSize: 9,
+                  letterSpacing:
+                    '.08em',
+                  color:
+                    'rgba(255,255,255,.48)',
+                }}
+              >
+                {usage.plan.toUpperCase()}
+              </span>
+            )}
+          </div>
 
           {loading ? (
             <p
@@ -320,41 +478,82 @@ export default function AdminPage() {
             >
               {error}
             </p>
-          ) : (
+          ) : usage ? (
             <>
               <div
                 style={{
-                  fontSize: 34,
-                  fontWeight: 700,
-                  letterSpacing:
-                    '-.02em',
-                  marginBottom: 4,
+                  display: 'flex',
+                  alignItems:
+                    'baseline',
+                  gap: 8,
+                  flexWrap:
+                    'wrap',
                 }}
               >
-                {
-                  formattedUsage
-                }
-              </div>
+                <strong
+                  style={{
+                    fontSize: 34,
+                    letterSpacing:
+                      '-.02em',
+                  }}
+                >
+                  {formatBytes(
+                    usage.totalBytes
+                  )}
+                </strong>
 
-              <p
-                style={{
-                  margin:
-                    '0 0 18px',
-                  color:
-                    'rgba(255,255,255,.5)',
-                  fontSize: 12,
-                }}
-              >
-                {
-                  usage?.imageCount ??
-                  0
-                }{' '}
-                IMAGES
-              </p>
+                {hasStorageLimit && (
+                  <span
+                    style={{
+                      color:
+                        'rgba(255,255,255,.42)',
+                      fontSize: 13,
+                    }}
+                  >
+                    /{' '}
+                    {formatBytes(
+                      usage.storageLimit
+                    )}
+                  </span>
+                )}
+              </div>
 
               <div
                 style={{
-                  height: 6,
+                  display:
+                    'flex',
+                  gap: 14,
+                  flexWrap:
+                    'wrap',
+                  margin:
+                    '5px 0 20px',
+                  fontSize: 11,
+                  color:
+                    'rgba(255,255,255,.5)',
+                }}
+              >
+                <span>
+                  {
+                    usage.imageCount
+                  }{' '}
+                  IMAGES
+                </span>
+
+                {hasStorageLimit &&
+                  storagePercent !==
+                    null && (
+                    <span>
+                      {formatPercent(
+                        storagePercent
+                      )}{' '}
+                      USED
+                    </span>
+                  )}
+              </div>
+
+              <div
+                style={{
+                  height: 7,
                   borderRadius:
                     999,
                   overflow:
@@ -366,33 +565,85 @@ export default function AdminPage() {
                 <div
                   style={{
                     width:
-                      usage &&
-                      usage.totalBytes >
-                        0
-                        ? '36%'
-                        : '0%',
-                    height: '100%',
+                      `${barPercent}%`,
+                    minWidth:
+                      barPercent > 0
+                        ? 2
+                        : 0,
+                    height:
+                      '100%',
                     background:
-                      'rgba(255,255,255,.72)',
+                      'rgba(255,255,255,.75)',
                     borderRadius:
                       999,
+                    transition:
+                      'width .35s ease',
                   }}
                 />
               </div>
 
-              <p
-                style={{
-                  margin:
-                    '10px 0 0',
-                  fontSize: 10,
-                  color:
-                    'rgba(255,255,255,.35)',
-                }}
-              >
-                current image storage
-              </p>
+              {hasStorageLimit ? (
+                <p
+                  style={{
+                    margin:
+                      '10px 0 0',
+                    fontSize: 10,
+                    color:
+                      'rgba(255,255,255,.36)',
+                  }}
+                >
+                  {formatBytes(
+                    usage.storageUsage
+                  )}{' '}
+                  registered by Cloudinary
+                </p>
+              ) : (
+                <div
+                  style={{
+                    marginTop: 12,
+                  }}
+                >
+                  <p
+                    style={{
+                      margin:
+                        '0 0 5px',
+                      fontSize: 10,
+                      color:
+                        'rgba(255,255,255,.38)',
+                    }}
+                  >
+                    STORAGE LIMIT IS NOT REPORTED SEPARATELY
+                  </p>
+
+                  {creditPercent !==
+                    null && (
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 11,
+                        color:
+                          'rgba(255,255,255,.55)',
+                      }}
+                    >
+                      CLOUDINARY CREDITS:{' '}
+                      {formatPercent(
+                        creditPercent
+                      )}{' '}
+                      USED
+                      {usage.credits
+                        ?.limit !==
+                        undefined &&
+                        usage.credits
+                          ?.usage !==
+                          undefined
+                        ? ` (${usage.credits.usage} / ${usage.credits.limit})`
+                        : ''}
+                    </p>
+                  )}
+                </div>
+              )}
             </>
-          )}
+          ) : null}
         </article>
 
         <article
