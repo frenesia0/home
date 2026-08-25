@@ -5,14 +5,18 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import {
   fetchGalleryPosts,
+  getGalleryCharacters,
   getGalleryImages,
+  getGalleryTags,
   subscribeGallery,
   type GalleryCategory,
-  type GalleryCharacterTag,
+  type GalleryCharacter,
   type GalleryPost,
+  type GalleryTag,
 } from '@/lib/galleryData';
 
-type FilterTag = 'all' | GalleryCharacterTag;
+type CharacterFilter = 'all' | GalleryCharacter;
+type TagFilter = 'all' | GalleryTag;
 
 function optimizeCloudinaryUrl(url: string) {
   if (!url.includes('/upload/')) return url;
@@ -23,8 +27,12 @@ function optimizeCloudinaryUrl(url: string) {
   );
 }
 
-function tagLabel(tag: GalleryCharacterTag) {
-  if (tag === 'song-inspired') return 'SONG INSPIRED';
+function characterLabel(character: GalleryCharacter) {
+  return character.toUpperCase();
+}
+
+function tagLabel(tag: GalleryTag) {
+  if (tag === 'song-parody') return 'SONG PARODY';
   return tag.toUpperCase();
 }
 
@@ -33,7 +41,8 @@ export default function GalleryPage() {
   const { isAdmin } = useAuth();
 
   const [category, setCategory] = useState<GalleryCategory>('original');
-  const [tag, setTag] = useState<FilterTag>('all');
+  const [character, setCharacter] = useState<CharacterFilter>('all');
+  const [tag, setTag] = useState<TagFilter>('all');
   const [query, setQuery] = useState('');
   const [illustrations, setIllustrations] = useState<GalleryPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,8 +90,12 @@ export default function GalleryPage() {
     return illustrations
       .filter((item) => item.category === category)
       .filter((item) => {
+        if (character === 'all') return true;
+        return getGalleryCharacters(item).includes(character);
+      })
+      .filter((item) => {
         if (tag === 'all') return true;
-        return item.tags.includes(tag);
+        return getGalleryTags(item).includes(tag);
       })
       .filter((item) => {
         if (!normalizedQuery) return true;
@@ -90,7 +103,8 @@ export default function GalleryPage() {
         const searchableText = [
           item.date,
           item.category,
-          ...item.tags,
+          ...getGalleryCharacters(item),
+          ...getGalleryTags(item),
         ]
           .join(' ')
           .toLowerCase();
@@ -98,7 +112,7 @@ export default function GalleryPage() {
         return searchableText.includes(normalizedQuery);
       })
       .sort((a, b) => b.date.localeCompare(a.date));
-  }, [illustrations, category, tag, query]);
+  }, [illustrations, category, character, tag, query]);
 
   const pillStyle = (active: boolean) => ({
     padding: '8px 14px',
@@ -213,48 +227,102 @@ export default function GalleryPage() {
         </button>
       </section>
 
-      <section
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '8px',
-          marginBottom: '36px',
-        }}
-      >
-        <button
-          onClick={() => setTag('all')}
-          style={pillStyle(tag === 'all')}
+      <section style={{ marginBottom: '18px' }}>
+        <p
+          style={{
+            margin: '0 0 9px',
+            fontSize: '10px',
+            letterSpacing: '.14em',
+            color: 'rgba(255,255,255,.45)',
+          }}
         >
-          ALL
-        </button>
+          CHARACTER
+        </p>
 
-        <button
-          onClick={() => setTag('shiki')}
-          style={pillStyle(tag === 'shiki')}
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '8px',
+          }}
         >
-          SHIKI
-        </button>
+          <button
+            onClick={() => setCharacter('all')}
+            style={pillStyle(character === 'all')}
+          >
+            ALL CHARACTER
+          </button>
 
-        <button
-          onClick={() => setTag('solas')}
-          style={pillStyle(tag === 'solas')}
-        >
-          SOLAS
-        </button>
+          <button
+            onClick={() => setCharacter('shiki')}
+            style={pillStyle(character === 'shiki')}
+          >
+            SHIKI
+          </button>
 
-        <button
-          onClick={() => setTag('reference')}
-          style={pillStyle(tag === 'reference')}
-        >
-          REFERENCE
-        </button>
+          <button
+            onClick={() => setCharacter('solas')}
+            style={pillStyle(character === 'solas')}
+          >
+            SOLAS
+          </button>
+        </div>
+      </section>
 
-        <button
-          onClick={() => setTag('song-inspired')}
-          style={pillStyle(tag === 'song-inspired')}
+      <section style={{ marginBottom: '36px' }}>
+        <p
+          style={{
+            margin: '0 0 9px',
+            fontSize: '10px',
+            letterSpacing: '.14em',
+            color: 'rgba(255,255,255,.45)',
+          }}
         >
-          SONG INSPIRED
-        </button>
+          TAG
+        </p>
+
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '8px',
+          }}
+        >
+          <button
+            onClick={() => setTag('all')}
+            style={pillStyle(tag === 'all')}
+          >
+            ALL TAG
+          </button>
+
+          <button
+            onClick={() => setTag('reference')}
+            style={pillStyle(tag === 'reference')}
+          >
+            REFERENCE
+          </button>
+
+          <button
+            onClick={() => setTag('song-parody')}
+            style={pillStyle(tag === 'song-parody')}
+          >
+            SONG PARODY
+          </button>
+
+          <button
+            onClick={() => setTag('manga')}
+            style={pillStyle(tag === 'manga')}
+          >
+            MANGA
+          </button>
+
+          <button
+            onClick={() => setTag('rakugaki')}
+            style={pillStyle(tag === 'rakugaki')}
+          >
+            RAKUGAKI
+          </button>
+        </div>
       </section>
 
       {loading && (
@@ -292,6 +360,8 @@ export default function GalleryPage() {
             const images = getGalleryImages(item);
             const firstImage = images[0];
             const imageCount = images.length;
+            const itemCharacters = getGalleryCharacters(item);
+            const itemTags = getGalleryTags(item);
 
             return (
               <article key={item.id}>
@@ -375,8 +445,11 @@ export default function GalleryPage() {
                     color: 'rgba(255,255,255,.7)',
                   }}
                 >
-                  {item.category.toUpperCase()} ·{' '}
-                  {item.tags.map(tagLabel).join(' / ')}
+                  {[
+                    item.category.toUpperCase(),
+                    ...itemCharacters.map(characterLabel),
+                    ...itemTags.map(tagLabel),
+                  ].join(' · ')}
                 </p>
               </article>
             );
