@@ -7,9 +7,10 @@ import {
   fetchGalleryPosts,
   saveGalleryPosts,
   type GalleryCategory,
-  type GalleryCharacterTag,
+  type GalleryCharacter,
   type GalleryImage,
   type GalleryPost,
+  type GalleryTag,
 } from '@/lib/galleryData';
 
 type CloudinaryUploadResponse = {
@@ -26,7 +27,8 @@ export default function NewIllustrationPage() {
 
   const [date, setDate] = useState('');
   const [category, setCategory] = useState<GalleryCategory>('original');
-  const [tags, setTags] = useState<GalleryCharacterTag[]>([]);
+  const [characters, setCharacters] = useState<GalleryCharacter[]>([]);
+  const [tags, setTags] = useState<GalleryTag[]>([]);
   const [images, setImages] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
 
@@ -43,7 +45,15 @@ export default function NewIllustrationPage() {
     };
   }, [images]);
 
-  const toggleTag = (tag: GalleryCharacterTag) => {
+  const toggleCharacter = (character: GalleryCharacter) => {
+    setCharacters((current) =>
+      current.includes(character)
+        ? current.filter((item) => item !== character)
+        : [...current, character]
+    );
+  };
+
+  const toggleTag = (tag: GalleryTag) => {
     setTags((current) =>
       current.includes(tag)
         ? current.filter((item) => item !== tag)
@@ -149,6 +159,7 @@ export default function NewIllustrationPage() {
         id: crypto.randomUUID(),
         date,
         category,
+        characters,
         tags,
         images: uploadedImages,
         authorId: user.id,
@@ -399,14 +410,23 @@ export default function NewIllustrationPage() {
               style={{ color: '#f5f5f5' }}
             />
 
-            <small
-              style={{
-                color: 'rgba(255,255,255,.5)',
-                lineHeight: 1.6,
-              }}
-            >
-              複数枚選択できます。左上の番号が表示順です。
-            </small>
+            {images.length > 0 && (
+              <div
+                style={{
+                  display: 'grid',
+                  gap: '4px',
+                  color: 'rgba(255,255,255,.58)',
+                  fontSize: '12px',
+                  lineHeight: 1.5,
+                }}
+              >
+                {images.map((file, index) => (
+                  <span key={`${file.name}-${index}`}>
+                    {index + 1}. {file.name}
+                  </span>
+                ))}
+              </div>
+            )}
           </label>
         </section>
 
@@ -430,6 +450,44 @@ export default function NewIllustrationPage() {
               }}
             />
           </label>
+
+          <fieldset
+            style={{
+              border: '1px solid rgba(255,255,255,.18)',
+              borderRadius: '10px',
+              padding: '18px',
+            }}
+          >
+            <legend style={{ padding: '0 8px' }}>
+              CHARACTER
+            </legend>
+
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '24px',
+              }}
+            >
+              <label style={choiceStyle}>
+                <input
+                  type="checkbox"
+                  checked={characters.includes('shiki')}
+                  onChange={() => toggleCharacter('shiki')}
+                />
+                SHIKI
+              </label>
+
+              <label style={choiceStyle}>
+                <input
+                  type="checkbox"
+                  checked={characters.includes('solas')}
+                  onChange={() => toggleCharacter('solas')}
+                />
+                SOLAS
+              </label>
+            </div>
+          </fieldset>
 
           <fieldset
             style={{
@@ -478,7 +536,7 @@ export default function NewIllustrationPage() {
             }}
           >
             <legend style={{ padding: '0 8px' }}>
-              TAGS
+              TAG
             </legend>
 
             <div
@@ -491,24 +549,6 @@ export default function NewIllustrationPage() {
               <label style={choiceStyle}>
                 <input
                   type="checkbox"
-                  checked={tags.includes('shiki')}
-                  onChange={() => toggleTag('shiki')}
-                />
-                SHIKI
-              </label>
-
-              <label style={choiceStyle}>
-                <input
-                  type="checkbox"
-                  checked={tags.includes('solas')}
-                  onChange={() => toggleTag('solas')}
-                />
-                SOLAS
-              </label>
-
-              <label style={choiceStyle}>
-                <input
-                  type="checkbox"
                   checked={tags.includes('reference')}
                   onChange={() => toggleTag('reference')}
                 />
@@ -518,10 +558,28 @@ export default function NewIllustrationPage() {
               <label style={choiceStyle}>
                 <input
                   type="checkbox"
-                  checked={tags.includes('song-inspired')}
-                  onChange={() => toggleTag('song-inspired')}
+                  checked={tags.includes('song-parody')}
+                  onChange={() => toggleTag('song-parody')}
                 />
-                SONG INSPIRED
+                SONG PARODY
+              </label>
+
+              <label style={choiceStyle}>
+                <input
+                  type="checkbox"
+                  checked={tags.includes('manga')}
+                  onChange={() => toggleTag('manga')}
+                />
+                MANGA
+              </label>
+
+              <label style={choiceStyle}>
+                <input
+                  type="checkbox"
+                  checked={tags.includes('rakugaki')}
+                  onChange={() => toggleTag('rakugaki')}
+                />
+                RAKUGAKI
               </label>
             </div>
           </fieldset>
