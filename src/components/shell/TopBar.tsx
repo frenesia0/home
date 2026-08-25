@@ -12,7 +12,7 @@ import { KToggle } from '@/components/ui/Kit';
 
 const NAV_ITEMS = [
   { label: 'HOME', href: '/' },
-  { label: 'CHARACTER', href: '/character' },
+  { label: 'CHARACTER', href: '/chars' },
   { label: 'GALLERY', href: '/gallery' },
   { label: 'NEWS', href: '/news' },
   { label: 'KOBANASHI', href: '/kobanashi' },
