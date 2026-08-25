@@ -186,10 +186,16 @@ export function LatestWidget() {
       href: '/roadview', tip: `로드비 · No.${String(it.no ?? 0).padStart(3, '0')}`,
     })),
     // 갤러리 — 전체공개 + 접기 없는 게시물의 대표(첫) 이미지
-    ...backups.filter(p => p.visibility === 'public' && !p.fold).map(p => ({
-      id: `b-${p.id}`, date: p.date, ref: p.images[0], ph: p.phList[0] ?? 'cool',
-      href: `/backup/${p.id}`, tip: `갤러리 · ${p.title}`,
-    })),
+    ...backups
+  .filter(p => p.visibility === 'public' && !p.fold && p.images?.length > 0)
+  .map(p => ({
+    id: `b-${p.id}`,
+    date: p.date,
+    ref: p.images?.[0],
+    ph: p.phList?.[0] ?? 'cool',
+    href: `/backup/${p.id}`,
+    tip: `ギャラリー · ${p.title}`,
+  })),
   ].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
   const phFallback = ['cool', 'warm', 'red'];
   return (
