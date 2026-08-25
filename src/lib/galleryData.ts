@@ -3,11 +3,16 @@
 import { fetchList, syncList, subscribeTable } from '@/lib/db';
 
 export type GalleryCategory = 'original' | 'commission';
-export type GalleryCharacterTag =
+
+export type GalleryCharacter =
   | 'shiki'
-  | 'solas'
+  | 'solas';
+
+export type GalleryTag =
   | 'reference'
-  | 'song-inspired';
+  | 'song-parody'
+  | 'manga'
+  | 'rakugaki';
 
 export interface GalleryImage {
   url: string;
@@ -19,7 +24,10 @@ export interface GalleryPost {
   title?: string;
   date: string;
   category: GalleryCategory;
-  tags: GalleryCharacterTag[];
+
+  // 新形式：キャラクターとタグを分離
+  characters?: GalleryCharacter[];
+  tags?: GalleryTag[];
 
   // 新形式：1投稿に複数画像を持てる
   images?: GalleryImage[];
@@ -27,6 +35,10 @@ export interface GalleryPost {
   // 旧形式との互換用。既存投稿を壊さないため当面残す
   imageUrl?: string;
   cloudinaryPublicId?: string;
+
+  // 旧形式との互換用。以前は shiki / solas / reference / song-inspired を
+  // すべて同じ tags 配列に入れていたため、読み取り時に分離する
+  legacyTags?: string[];
 
   authorId: string;
   visibility: 'public';
@@ -67,6 +79,70 @@ export function getGalleryImages(post: GalleryPost): GalleryImage[] {
   }
 
   return [];
+}
+
+/**
+ * 新旧どちらの形式でもキャラクター情報を取得する。
+ * 旧形式では item.tags に shiki / solas が混在していたため、
+ * それをキャラクターとして読み替える。
+ */
+export function getGalleryCharacters(post: GalleryPost): GalleryCharacter[] {
+  if (Array.isArray(post.characters)) {
+    return post.characters.filter(
+      (character): character is GalleryCharacter =>
+        character === 'shiki' || character === 'solas'
+    );
+  }
+
+  const legacy = Array.isArray((post as { tags?: unknown }).tags)
+    ? ((post as { tags?: unknown[] }).tags ?? [])
+    : Array.isArray(post.legacyTags)
+      ? post.legacyTags
+      : [];
+
+  return legacy.filter(
+    (item): item is GalleryCharacter =>
+      item === 'shiki' || item === 'solas'
+  );
+}
+
+/**
+ * 新旧どちらの形式でもタグ情報を取得する。
+ * 旧形式の song-inspired は song-parody として読み替える。
+ */
+export function getGalleryTags(post: GalleryPost): GalleryTag[] {
+  if (Array.isArray(post.tags)) {
+    const hasNewOnly = post.tags.every(
+      (tag) =>
+        tag === 'reference' ||
+        tag === 'song-parody' ||
+        tag === 'manga' ||
+        tag === 'rakugaki'
+    );
+
+    if (hasNewOnly) {
+      return post.tags;
+    }
+  }
+
+  const legacy = Array.isArray((post as { tags?: unknown }).tags)
+    ? ((post as { tags?: unknown[] }).tags ?? [])
+    : Array.isArray(post.legacyTags)
+      ? post.legacyTags
+      : [];
+
+  const converted: GalleryTag[] = [];
+
+  for (const item of legacy) {
+    if (item === 'reference') converted.push('reference');
+    if (item === 'song-inspired' || item === 'song-parody') {
+      converted.push('song-parody');
+    }
+    if (item === 'manga') converted.push('manga');
+    if (item === 'rakugaki') converted.push('rakugaki');
+  }
+
+  return Array.from(new Set(converted));
 }
 
 /** Gallery一覧をFirestoreから取得する */
