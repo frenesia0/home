@@ -386,15 +386,37 @@ export default function GalleryDetailPage() {
                   imageIndex + 1
                 }`}
                 watermark={currentImage.watermark}
-                imageStyle={{
-                  display: 'block',
-                  maxWidth: '100%',
-                  maxHeight:
-                    'calc(100vh - 150px)',
-                  width: 'auto',
-                  height: 'auto',
-                  objectFit: 'contain',
-                }}
+                {currentImage ? (
+  <div
+    style={{
+      width: '100%',
+      height: '100%',
+      minHeight: '620px',
+      position: 'relative',
+    }}
+  >
+    <WatermarkedImage
+      src={currentImage.url}
+      alt={`illustration ${imageIndex + 1}`}
+      watermark={currentImage.watermark}
+      fit="contain"
+      style={{
+        width: '100%',
+        height: '100%',
+        minHeight: '620px',
+      }}
+    />
+  </div>
+) : (
+  <div
+    style={{
+      color: 'rgba(255,255,255,.4)',
+      fontSize: '12px',
+    }}
+  >
+    NO IMAGE
+  </div>
+)}
               />
             ) : (
               <div
