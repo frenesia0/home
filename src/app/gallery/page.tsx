@@ -1,102 +1,266 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import {
+  useRouter,
+  useSearchParams,
+} from 'next/navigation';
 import { useAuth } from '@/lib/auth';
+import {
+  fetchGalleryPosts,
+  getGalleryCharacters,
+  getGalleryCommission,
+  getGalleryImages,
+  getGalleryTags,
+  getGalleryThumbnailImage,
+  subscribeGallery,
+  type GalleryCategory,
+  type GalleryCharacter,
+  type GalleryPost,
+  type GalleryTag,
+} from '@/lib/galleryData';
+import { CropImg } from '@/components/ui/CropEditor';
 
-type Category = 'original' | 'commission';
-type CharacterTag = 'shiki' | 'solas' | 'reference';
-type FilterTag = 'all' | CharacterTag;
+type CharacterFilter = 'all' | GalleryCharacter;
+type TagFilter = 'all' | GalleryTag;
+type SortOrder = 'newest' | 'oldest';
 
-type GalleryPost = {
-  id: string;
-  title: string;
-  date: string;
-  category: Category;
-  tags: CharacterTag[];
-};
+function optimizeCloudinaryUrl(url: string) {
+  if (!url.includes('/upload/')) return url;
 
-const STORAGE_KEY = 'shiki-solas-gallery-posts';
+  return url.replace(
+    '/upload/',
+    '/upload/f_auto,q_auto:best,c_limit,w_1200/'
+  );
+}
 
-const demoPosts: GalleryPost[] = [
-  {
-    id: 'demo-1',
-    title: 'Illustration 01',
-    date: '2026-08-25',
-    category: 'original',
-    tags: ['shiki'],
-  },
-  {
-    id: 'demo-2',
-    title: 'Illustration 02',
-    date: '2026-07-10',
-    category: 'commission',
-    tags: ['solas'],
-  },
-  {
-    id: 'demo-3',
-    title: 'Illustration 03',
-    date: '2026-06-18',
-    category: 'original',
-    tags: ['shiki', 'solas', 'reference'],
-  },
-];
+function characterLabel(character: GalleryCharacter) {
+  return character.toUpperCase();
+}
+
+function tagLabel(tag: GalleryTag) {
+  if (tag === 'song-parody') return 'SONG PARODY';
+  return tag.toUpperCase();
+}
+
+function isCategory(value: string | null): value is GalleryCategory {
+  return value === 'original' || value === 'commission';
+}
+
+function isCharacterFilter(
+  value: string | null
+): value is CharacterFilter {
+  return (
+    value === 'all' ||
+    value === 'shiki' ||
+    value === 'solas'
+  );
+}
+
+function isTagFilter(
+  value: string | null
+): value is TagFilter {
+  return (
+    value === 'all' ||
+    value === 'reference' ||
+    value === 'song-parody' ||
+    value === 'manga' ||
+    value === 'rakugaki' ||
+    value === 'tachie'
+  );
+}
+
+function isSortOrder(
+  value: string | null
+): value is SortOrder {
+  return value === 'newest' || value === 'oldest';
+}
+
+/**
+ * 初期値と同じ条件はURLへ書かない。
+ * ORIGINAL / ALL CHARACTER / ALL TAG / NEWEST は省略する。
+ */
+function buildGalleryQuery(
+  category: GalleryCategory,
+  character: CharacterFilter,
+  tag: TagFilter,
+  sortOrder: SortOrder
+) {
+  const params = new URLSearchParams();
+
+  if (category !== 'original') {
+    params.set('category', category);
+  }
+
+  if (character !== 'all') {
+    params.set('character', character);
+  }
+
+  if (
+    category === 'original' &&
+    tag !== 'all'
+  ) {
+    params.set('tag', tag);
+  }
+
+  if (sortOrder !== 'newest') {
+    params.set('sort', sortOrder);
+  }
+
+  return params.toString();
+}
 
 export default function GalleryPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isAdmin } = useAuth();
 
-  const [category, setCategory] = useState<Category>('original');
-  const [tag, setTag] = useState<FilterTag>('all');
-  const [query, setQuery] = useState('');
-  const [savedPosts, setSavedPosts] = useState<GalleryPost[]>([]);
+  const initialCategory =
+    isCategory(searchParams.get('category'))
+      ? searchParams.get('category') as GalleryCategory
+      : 'original';
+
+  const initialCharacter =
+    isCharacterFilter(searchParams.get('character'))
+      ? searchParams.get('character') as CharacterFilter
+      : 'all';
+
+  const initialTag =
+    isTagFilter(searchParams.get('tag'))
+      ? searchParams.get('tag') as TagFilter
+      : 'all';
+
+  const initialSort =
+    isSortOrder(searchParams.get('sort'))
+      ? searchParams.get('sort') as SortOrder
+      : 'newest';
+
+  const [category, setCategory] =
+    useState<GalleryCategory>(initialCategory);
+  const [character, setCharacter] =
+    useState<CharacterFilter>(initialCharacter);
+  const [tag, setTag] =
+    useState<TagFilter>(initialTag);
+  const [sortOrder, setSortOrder] =
+    useState<SortOrder>(initialSort);
+
+  const [illustrations, setIllustrations] =
+    useState<GalleryPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    let alive = true;
 
-    if (!saved) {
-      setSavedPosts([]);
-      return;
-    }
+    const load = async () => {
+      try {
+        const posts = await fetchGalleryPosts();
 
-    try {
-      const parsed = JSON.parse(saved) as GalleryPost[];
-      setSavedPosts(parsed);
-    } catch {
-      setSavedPosts([]);
-    }
+        if (alive) {
+          setIllustrations(posts);
+          setError('');
+        }
+      } catch (err) {
+        if (alive) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : 'ギャラリーを読み込めませんでした。'
+          );
+        }
+      } finally {
+        if (alive) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void load();
+
+    const off = subscribeGallery(() => {
+      void load();
+    });
+
+    return () => {
+      alive = false;
+      off();
+    };
   }, []);
 
-  const illustrations = useMemo(
-    () => [...savedPosts, ...demoPosts],
-    [savedPosts]
-  );
+  useEffect(() => {
+    const query = buildGalleryQuery(
+      category,
+      character,
+      tag,
+      sortOrder
+    );
+
+    router.replace(
+      query
+        ? `/gallery?${query}`
+        : '/gallery',
+      {
+        scroll: false,
+      }
+    );
+  }, [
+    category,
+    character,
+    tag,
+    sortOrder,
+    router,
+  ]);
 
   const filtered = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-
     return illustrations
       .filter((item) => item.category === category)
       .filter((item) => {
-        if (tag === 'all') return true;
-        return item.tags.includes(tag);
+        if (character === 'all') return true;
+        return getGalleryCharacters(item).includes(character);
       })
       .filter((item) => {
-        if (!normalizedQuery) return true;
-
-        const searchableText = [
-          item.title,
-          item.date,
-          item.category,
-          ...item.tags,
-        ]
-          .join(' ')
-          .toLowerCase();
-
-        return searchableText.includes(normalizedQuery);
+        if (category === 'commission' || tag === 'all') return true;
+        return getGalleryTags(item).includes(tag);
       })
-      .sort((a, b) => b.date.localeCompare(a.date));
-  }, [illustrations, category, tag, query]);
+      .sort((a, b) =>
+        sortOrder === 'newest'
+          ? b.date.localeCompare(a.date)
+          : a.date.localeCompare(b.date)
+      );
+  }, [
+    illustrations,
+    category,
+    character,
+    tag,
+    sortOrder,
+  ]);
+
+  const currentQuery = useMemo(
+    () =>
+      buildGalleryQuery(
+        category,
+        character,
+        tag,
+        sortOrder
+      ),
+    [
+      category,
+      character,
+      tag,
+      sortOrder,
+    ]
+  );
+
+  const openIllustration = (id: string) => {
+    const base =
+      `/gallery/${encodeURIComponent(id)}`;
+
+    router.push(
+      currentQuery
+        ? `${base}?${currentQuery}`
+        : base
+    );
+  };
 
   const pillStyle = (active: boolean) => ({
     padding: '8px 14px',
@@ -153,7 +317,7 @@ export default function GalleryPage() {
 
         {isAdmin && (
           <button
-            onClick={() => router.push('/gallery/new')}
+            onClick={() => router.push('/gallery/add')}
             style={{
               padding: '10px 16px',
               borderRadius: '8px',
@@ -171,25 +335,44 @@ export default function GalleryPage() {
 
       <div
         style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
           marginBottom: '22px',
         }}
       >
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search illustrations..."
+        <button
+          type="button"
+          aria-label={
+            sortOrder === 'newest'
+              ? '新しい順。押すと古い順に切り替えます'
+              : '古い順。押すと新しい順に切り替えます'
+          }
+          title={sortOrder === 'newest' ? '新しい順' : '古い順'}
+          onClick={() =>
+            setSortOrder((current) =>
+              current === 'newest' ? 'oldest' : 'newest'
+            )
+          }
           style={{
-            width: '100%',
-            maxWidth: '520px',
-            padding: '11px 14px',
+            padding: '10px 14px',
             borderRadius: '9px',
             border: '1px solid rgba(255,255,255,.2)',
             background: 'rgba(255,255,255,.06)',
             color: '#f5f5f5',
-            outline: 'none',
+            cursor: 'pointer',
+            fontSize: '11px',
           }}
-        />
+        >
+          <span
+            aria-hidden="true"
+            style={{
+              fontSize: '16px',
+              lineHeight: 1,
+            }}
+          >
+            {sortOrder === 'newest' ? '↓' : '↑'}
+          </span>
+        </button>
       </div>
 
       <section
@@ -201,116 +384,138 @@ export default function GalleryPage() {
         }}
       >
         <button
-          onClick={() => setCategory('original')}
+          onClick={() => {
+            setCategory('original');
+            setTag('all');
+          }}
           style={pillStyle(category === 'original')}
         >
           ORIGINAL
         </button>
 
         <button
-          onClick={() => setCategory('commission')}
+          onClick={() => {
+            setCategory('commission');
+            setTag('all');
+          }}
           style={pillStyle(category === 'commission')}
         >
           COMMISSION
         </button>
       </section>
 
-      <section
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '8px',
-          marginBottom: '36px',
-        }}
-      >
-        <button
-          onClick={() => setTag('all')}
-          style={pillStyle(tag === 'all')}
+      <section style={{ marginBottom: '18px' }}>
+        <p
+          style={{
+            margin: '0 0 9px',
+            fontSize: '10px',
+            letterSpacing: '.14em',
+            color: 'rgba(255,255,255,.45)',
+          }}
         >
-          ALL
-        </button>
+          CHARACTER
+        </p>
 
-        <button
-          onClick={() => setTag('shiki')}
-          style={pillStyle(tag === 'shiki')}
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '8px',
+          }}
         >
-          SHIKI
-        </button>
+          <button
+            onClick={() => setCharacter('all')}
+            style={pillStyle(character === 'all')}
+          >
+            ALL CHARACTER
+          </button>
 
-        <button
-          onClick={() => setTag('solas')}
-          style={pillStyle(tag === 'solas')}
-        >
-          SOLAS
-        </button>
+          <button
+            onClick={() => setCharacter('shiki')}
+            style={pillStyle(character === 'shiki')}
+          >
+            SHIKI
+          </button>
 
-        <button
-          onClick={() => setTag('reference')}
-          style={pillStyle(tag === 'reference')}
-        >
-          REFERENCE
-        </button>
+          <button
+            onClick={() => setCharacter('solas')}
+            style={pillStyle(character === 'solas')}
+          >
+            SOLAS
+          </button>
+        </div>
       </section>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-          gap: '28px 22px',
-        }}
-      >
-        {filtered.map((item) => (
-          <article key={item.id}>
-            <div
-              style={{
-                aspectRatio: '1 / 1',
-                background: 'rgba(255,255,255,.82)',
-                borderRadius: '8px',
-                marginBottom: '12px',
-                display: 'grid',
-                placeItems: 'center',
-                color: '#17191d',
-                fontSize: '12px',
-              }}
-            >
-              IMAGE
-            </div>
+      {category === 'original' && (
+        <section style={{ marginBottom: '36px' }}>
+          <p
+            style={{
+              margin: '0 0 9px',
+              fontSize: '10px',
+              letterSpacing: '.14em',
+              color: 'rgba(255,255,255,.45)',
+            }}
+          >
+            TAG
+          </p>
 
-            <h2
-              style={{
-                fontSize: '15px',
-                margin: '0 0 5px',
-                fontWeight: 600,
-              }}
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '8px',
+            }}
+          >
+            <button
+              onClick={() => setTag('all')}
+              style={pillStyle(tag === 'all')}
             >
-              {item.title}
-            </h2>
+              ALL TAG
+            </button>
 
-            <p
-              style={{
-                margin: '0 0 5px',
-                fontSize: '11px',
-                color: 'rgba(255,255,255,.55)',
-              }}
+            <button
+              onClick={() => setTag('reference')}
+              style={pillStyle(tag === 'reference')}
             >
-              {item.date}
-            </p>
+              REFERENCE
+            </button>
 
-            <p
-              style={{
-                margin: 0,
-                fontSize: '11px',
-                color: 'rgba(255,255,255,.7)',
-              }}
+            <button
+              onClick={() => setTag('song-parody')}
+              style={pillStyle(tag === 'song-parody')}
             >
-              {item.category.toUpperCase()} ·{' '}
-              {item.tags.map((itemTag) => itemTag.toUpperCase()).join(' / ')}
-            </p>
-          </article>
-        ))}
-      </div>
+              SONG PARODY
+            </button>
 
-      {filtered.length === 0 && (
+            <button
+              onClick={() => setTag('manga')}
+              style={pillStyle(tag === 'manga')}
+            >
+              MANGA
+            </button>
+
+            <button
+              onClick={() => setTag('rakugaki')}
+              style={pillStyle(tag === 'rakugaki')}
+            >
+              RAKUGAKI
+            </button>
+
+            <button
+              onClick={() => setTag('tachie')}
+              style={pillStyle(tag === 'tachie')}
+            >
+              TACHIE
+            </button>
+          </div>
+        </section>
+      )}
+
+      {category === 'commission' && (
+        <div style={{ marginBottom: '36px' }} />
+      )}
+
+      {loading && (
         <p
           style={{
             padding: '60px 0',
@@ -318,9 +523,177 @@ export default function GalleryPage() {
             color: 'rgba(255,255,255,.45)',
           }}
         >
-          NO ILLUSTRATIONS
+          LOADING...
         </p>
       )}
+
+      {error && (
+        <p
+          style={{
+            padding: '20px 0',
+            color: '#ff8d8d',
+          }}
+        >
+          {error}
+        </p>
+      )}
+
+      {!loading && !error && (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns:
+              'repeat(auto-fill, minmax(220px, 1fr))',
+            gap: '28px 22px',
+          }}
+        >
+          {filtered.map((item) => {
+            const images = getGalleryImages(item);
+            const imageCount = images.length;
+            const thumbnail = getGalleryThumbnailImage(item);
+            const itemCharacters = getGalleryCharacters(item);
+            const itemTags = getGalleryTags(item);
+            const commission = getGalleryCommission(item);
+
+            return (
+              <article
+                key={item.id}
+                role="link"
+                tabIndex={0}
+                onClick={() => openIllustration(item.id)}
+                onKeyDown={(event) => {
+                  if (
+                    event.key === 'Enter' ||
+                    event.key === ' '
+                  ) {
+                    event.preventDefault();
+                    openIllustration(item.id);
+                  }
+                }}
+                style={{
+                  cursor: 'pointer',
+                  outline: 'none',
+                }}
+              >
+                <div
+                  style={{
+                    position: 'relative',
+                    aspectRatio: '1 / 1',
+                    background: 'rgba(255,255,255,.08)',
+                    borderRadius: '8px',
+                    marginBottom: '10px',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {thumbnail ? (
+                    <CropImg
+                      src={optimizeCloudinaryUrl(thumbnail.url)}
+                      crop={item.thumbnailCrop}
+                      alt="illustration thumbnail"
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        display: 'grid',
+                        placeItems: 'center',
+                        color: 'rgba(255,255,255,.35)',
+                        fontSize: '12px',
+                      }}
+                    >
+                      NO IMAGE
+                    </div>
+                  )}
+
+                  {imageCount > 1 && (
+                    <div
+                      aria-label={`${imageCount}枚の画像`}
+                      style={{
+                        position: 'absolute',
+                        top: '10px',
+                        right: '10px',
+                        minWidth: '30px',
+                        height: '30px',
+                        padding: '0 8px',
+                        borderRadius: '999px',
+                        display: 'grid',
+                        placeItems: 'center',
+                        background: 'rgba(0,0,0,.68)',
+                        border: '1px solid rgba(255,255,255,.28)',
+                        color: '#fff',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        backdropFilter: 'blur(6px)',
+                      }}
+                    >
+                      {imageCount}
+                    </div>
+                  )}
+                </div>
+
+                <p
+                  style={{
+                    margin: '0 0 5px',
+                    fontSize: '11px',
+                    color: 'rgba(255,255,255,.55)',
+                  }}
+                >
+                  {item.date}
+                </p>
+
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: '11px',
+                    color: 'rgba(255,255,255,.7)',
+                  }}
+                >
+                  {item.category === 'commission'
+                    ? [
+                        'COMMISSION',
+                        ...itemCharacters.map(characterLabel),
+                      ].join(' · ')
+                    : [
+                        'ORIGINAL',
+                        ...itemCharacters.map(characterLabel),
+                        ...itemTags.map(tagLabel),
+                      ].join(' · ')}
+                </p>
+
+                {item.category === 'commission' && commission && (
+                  <p
+                    style={{
+                      margin: '5px 0 0',
+                      fontSize: '11px',
+                      color: 'rgba(255,255,255,.58)',
+                    }}
+                  >
+                    Artist: {commission.artistName}様
+                    {commission.snsId
+                      ? ` / ${commission.snsId}`
+                      : ''}
+                  </p>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      )}
+
+      {!loading &&
+        !error &&
+        filtered.length === 0 && (
+          <p
+            style={{
+              padding: '60px 0',
+              textAlign: 'center',
+              color: 'rgba(255,255,255,.45)',
+            }}
+          >
+            NO ILLUSTRATIONS
+          </p>
+        )}
     </main>
   );
 }

@@ -1,7 +1,7 @@
-﻿'use client';
-// 캐릭터 등록/프로필 편집 — 전용 페이지 폼 (4.4)
-// 모달이 아니라 페이지라 잘못 클릭해도 닫히지 않음. 탭 내용은 별도 편집 화면으로 전환해 작성.
-// 아트는 여러 장 — 첫 장이 대표 풀 아트이자 리스트 썸네일(3:4 크롭) 원본 (6.1)
+'use client';
+// キャラクター登録／プロフィール編集 — 専用ページフォーム (4.4)
+// モーダルではなく専用ページ。誤クリックで閉じない。タブ内容は専用編集画面に切り替えて作成する。
+// アートは複数枚対応 — 1枚目が代表フルアート兼、一覧サムネイル（3:4クロップ）の元画像 (6.1)
 import React, { useEffect, useState } from 'react';
 import { Character, CharTab, ColorChip, Visibility, CharGrant } from '@/lib/charStore';
 import { GrantsEditor } from '@/components/chars/GrantsEditor';
@@ -32,27 +32,33 @@ function ArtThumb({ item, crop }: { item: ArtItem; crop?: CropValue }) {
 }
 
 export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }: {
-  initial: Character | null;               // null = 신규 등록
+  initial: Character | null;               // null = 新規登録
   onSave: (c: Character) => void;
   onCancel: () => void;
-  auMode?: boolean;                        // AU 전용 편집 (v1.9) — 공개범위·회원권한은 base 소관이라 숨김
-  existingIds?: string[];                  // 페이지 주소 중복 검사용 (v1.9 — 신규 등록)
+  auMode?: boolean;                        // AU専用編集 (v1.9) — 公開範囲・会員権限はbase側で管理するため非表示
+  existingIds?: string[];                  // ページURL重複チェック用 (v1.9 — 新規登録)
 }) {
   const { fonts, familyOf } = useFonts();
   const toast = useToast();
   const isNew = !initial;
 
   const [name, setName] = useState(initial?.name ?? '');
-  const [slug, setSlug] = useState('');   // 페이지 주소 /chars/{slug} (v1.9 — 신규 등록, 비우면 자동)
+  const [slug, setSlug] = useState('');   // ページURL /character/{slug} (v1.9 — 新規登録, 空欄なら自動)
   const [sub, setSub] = useState(initial?.sub ?? '');
   const [color, setColor] = useState(initial?.color ?? '#5d636d');
   const [themeMode, setThemeMode] = useState<'default' | 'custom'>(initial?.themeMode ?? 'default');
   const [visibility, setVisibility] = useState<Visibility>(initial?.visibility ?? 'public');
   const [fontId, setFontId] = useState(initial?.fontId ?? 'serif');
-  const [nameSize, setNameSize] = useState(initial?.nameSize ?? 38);   // 상세 큰 이름 크기 (v2.0)
+  const [nameSize, setNameSize] = useState(initial?.nameSize ?? 38);   // 詳細ページの大きな名前サイズ (v2.0)
   const [bodyFontId, setBodyFontId] = useState(initial?.bodyFontId ?? 'default');
   const [specs, setSpecs] = useState<SpecRow[]>(
-    (initial?.specs ?? [{ label: '성별', value: '' }, { label: '키', value: '' }]).map(s => ({ ...s, id: newId() })));
+    (
+      initial?.specs ?? [
+        { label: '性別', value: '' },
+        { label: '身長', value: '' },
+        { label: '体重', value: '' },
+      ]
+    ).map(s => ({ ...s, id: newId() })));
   const [colors, setColors] = useState<ColorRow[]>((initial?.colors ?? []).map(c => ({ ...c, id: newId() })));
   const [colorTipMode, setColorTipMode] = useState<'hex' | 'both' | 'label'>(initial?.colorTipMode ?? 'hex');
   const [basicHtml, setBasicHtml] = useState(initial?.basicHtml ?? '');
@@ -62,69 +68,145 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
     return refs.map(r => ({ id: newId(), ref: r }));
   });
   const [thumbCrop, setThumbCrop] = useState<CropValue | undefined>(initial?.thumbCrop);
-  const [grants, setGrants] = useState<CharGrant[]>(initial?.grants ?? []); // 상대 캐릭터 회원 권한 (v1.9)
+  const [grants, setGrants] = useState<CharGrant[]>(initial?.grants ?? []); // 関連キャラクターの会員権限 (v1.9)
   const [cropOpen, setCropOpen] = useState(false);
-  const [lb, setLb] = useState<number | null>(null);   // 아트 썸네일 클릭 → 원본 보기
-  // 화면 전환: 메인 폼 / 탭 전용 편집 화면
+  const [lb, setLb] = useState<number | null>(null);   // アート サムネイルクリック → 原寸表示
+  // 画面切替：メインフォーム／タブ専用編集画面
   const [view, setView] = useState<'main' | string>('main');
 
   const addArts = (list: FileList | null) => {
     if (!list || list.length === 0) return;
     const items = Array.from(list).map(f => ({ id: newId(), url: URL.createObjectURL(f), file: f }));
     setArts(prev => {
-      if (prev.length === 0) { setThumbCrop(undefined); setCropOpen(true); } // 첫 장 → 썸네일 크롭 (6.1)
+      if (prev.length === 0) { setThumbCrop(undefined); setCropOpen(true); } // 1枚目 → サムネイルクロップ (6.1)
       return [...prev, ...items];
     });
   };
 
   const save = async () => {
-    if (!name.trim()) { toast('이름을 입력해 주세요'); return; }
-    // 페이지 주소 (v1.9) — 유효성·중복 검사
-    if (isNew && slug) {
-      if (!isValidSlug(slug)) { toast('주소는 영문 소문자·숫자·하이픈만 쓸 수 있습니다'); return; }
-      if (existingIds?.includes(slug)) { toast('이미 사용 중인 주소입니다 — 다른 주소를 입력해 주세요'); return; }
+  if (!name.trim()) {
+    toast('名前を入力してください');
+    return;
+  }
+
+  // ページURLの形式・重複チェック
+  if (isNew && slug) {
+    if (!isValidSlug(slug)) {
+      toast(
+        'URLには半角英小文字・数字・ハイフンのみ使用できます'
+      );
+      return;
     }
-    const artIds = await Promise.all(arts.map(a => (a.file ? putBlob(a.file) : Promise.resolve(a.ref!))));
+
+    if (existingIds?.includes(slug)) {
+      toast(
+        'すでに使用中のURLです。別のURLを入力してください'
+      );
+      return;
+    }
+  }
+
+  try {
+    const artIds = await Promise.all(
+      arts.map((a) =>
+        a.file
+          ? putBlob(a.file)
+          : Promise.resolve(a.ref!)
+      )
+    );
+
     onSave({
-      id: initial?.id ?? (slug || newId()),
-      // 입력한 그대로 저장 — 예전에는 대문자로 바꿔 저장해서 소문자 이름을 쓸 수 없었다
+      id:
+        initial?.id ??
+        (slug || newId()),
+
       name: name.trim(),
       sub: sub.trim(),
       color,
       themeMode,
-      colors: colors.filter(x => x.hex).map(({ hex, label }) => ({ hex, label })),
+
+      colors: colors
+        .filter((x) => x.hex)
+        .map(({ hex, label }) => ({
+          hex,
+          label,
+        })),
+
       colorTipMode,
-      specs: specs.filter(s => s.label.trim()).map(({ label, value }) => ({ label: label.trim(), value })),
-      tabs,   // 제목이 비어도 유지 — 필터로 사라지던 버그 수정 (v1.9 사용자 지적)
+
+      specs: specs
+        .filter((s) =>
+          s.label.trim()
+        )
+        .map(({ label, value }) => ({
+          label: label.trim(),
+          value,
+        })),
+
+      tabs,
       basicHtml,
       visibility,
       fontId,
       nameSize,
       bodyFontId,
-      thumbClass: initial?.thumbClass ?? '',
+
+      thumbClass:
+        initial?.thumbClass ??
+        '',
+
       arts: artIds,
-      thumbId: artIds[0],       // 썸네일 = 첫 아트 + 크롭
+      thumbId: artIds[0],
       thumbCrop,
       artId: artIds[0],
-      own: initial?.own ?? true,
-      grants: grants.length ? grants : undefined,
+
+      own:
+        initial?.own ??
+        true,
+
+      grants:
+        grants.length
+          ? grants
+          : undefined,
     });
+  } catch (err) {
+    console.error(
+      'Character save failed:',
+      err
+    );
+
+    const message =
+      err instanceof Error
+        ? err.message
+        : 'キャラクターの保存に失敗しました。';
+
+    toast(message);
+  }
+};
+
+  const specValuePlaceholder = (label: string) => {
+    const normalized = label.trim();
+
+    if (normalized === '性別') return '例：男性';
+    if (normalized === '身長') return '例：186cm';
+    if (normalized === '体重') return '例：100kg';
+
+    return '値';
   };
 
   const rowInp: React.CSSProperties = { fontSize: 12, padding: '7px 10px' };
   const addBtn: React.CSSProperties = { padding: '5px 12px', fontSize: 11, justifySelf: 'center' };
 
-  // 탭 삭제 — 경고 모달을 거침 (v1.9)
+  // タブ削除 — 確認モーダルを表示 (v1.9)
   const del = useConfirmDelete();
   const askDeleteTab = (tabId: string, after?: () => void) => {
     const t = tabs.find(x => x.id === tabId);
-    del.ask(`탭 「${t?.title || '제목 없음'}」을 삭제하시겠습니까?`, () => {
+    del.ask(`タブ「${t?.title || 'タイトルなし'}」を削除しますか？`, () => {
       setTabs(l => l.filter(x => x.id !== tabId));
       after?.();
-    }, '탭에 작성한 내용도 함께 사라집니다. 저장(SAVE) 전까지는 CANCEL로 폼을 벗어나면 되돌릴 수 있습니다.');
+    }, 'タブに入力した内容も一緒に削除されます。SAVE前であればCANCELでフォームを離れることで元に戻せます。');
   };
 
-  /* ---------- 탭 전용 편집 화면 ---------- */
+  /* ---------- タブ専用編集画面 ---------- */
   const curTab = tabs.find(t => t.id === view);
   if (curTab) {
     return <>
@@ -137,37 +219,37 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
     </>;
   }
 
-  /* ---------- 메인 폼 ---------- */
+  /* ---------- メインフォーム ---------- */
   return (
     <div className="write-grid">
-      {/* 좌: 아트/스펙/컬러/본문/탭 */}
+      {/* 左：アート／基本情報／カラー／本文／タブ */}
       <div className="panel" style={{ padding: 24, display: 'grid', gap: 12, alignContent: 'start' }}>
-        {/* 아트 목록 */}
+        {/* アート一覧 */}
         <label className="k-label" style={{ margin: 0 }}>
-          아트 <span style={{ fontWeight: 400, color: 'var(--faint)' }}>— 첫 장이 대표 풀 아트 · 리스트 썸네일은 첫 장에서 3:4 크롭 · ⠿ 순서 변경</span>
+          アート <span style={{ fontWeight: 400, color: 'var(--faint)' }}>— 1枚目が代表フルアート · 一覧サムネイルは1枚目から3:4でクロップ · ⠿で順序変更</span>
         </label>
         {arts.length > 0 && (
           <DragList items={arts} keyOf={a => a.id} onReorder={setArts}
             render={(a, i) => (
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', width: '100%', padding: '3px 0' }}>
                 <span className="drag-h">⠿</span>
-                <div data-tip="클릭하면 원본 보기" onClick={() => setLb(i)}
+                <div data-tip="クリックで原寸表示" onClick={() => setLb(i)}
                   style={{ width: 64, aspectRatio: '3/4', borderRadius: 7, overflow: 'hidden', position: 'relative', flexShrink: 0, cursor: 'zoom-in' }}>
                   <ArtThumb item={a} crop={i === 0 ? thumbCrop : undefined} />
                 </div>
                 {i === 0 ? (
                   <>
-                    <span className="pill dark">대표 · 썸네일</span>
-                    {/* 옆의 「대표 · 썸네일」 뱃지와 세로 크기 통일 (23px).
-                        상세 화면에 보일 위치는 상세에서 우클릭으로 잡는다 (v2.0) */}
+                    <span className="pill dark">代表 · サムネイル</span>
+                    {/* 隣の「代表 · サムネイル」バッジと高さを統一 (23px).
+                        詳細画面での表示位置は詳細ページで右クリックして調整する (v2.0) */}
                     <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 10.5, lineHeight: '13px' }}
-                      onClick={() => setCropOpen(true)}>✂ 썸네일 크롭</button>
+                      onClick={() => setCropOpen(true)}>✂ サムネイル調整</button>
                   </>
                 ) : (
-                  <span className="pill">추가 아트</span>
+                  <span className="pill">追加アート</span>
                 )}
                 <span className="fx" style={{ marginLeft: 'auto' }}
-                  onClick={() => del.ask('이 아트를 삭제하시겠습니까?', () => setArts(l => l.filter(x => x.id !== a.id)))}>✕</span>
+                  onClick={() => del.ask('このアートを削除しますか？', () => setArts(l => l.filter(x => x.id !== a.id)))}>✕</span>
               </div>
             )} />
         )}
@@ -176,22 +258,22 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
         <button className="btn btn-ghost" style={addBtn}
           onClick={() => document.getElementById('chArtsF')?.click()}
           {...fileDrop(fl => addArts(fl))}>
-          ＋ ADD ART {arts.length === 0 && '(첫 장 등록 시 썸네일 크롭 지정)'}
+          ＋ ADD ART {arts.length === 0 && '(1枚目登録時にサムネイル範囲を指定)'}
         </button>
 
-        {/* 기본 정보 스펙 */}
-        <label className="k-label" style={{ margin: 0 }}>기본 정보 항목</label>
+        {/* 基本情報 */}
+        <label className="k-label" style={{ margin: 0 }}>基本情報</label>
         <DragList items={specs} keyOf={s => s.id} onReorder={setSpecs}
           render={s => (
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', width: '100%', padding: '2px 0' }}>
               <span className="drag-h">⠿</span>
-              <KInput placeholder="항목" value={s.label} style={{ ...rowInp, width: 90 }}
+              <KInput placeholder="項目" value={s.label} style={{ ...rowInp, width: 90 }}
                 onChange={e => setSpecs(l => l.map(x => x.id === s.id ? { ...x, label: e.target.value } : x))} />
-              <KInput placeholder="값" value={s.value} style={rowInp}
+              <KInput placeholder={specValuePlaceholder(s.label)} value={s.value} style={rowInp}
                 onChange={e => setSpecs(l => l.map(x => x.id === s.id ? { ...x, value: e.target.value } : x))} />
               <span className="fx" onClick={() => {
                 const remove = () => setSpecs(l => l.filter(x => x.id !== s.id));
-                if (s.label.trim() || s.value.trim()) del.ask('이 항목을 삭제하시겠습니까?', remove, `${s.label} — ${s.value}`);
+                if (s.label.trim() || s.value.trim()) del.ask('この項目を削除しますか？', remove, `${s.label} — ${s.value}`);
                 else remove();
               }}>✕</span>
             </div>
@@ -199,43 +281,43 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
         <button className="btn btn-ghost" style={addBtn}
           onClick={() => setSpecs(l => [...l, { id: newId(), label: '', value: '' }])}>＋ ADD</button>
 
-        {/* 테마 컬러 — 한 줄에 2개 */}
+        {/* テーマカラー — 1行2件 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <label className="k-label" style={{ margin: 0 }}>테마 컬러 (프로필 색 점 나열)</label>
-          <div className="mini-seg" data-tip="색 점 호버 툴팁 표기 방식">
+          <label className="k-label" style={{ margin: 0 }}>テーマカラー（プロフィールの色チップ）</label>
+          <div className="mini-seg" data-tip="色チップにカーソルを合わせた時の表示形式">
             <button className={colorTipMode === 'hex' ? 'on' : ''} onClick={() => setColorTipMode('hex')}>hex</button>
-            <button className={colorTipMode === 'both' ? 'on' : ''} onClick={() => setColorTipMode('both')}>이름+hex</button>
-            <button className={colorTipMode === 'label' ? 'on' : ''} onClick={() => setColorTipMode('label')}>이름만</button>
+            <button className={colorTipMode === 'both' ? 'on' : ''} onClick={() => setColorTipMode('both')}>名前+hex</button>
+            <button className={colorTipMode === 'label' ? 'on' : ''} onClick={() => setColorTipMode('label')}>名前のみ</button>
           </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 10px' }}>
           {colors.map(c => (
             <div key={c.id} style={{ display: 'flex', gap: 6, alignItems: 'center', minWidth: 0 }}>
               <ColorField value={c.hex} onChange={hex => setColors(l => l.map(x => x.id === c.id ? { ...x, hex } : x))} />
-              <KInput placeholder="라벨" value={c.label} style={{ ...rowInp, flex: 1, minWidth: 50 }}
+              <KInput placeholder="ラベル" value={c.label} style={{ ...rowInp, flex: 1, minWidth: 50 }}
                 onChange={e => setColors(l => l.map(x => x.id === c.id ? { ...x, label: e.target.value } : x))} />
-              <span className="fx" onClick={() => del.ask('이 컬러를 삭제하시겠습니까?', () => setColors(l => l.filter(x => x.id !== c.id)), c.label || c.hex)}>✕</span>
+              <span className="fx" onClick={() => del.ask('このカラーを削除しますか？', () => setColors(l => l.filter(x => x.id !== c.id)), c.label || c.hex)}>✕</span>
             </div>
           ))}
         </div>
         <button className="btn btn-ghost" style={addBtn}
           onClick={() => setColors(l => [...l, { id: newId(), hex: '#888888', label: '' }])}>＋ ADD COLOR</button>
 
-        {/* 기본 소개 본문 — 리치 에디터 */}
-        <label className="k-label" style={{ margin: 0 }}>기본 정보 소개 본문</label>
+        {/* 基本プロフィール本文 — リッチエディタ */}
+        <label className="k-label" style={{ margin: 0 }}>基本プロフィール本文</label>
         <RichEditor value={basicHtml} onChange={setBasicHtml}
-          placeholder="캐릭터 소개를 작성하세요 — 이미지 삽입 가능 (스크립트 불허 6.3)" />
+          placeholder="キャラクター紹介を入力してください — 画像挿入可（スクリプト不可 6.3）" />
 
-        {/* 추가 탭 — 목록만, 내용은 전용 화면에서 */}
-        <label className="k-label" style={{ margin: 0 }}>추가 탭 — 내용은 [편집]을 눌러 전용 화면에서 작성</label>
+        {/* 追加タブ — ここでは一覧のみ。内容は専用画面で編集 */}
+        <label className="k-label" style={{ margin: 0 }}>追加タブ — 内容は［編集］から専用画面で作成</label>
         {tabs.map(t => (
           <div key={t.id} style={{ display: 'flex', gap: 8, alignItems: 'center', border: '1.5px solid var(--line)', borderRadius: 8, padding: '8px 10px' }}>
             <span style={{ width: 28, height: 28, borderRadius: 8, background: '#eef0f2', display: 'grid', placeItems: 'center', fontSize: 14, flexShrink: 0 }}>{t.icon}</span>
-            <b style={{ fontSize: 13, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title || '(제목 없음)'}</b>
+            <b style={{ fontSize: 13, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title || '(タイトルなし)'}</b>
             {t.subtitle && <small style={{ color: 'var(--faint)', fontSize: 10.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.subtitle}</small>}
-            <small style={{ color: 'var(--faint)', fontSize: 10.5, flexShrink: 0 }}>{t.html ? `${t.html.length.toLocaleString()}자` : '비어 있음'}</small>
+            <small style={{ color: 'var(--faint)', fontSize: 10.5, flexShrink: 0 }}>{t.html ? `${t.html.length.toLocaleString()}文字` : '未入力'}</small>
             <button className="btn btn-dark" style={{ marginLeft: 'auto', height: 27, padding: '0 12px', fontSize: 11 }}
-              onClick={() => setView(t.id)}>편집 ›</button>
+              onClick={() => setView(t.id)}>編集 ›</button>
             <span className="fx" onClick={() => askDeleteTab(t.id)}>✕</span>
           </div>
         ))}
@@ -243,55 +325,55 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
           onClick={() => {
             const id = newId();
             setTabs(l => [...l, { id, icon: '✦', title: '', html: '' }]);
-            setView(id); // 바로 전용 편집 화면으로
+            setView(id); // そのまま専用編集画面へ
           }}>＋ ADD TAB</button>
 
-        {/* 상대 캐릭터 회원 권한 — 역극 플레이 / 편집까지 (3차 회원-캐릭터 연결, v1.9) — AU 편집에선 base 소관 */}
+        {/* 関連キャラクターの会員権限 — RPプレイ／編集まで（会員-キャラクター連携, v1.9）— AU編集中はbase側で管理 */}
         {!auMode && initial?.own === false && (
           <>
-            <label className="k-label" style={{ margin: '6px 0 0' }}>회원 권한 — 역극 플레이 · 캐릭터 편집</label>
+            <label className="k-label" style={{ margin: '6px 0 0' }}>会員権限 — RPプレイ · キャラクター編集</label>
             <GrantsEditor value={grants} onChange={setGrants} />
           </>
         )}
       </div>
 
-      {/* 우: 기본 설정 + 저장 */}
+      {/* 右：基本設定 + 保存 */}
       <div>
         <div className="panel widget" style={{ marginBottom: 14 }}>
-          <h4>기본</h4>
+          <h4>基本設定</h4>
           <div style={{ display: 'grid', gap: 9 }}>
-            <KInput placeholder="이름" value={name} onChange={e => setName(e.target.value)}
+            <KInput placeholder="名前" value={name} onChange={e => setName(e.target.value)}
               style={{ fontFamily: familyOf(fontId) }} />
-            {/* 페이지 주소 (v1.9) — /chars/{slug}, 비우면 자동 · 중복이면 경고 */}
+            {/* ページURL (v1.9) — /character/{slug}。空欄なら自動・重複時は警告 */}
             {isNew && (
               <div>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <span style={{ fontSize: 12, color: 'var(--faint)', whiteSpace: 'nowrap' }}>/chars/</span>
-                  <KInput placeholder="페이지 주소 (선택)" value={slug}
+                  <span style={{ fontSize: 12, color: 'var(--faint)', whiteSpace: 'nowrap' }}>/character/</span>
+                  <KInput placeholder="ページURL（任意）" value={slug}
                     onChange={e => setSlug(slugify(e.target.value))} style={{ flex: 1 }} />
                 </div>
                 {slug && existingIds?.includes(slug) && (
-                  <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--accent)' }}>이미 사용 중인 주소입니다</p>
+                  <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--accent)' }}>すでに使用中のURLです</p>
                 )}
               </div>
             )}
-            <KInput placeholder="한 줄 소개 (선택)" value={sub} onChange={e => setSub(e.target.value)} />
+            <KInput placeholder="一言紹介（任意）" value={sub} onChange={e => setSub(e.target.value)} />
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <span className="cp-lb">대표 테마색</span>
+              <span className="cp-lb">代表テーマカラー</span>
               <ColorField value={color} onChange={setColor} />
             </div>
-            {/* 상세 페이지 테마 (v1.9 사용자 확정) — 기존 테마 유지 / 대표 테마색으로 팔레트 전환 */}
+            {/* 詳細ページテーマ — 既存テーマを維持／代表テーマ色へ切替 */}
             <div className="mini-seg">
-              <button className={themeMode === 'default' ? 'on' : ''} onClick={() => setThemeMode('default')}>기존 테마 따르기</button>
-              <button className={themeMode === 'custom' ? 'on' : ''} onClick={() => setThemeMode('custom')}>캐릭터 테마색</button>
+              <button className={themeMode === 'default' ? 'on' : ''} onClick={() => setThemeMode('default')}>既存テーマを使用</button>
+              <button className={themeMode === 'custom' ? 'on' : ''} onClick={() => setThemeMode('custom')}>キャラクターテーマ色</button>
             </div>
-            {/* 공개범위는 base 소관 — AU 편집에선 숨김 (v1.9) */}
+            {/* 公開範囲はbase側で管理 — AU編集中は非表示 (v1.9) */}
             {!auMode && (
               <KSelect value={visibility} onChange={v => setVisibility(v as Visibility)}
                 options={[
-                  { value: 'public', label: '전체공개' },
-                  { value: 'member', label: '멤버공개' },
-                  { value: 'private', label: '나만보기' },
+                  { value: 'public', label: '全体公開' },
+                  { value: 'member', label: 'メンバー限定' },
+                  { value: 'private', label: '非公開' },
                 ]} />
             )}
             <KSelect value={fontId} onChange={setFontId}
@@ -299,10 +381,10 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
                 value: f.id,
                 label: <span style={{ fontFamily: f.family }}>{f.name}</span>,
               }))} />
-            <p className="hint" style={{ margin: 0 }}>이름 폰트 — 리스트·상세 이름에 적용</p>
-            {/* 이름 길이가 제각각이라 자동으로 줄이면 어중간해진다 — 캐릭터마다 직접 정한다 (v2.0) */}
+            <p className="hint" style={{ margin: 0 }}>名前フォント — 一覧・詳細の名前に適用</p>
+            {/* 名前の長さが異なるため自動縮小せず、キャラクターごとに指定する (v2.0) */}
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <span className="k-label" style={{ margin: 0, flex: 1 }}>상세 이름 크기</span>
+              <span className="k-label" style={{ margin: 0, flex: 1 }}>詳細ページの名前サイズ</span>
               <KStep value={nameSize} onChange={setNameSize} min={14} max={72} step={1} suffix="px" />
             </div>
             <KSelect value={bodyFontId} onChange={setBodyFontId}
@@ -310,7 +392,7 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
                 value: f.id,
                 label: <span style={{ fontFamily: f.family }}>{f.name}</span>,
               }))} />
-            <p className="hint" style={{ margin: 0 }}>본문 폰트 — 프로필 정보·소개 텍스트에 적용</p>
+            <p className="hint" style={{ margin: 0 }}>本文フォント — プロフィール情報・紹介文に適用</p>
           </div>
         </div>
         <div className="form-actions">
@@ -321,13 +403,13 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
         </div>
       </div>
 
-      {/* 썸네일 크롭 (3:4 — 첫 아트 기준, 6.1) */}
+      {/* サムネイルクロップ（3:4 — 1枚目のアート基準, 6.1） */}
       {arts[0] && (
         <FirstArtCrop open={cropOpen} item={arts[0]} crop={thumbCrop}
           onClose={() => setCropOpen(false)}
           onApply={c => { setThumbCrop(c); setCropOpen(false); }} />
       )}
-      {/* 아트 원본 보기 — 아직 저장 전 파일은 url, 저장된 것은 ref (Lightbox가 둘 다 처리) */}
+      {/* アート原寸表示 — 保存前ファイルはurl、保存済みはref（Lightboxが両方対応） */}
       {lb !== null && (
         <Lightbox srcs={arts.map(a => a.url ?? a.ref ?? '')} index={lb} onClose={() => setLb(null)} />
       )}
@@ -336,7 +418,7 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
   );
 }
 
-/* ---------- 탭 전용 편집 화면 — 큰 에디터 + 실시간 미리보기 ---------- */
+/* ---------- タブ専用編集画面 — 大きなエディタ + リアルタイムプレビュー ---------- */
 function TabEditView({ tab, onChange, onDelete, onBack }: {
   tab: CharTab;
   onChange: (patch: Partial<CharTab>) => void;
@@ -346,30 +428,30 @@ function TabEditView({ tab, onChange, onDelete, onBack }: {
   return (
     <div className="panel" style={{ padding: 24, display: 'grid', gap: 12 }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <button className="btn btn-ghost" onClick={onBack}>‹ 돌아가기</button>
-        <b style={{ fontSize: 14 }}>탭 편집</b>
-        <span className="hint" style={{ margin: 0 }}>이 화면의 내용은 프로필 [SAVE] 시 함께 저장됩니다</span>
-        <button className="btn btn-ghost" style={{ marginLeft: 'auto', fontSize: 11 }} onClick={onDelete}>탭 삭제</button>
+        <button className="btn btn-ghost" onClick={onBack}>‹ 戻る</button>
+        <b style={{ fontSize: 14 }}>タブ編集</b>
+        <span className="hint" style={{ margin: 0 }}>この画面の内容はプロフィール［SAVE］時に一緒に保存されます</span>
+        <button className="btn btn-ghost" style={{ marginLeft: 'auto', fontSize: 11 }} onClick={onDelete}>タブ削除</button>
       </div>
-      {/* 아이콘 + Title/Subtitle 한 줄 — Subtitle은 제목 아래 작은 글씨 (없으면 표시 안 됨) */}
+      {/* アイコン + Title/Subtitleを1行表示 — Subtitleはタイトル下の小さな文字 */}
       <div style={{ display: 'flex', gap: 8 }}>
-        {/* 아이콘 — 클릭하면 특수문자 프리셋, 직접 입력도 가능 (v1.9) */}
+        {/* アイコン — クリックで特殊文字プリセット、直接入力も可能 (v1.9) */}
         <SymbolInput value={tab.icon} maxLength={2} style={{ width: 56, textAlign: 'center' }}
           onChange={v => onChange({ icon: v })} />
-        <KInput placeholder="탭 제목" value={tab.title}
+        <KInput placeholder="タブタイトル" value={tab.title}
           onChange={e => onChange({ title: e.target.value })} />
-        <KInput placeholder="소제목 (선택)" value={tab.subtitle ?? ''}
+        <KInput placeholder="サブタイトル（任意）" value={tab.subtitle ?? ''}
           onChange={e => onChange({ subtitle: e.target.value })} />
       </div>
-      {/* 리치 에디터 (TipTap) — 툴바로 서식·이미지 삽입, 출력은 HTML */}
+      {/* リッチエディタ (TipTap) — ツールバーで装飾・画像挿入、出力はHTML */}
       <RichEditor value={tab.html} onChange={html => onChange({ html })}
-        placeholder="탭 내용을 작성하세요 — 이미지 삽입 가능 (스크립트 불허 6.3)" />
-      <button className="btn btn-dark" style={{ justifySelf: 'end' }} onClick={onBack}>완료 — 목록으로</button>
+        placeholder="タブ内容を入力してください — 画像挿入可（スクリプト不可 6.3）" />
+      <button className="btn btn-dark" style={{ justifySelf: 'end' }} onClick={onBack}>完了 — 一覧へ</button>
     </div>
   );
 }
 
-/** 첫 아트(새 파일 또는 저장된 blob)를 소스로 3:4 크롭 편집기 표시 */
+/** 1枚目のアート（新規ファイルまたは保存済みblob）を元に3:4クロップ編集画面を表示 */
 function FirstArtCrop({ open, item, crop, onClose, onApply }: {
   open: boolean; item: ArtItem; crop?: CropValue;
   onClose: () => void; onApply: (c: CropValue) => void;
@@ -383,4 +465,3 @@ function FirstArtCrop({ open, item, crop, onClose, onApply }: {
   if (!src || !open) return null;
   return <CropEditor open={open} src={src} aspect="3:4" initial={crop} onClose={onClose} onApply={onApply} />;
 }
-
