@@ -392,37 +392,151 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
     },
 
     async uploadFile(blob, ext) {
-      const path = `ohome/${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}.${ext}`;
-      const r = stMod.ref(storage, path);
-      // 경로가 업로드마다 고유하므로 내용이 바뀌지 않는다 — 길게 캐시해 재방문·엣지 캐시 이득을 본다
-      // (지정하지 않으면 브라우저가 매번 다시 받아 먼 지역 버킷에서 지연이 그대로 드러남)
-      await stMod.uploadBytes(r, blob, {
-        contentType: blob.type || 'application/octet-stream',
-        cacheControl: 'public, max-age=31536000, immutable',
-      });
-      return await stMod.getDownloadURL(r);
-    },
+  const path =
+    `ohome/${Date.now().toString(36)}${Math.random()
+      .toString(36)
+      .slice(2, 8)}.${ext}`;
 
-    async listFiles() {
-      // 저장하는 주소가 다운로드 URL이므로 목록도 같은 형태로 돌려줘야 대조가 된다
-      const res = await stMod.listAll(stMod.ref(storage, 'ohome'));
-      return Promise.all(res.items.map(async it => {
-        const [ref, meta] = await Promise.all([stMod.getDownloadURL(it), stMod.getMetadata(it)]);
-        return { ref, size: meta.size ?? 0 };
-      }));
-    },
+  const fileRef = stMod.ref(
+    storage,
+    path
+  );
 
-    async deleteFile(ref) {
-      // Firebase SDK는 다운로드 URL로도 참조를 만들 수 있다
-      await stMod.deleteObject(stMod.ref(storage, ref));
-    },
+  const task =
+    stMod.uploadBytesResumable(
+      fileRef,
+      blob,
+      {
+        contentType:
+          blob.type ||
+          'application/octet-stream',
+        cacheControl:
+          'public, max-age=31536000, immutable',
+      }
+    );
 
-    async deleteMember(id) {
-      // profiles 문서만 지운다 — Authentication 계정은 관리자 키가 있어야 지울 수 있다
-      await deleteDoc(doc(db, 'profiles', id));
-    },
-  };
+  await new Promise<void>(
+    (resolve, reject) => {
+      let finished = false;
 
-  // (deleteDoc은 삭제 배치에서 doc 단위로 쓰지 않아 참조만 유지)
-  void deleteDoc;
-}
+      const timer =
+        window.setTimeout(
+          () => {
+            if (finished) return;
+
+            finished = true;
+
+            task.cancel();
+
+            reject(
+              new Error(
+                '画像のアップロードが30秒以内に完了しませんでした。Firebase Storageの設定・ルール・バケット名を確認してください。'
+              )
+            );
+          },
+          30000
+        );
+
+      task.on(
+        'state_changed',
+        undefined,
+        (error) => {
+          if (finished) return;
+
+          finished = true;
+          clearTimeout(timer);
+
+          const code =
+            (error as {
+              code?: string;
+            }).code ?? '';
+
+          if (
+            code.includes(
+              'storage/unauthorized'
+            )
+          ) {
+            reject(
+              new Error(
+                '画像を保存する権限がありません。Firebase Storageのルールとログイン状態を確認してください。'
+              )
+            );
+            return;
+          }
+
+          if (
+            code.includes(
+              'storage/retry-limit-exceeded'
+            )
+          ) {
+            reject(
+              new Error(
+                'Firebase Storageへの接続が不安定です。しばらくしてからもう一度お試しください。'
+              )
+            );
+            return;
+          }
+
+          if (
+            code.includes(
+              'storage/bucket-not-found'
+            )
+          ) {
+            reject(
+              new Error(
+                'Firebase Storageの保存先が見つかりません。Storageのバケット設定を確認してください。'
+              )
+            );
+            return;
+          }
+
+          if (
+            code.includes(
+              'storage/canceled'
+            )
+          ) {
+            reject(
+              new Error(
+                '画像のアップロードを中止しました。'
+              )
+            );
+            return;
+          }
+
+          reject(
+            new Error(
+              error.message ||
+                '画像のアップロードに失敗しました。'
+            )
+          );
+        },
+        () => {
+          if (finished) return;
+
+          finished = true;
+          clearTimeout(timer);
+
+          resolve();
+        }
+      );
+    }
+  );
+
+  const downloadUrl =
+    await withLimit(
+      stMod.getDownloadURL(
+        fileRef
+      ),
+      12000
+    );
+
+  if (
+    downloadUrl === TIMEOUT
+  ) {
+    throw new Error(
+      '画像は保存されましたが、表示用URLの取得に時間がかかりすぎました。Firebase Storageを確認してください。'
+    );
+  }
+
+  return downloadUrl;
+},
