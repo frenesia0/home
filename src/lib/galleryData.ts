@@ -72,6 +72,14 @@ export interface GalleryPost {
 }
 
 /**
+ * 新Gallery専用のFirestoreコレクション名。
+ *
+ * 旧O.HOMEの「絵バックアップ」は gallery コレクションを使用しているため、
+ * 新しい /gallery 機能は illustrations に分離する。
+ */
+export const GALLERY_COLLECTION = 'illustrations';
+
+/**
  * 新旧どちらの形式でも画像を取得する。
  */
 export function getGalleryImages(post: GalleryPost): GalleryImage[] {
@@ -190,9 +198,11 @@ export function getGalleryTags(post: GalleryPost): GalleryTag[] {
 
   for (const item of source) {
     if (item === 'reference') converted.push('reference');
+
     if (item === 'song-inspired' || item === 'song-parody') {
       converted.push('song-parody');
     }
+
     if (item === 'manga') converted.push('manga');
     if (item === 'rakugaki') converted.push('rakugaki');
     if (item === 'tachie') converted.push('tachie');
@@ -228,21 +238,31 @@ export function getGalleryCommission(
   };
 }
 
-/** Gallery一覧をFirestoreから取得する */
+/** 新Gallery一覧をFirestoreから取得する */
 export async function fetchGalleryPosts(): Promise<GalleryPost[]> {
-  return fetchList<GalleryPost>('gallery');
+  return fetchList<GalleryPost>(GALLERY_COLLECTION);
 }
 
-/** Gallery一覧の変更をFirestoreへ同期する */
+/** 新Gallery一覧の変更をFirestoreへ同期する */
 export async function saveGalleryPosts(
   previous: GalleryPost[],
   next: GalleryPost[],
   uid: string | null,
 ): Promise<void> {
-  await syncList<GalleryPost>('gallery', previous, next, uid);
+  await syncList<GalleryPost>(
+    GALLERY_COLLECTION,
+    previous,
+    next,
+    uid
+  );
 }
 
-/** Galleryコレクションの変更を購読する */
-export function subscribeGallery(onChange: () => void): () => void {
-  return subscribeTable('gallery', onChange);
+/** 新Galleryコレクションの変更を購読する */
+export function subscribeGallery(
+  onChange: () => void
+): () => void {
+  return subscribeTable(
+    GALLERY_COLLECTION,
+    onChange
+  );
 }
