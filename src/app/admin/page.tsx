@@ -631,13 +631,13 @@ export default function AdminPage() {
                       )}{' '}
                       USED
                       {usage.credits
-                        ?.limit !==
-                        undefined &&
-                        usage.credits
-                          ?.usage !==
-                          undefined
-                        ? ` (${usage.credits.usage} / ${usage.credits.limit})`
-                        : ''}
+  ?.limit !==
+  undefined &&
+  usage.credits
+    ?.usage !==
+    undefined
+  ? ` (${usage.credits.usage} / ${usage.credits.limit} CREDITS)`
+  : ''}
                     </p>
                   )}
                 </div>
