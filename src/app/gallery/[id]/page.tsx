@@ -292,10 +292,26 @@ export default function GalleryDetailPage() {
 
   const contextQuery = useMemo(() => {
     const query = new URLSearchParams();
-    query.set('category', category);
-    query.set('character', character);
-    query.set('tag', tag);
-    query.set('sort', sortOrder);
+
+    if (category !== 'original') {
+      query.set('category', category);
+    }
+
+    if (character !== 'all') {
+      query.set('character', character);
+    }
+
+    if (
+      category === 'original' &&
+      tag !== 'all'
+    ) {
+      query.set('tag', tag);
+    }
+
+    if (sortOrder !== 'newest') {
+      query.set('sort', sortOrder);
+    }
+
     return query.toString();
   }, [
     category,
@@ -309,16 +325,23 @@ export default function GalleryDetailPage() {
   ) => {
     if (!target) return;
 
-    router.push(
+    const base =
       `/gallery/${encodeURIComponent(
         target.id
-      )}?${contextQuery}`
+      )}`;
+
+    router.push(
+      contextQuery
+        ? `${base}?${contextQuery}`
+        : base
     );
   };
 
   const goBackToGallery = () => {
     router.push(
-      `/gallery?${contextQuery}`
+      contextQuery
+        ? `/gallery?${contextQuery}`
+        : '/gallery'
     );
   };
 
@@ -568,16 +591,6 @@ export default function GalleryDetailPage() {
             alignItems: 'center',
           }}
         >
-          <span
-            style={{
-              color:
-                'rgba(255,255,255,.45)',
-              fontSize: '11px',
-            }}
-          >
-            {post.id}
-          </span>
-
           {isAdmin && (
             <button
               type="button"
