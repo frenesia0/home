@@ -1447,20 +1447,24 @@ export default function AddIllustrationPage() {
               type="submit"
               disabled={posting}
               style={{
-                padding:
-                  '13px 20px',
-                borderRadius:
-                  '9px',
+                width: '100%',
+                minHeight: '48px',
+                marginTop: '6px',
+                padding: '14px 20px',
+                border: '1px solid rgba(255,255,255,.35)',
+                borderRadius: '10px',
+                background: '#f1f1f1',
+                color: '#17191d',
+                fontSize: '13px',
                 fontWeight: 700,
-                cursor:
-                  posting
-                    ? 'wait'
-                    : 'pointer',
+                letterSpacing: '.08em',
+                cursor: posting ? 'wait' : 'pointer',
+                opacity: posting ? 0.65 : 1,
               }}
             >
               {posting
                 ? 'UPLOADING...'
-                : 'POST'}
+                : 'POST ILLUSTRATION'}
             </button>
           </section>
         </form>
