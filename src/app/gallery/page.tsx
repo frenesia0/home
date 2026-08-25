@@ -1,7 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import {
+  useRouter,
+  useSearchParams,
+} from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import {
   fetchGalleryPosts,
@@ -40,18 +43,72 @@ function tagLabel(tag: GalleryTag) {
   return tag.toUpperCase();
 }
 
+function isCategory(value: string | null): value is GalleryCategory {
+  return value === 'original' || value === 'commission';
+}
+
+function isCharacterFilter(
+  value: string | null
+): value is CharacterFilter {
+  return (
+    value === 'all' ||
+    value === 'shiki' ||
+    value === 'solas'
+  );
+}
+
+function isTagFilter(
+  value: string | null
+): value is TagFilter {
+  return (
+    value === 'all' ||
+    value === 'reference' ||
+    value === 'song-parody' ||
+    value === 'manga' ||
+    value === 'rakugaki' ||
+    value === 'tachie'
+  );
+}
+
+function isSortOrder(
+  value: string | null
+): value is SortOrder {
+  return value === 'newest' || value === 'oldest';
+}
+
 export default function GalleryPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isAdmin } = useAuth();
 
+  const initialCategory =
+    isCategory(searchParams.get('category'))
+      ? searchParams.get('category') as GalleryCategory
+      : 'original';
+
+  const initialCharacter =
+    isCharacterFilter(searchParams.get('character'))
+      ? searchParams.get('character') as CharacterFilter
+      : 'all';
+
+  const initialTag =
+    isTagFilter(searchParams.get('tag'))
+      ? searchParams.get('tag') as TagFilter
+      : 'all';
+
+  const initialSort =
+    isSortOrder(searchParams.get('sort'))
+      ? searchParams.get('sort') as SortOrder
+      : 'newest';
+
   const [category, setCategory] =
-    useState<GalleryCategory>('original');
+    useState<GalleryCategory>(initialCategory);
   const [character, setCharacter] =
-    useState<CharacterFilter>('all');
+    useState<CharacterFilter>(initialCharacter);
   const [tag, setTag] =
-    useState<TagFilter>('all');
+    useState<TagFilter>(initialTag);
   const [sortOrder, setSortOrder] =
-    useState<SortOrder>('newest');
+    useState<SortOrder>(initialSort);
 
   const [illustrations, setIllustrations] =
     useState<GalleryPost[]>([]);
@@ -96,6 +153,24 @@ export default function GalleryPage() {
     };
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams();
+    params.set('category', category);
+    params.set('character', character);
+    params.set('tag', tag);
+    params.set('sort', sortOrder);
+
+    router.replace(`/gallery?${params.toString()}`, {
+      scroll: false,
+    });
+  }, [
+    category,
+    character,
+    tag,
+    sortOrder,
+    router,
+  ]);
+
   const filtered = useMemo(() => {
     return illustrations
       .filter((item) => item.category === category)
@@ -119,6 +194,26 @@ export default function GalleryPage() {
     tag,
     sortOrder,
   ]);
+
+  const currentQuery = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set('category', category);
+    params.set('character', character);
+    params.set('tag', tag);
+    params.set('sort', sortOrder);
+    return params.toString();
+  }, [
+    category,
+    character,
+    tag,
+    sortOrder,
+  ]);
+
+  const openIllustration = (id: string) => {
+    router.push(
+      `/gallery/${encodeURIComponent(id)}?${currentQuery}`
+    );
+  };
 
   const pillStyle = (active: boolean) => ({
     padding: '8px 14px',
@@ -242,14 +337,20 @@ export default function GalleryPage() {
         }}
       >
         <button
-          onClick={() => setCategory('original')}
+          onClick={() => {
+            setCategory('original');
+            setTag('all');
+          }}
           style={pillStyle(category === 'original')}
         >
           ORIGINAL
         </button>
 
         <button
-          onClick={() => setCategory('commission')}
+          onClick={() => {
+            setCategory('commission');
+            setTag('all');
+          }}
           style={pillStyle(category === 'commission')}
         >
           COMMISSION
@@ -412,18 +513,14 @@ export default function GalleryPage() {
                 key={item.id}
                 role="link"
                 tabIndex={0}
-                onClick={() =>
-                  router.push(`/gallery/${encodeURIComponent(item.id)}`)
-                }
+                onClick={() => openIllustration(item.id)}
                 onKeyDown={(event) => {
                   if (
                     event.key === 'Enter' ||
                     event.key === ' '
                   ) {
                     event.preventDefault();
-                    router.push(
-                      `/gallery/${encodeURIComponent(item.id)}`
-                    );
+                    openIllustration(item.id);
                   }
                 }}
                 style={{
