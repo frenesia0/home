@@ -7,45 +7,108 @@ import {
 } from 'react';
 
 import type {
+  CSSProperties,
+} from 'react';
+
+import type {
   GalleryWatermark,
 } from '@/lib/galleryData';
+
+
+/* =========================================================
+   TYPES
+========================================================= */
 
 type FitMode =
   | 'contain'
   | 'cover';
 
-type Props = {
-  src: string;
-  alt?: string;
+
+type WatermarkedImageProps = {
+  src:
+    string;
+
+  alt?:
+    string;
 
   watermark?:
     GalleryWatermark;
 
-  fit?: FitMode;
+  fit?:
+    FitMode;
 
-  className?: string;
+  className?:
+    string;
 
-  style?: React.CSSProperties;
+  style?:
+    CSSProperties;
 };
+
+
+type WatermarkOverlayProps = {
+  watermark?:
+    GalleryWatermark;
+
+  /**
+   * この表示領域の横幅。
+   *
+   * メイン画像では実画像の描画幅、
+   * サムネイルではサムネイル幅を渡す。
+   *
+   * 指定しなければ500px基準。
+   */
+  referenceWidth?:
+    number;
+
+  style?:
+    CSSProperties;
+};
+
 
 type ImageArea = {
-  left: number;
-  top: number;
-  width: number;
-  height: number;
+  left:
+    number;
+
+  top:
+    number;
+
+  width:
+    number;
+
+  height:
+    number;
 };
 
-const DEFAULT_AREA: ImageArea = {
-  left: 0,
-  top: 0,
-  width: 0,
-  height: 0,
+
+const DEFAULT_AREA:
+  ImageArea = {
+  left:
+    0,
+
+  top:
+    0,
+
+  width:
+    0,
+
+  height:
+    0,
 };
+
+
+/* =========================================================
+   HELPERS
+========================================================= */
 
 function clamp(
-  value: number,
-  min: number,
-  max: number
+  value:
+    number,
+
+  min:
+    number,
+
+  max:
+    number
 ) {
   return Math.min(
     max,
@@ -56,26 +119,41 @@ function clamp(
   );
 }
 
+
 function normalizeOpacity(
-  value: number
+  value:
+    number
 ) {
   return (
     clamp(
-      Number.isFinite(value)
+      Number.isFinite(
+        value
+      )
         ? value
         : 25,
+
       0,
       100
     ) / 100
   );
 }
 
+
 function getRenderedImageArea(
-  boxWidth: number,
-  boxHeight: number,
-  naturalWidth: number,
-  naturalHeight: number,
-  fit: FitMode
+  boxWidth:
+    number,
+
+  boxHeight:
+    number,
+
+  naturalWidth:
+    number,
+
+  naturalHeight:
+    number,
+
+  fit:
+    FitMode
 ): ImageArea {
   if (
     boxWidth <= 0 ||
@@ -115,20 +193,241 @@ function getRenderedImageArea(
 
   return {
     left:
-      (boxWidth -
-        width) /
-      2,
+      (
+        boxWidth -
+        width
+      ) / 2,
 
     top:
-      (boxHeight -
-        height) /
-      2,
+      (
+        boxHeight -
+        height
+      ) / 2,
 
     width,
 
     height,
   };
 }
+
+
+/* =========================================================
+   WATERMARK OVERLAY
+========================================================= */
+
+/**
+ * 透かし部分だけを描画する共通部品。
+ *
+ * GALLERY一覧のCropImgにも
+ * このコンポーネントを重ねられる。
+ */
+export function WatermarkOverlay({
+  watermark,
+  referenceWidth = 500,
+  style,
+}: WatermarkOverlayProps) {
+  if (
+    !watermark ||
+    watermark.color ===
+      'none'
+  ) {
+    return null;
+  }
+
+
+  const opacity =
+    normalizeOpacity(
+      watermark.opacity
+    );
+
+
+  const rgb =
+    watermark.color ===
+      'black'
+      ? '0,0,0'
+      : '255,255,255';
+
+
+  const gridSize =
+    clamp(
+      watermark.gridSize ??
+        180,
+
+      60,
+      500
+    );
+
+
+  const safeReferenceWidth =
+    Math.max(
+      1,
+      referenceWidth
+    );
+
+
+  /*
+   * 元画像表示が小さくなった場合、
+   * 格子も比例して縮める。
+   */
+  const responsiveGridSize =
+    clamp(
+      gridSize *
+        (
+          safeReferenceWidth /
+          800
+        ),
+
+      32,
+      gridSize
+    );
+
+
+  /*
+   * IDサイズも表示サイズへ追従。
+   */
+  const textSize =
+    clamp(
+      safeReferenceWidth *
+        0.035,
+
+      8,
+      28
+    );
+
+
+  const textPadding =
+    clamp(
+      safeReferenceWidth *
+        0.025,
+
+      6,
+      24
+    );
+
+
+  const lineColor =
+    `rgba(${rgb}, ${opacity})`;
+
+  const textColor =
+    `rgba(${rgb}, ${opacity})`;
+
+
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        position:
+          'absolute',
+
+        inset:
+          0,
+
+        overflow:
+          'hidden',
+
+        pointerEvents:
+          'none',
+
+        zIndex:
+          2,
+
+        ...style,
+      }}
+    >
+
+      {/* ===============================================
+          DIAGONAL GRID
+      =============================================== */}
+
+      {watermark.grid !==
+        false && (
+        <div
+          style={{
+            position:
+              'absolute',
+
+            inset:
+              '-30%',
+
+            backgroundImage: `
+              repeating-linear-gradient(
+                45deg,
+                transparent 0,
+                transparent calc(${responsiveGridSize}px - 1px),
+                ${lineColor} calc(${responsiveGridSize}px - 1px),
+                ${lineColor} ${responsiveGridSize}px
+              ),
+              repeating-linear-gradient(
+                -45deg,
+                transparent 0,
+                transparent calc(${responsiveGridSize}px - 1px),
+                ${lineColor} calc(${responsiveGridSize}px - 1px),
+                ${lineColor} ${responsiveGridSize}px
+              )
+            `,
+
+            transform:
+              'translateZ(0)',
+          }}
+        />
+      )}
+
+
+      {/* ===============================================
+          ID
+      =============================================== */}
+
+      {watermark.text && (
+        <div
+          style={{
+            position:
+              'absolute',
+
+            right:
+              textPadding,
+
+            bottom:
+              textPadding,
+
+            color:
+              textColor,
+
+            fontSize:
+              `${textSize}px`,
+
+            lineHeight:
+              1,
+
+            fontWeight:
+              500,
+
+            letterSpacing:
+              '.01em',
+
+            whiteSpace:
+              'nowrap',
+
+            userSelect:
+              'none',
+
+            textShadow:
+              watermark.color ===
+              'white'
+                ? '0 1px 2px rgba(0,0,0,.08)'
+                : '0 1px 2px rgba(255,255,255,.05)',
+          }}
+        >
+          {watermark.text}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/* =========================================================
+   WATERMARKED IMAGE
+========================================================= */
 
 export function WatermarkedImage({
   src,
@@ -137,17 +436,22 @@ export function WatermarkedImage({
   fit = 'contain',
   className,
   style,
-}: Props) {
+}: WatermarkedImageProps) {
   const wrapRef =
     useRef<HTMLDivElement>(
       null
     );
 
+
   const naturalRef =
     useRef({
-      width: 0,
-      height: 0,
+      width:
+        0,
+
+      height:
+        0,
     });
+
 
   const [
     imageArea,
@@ -156,6 +460,11 @@ export function WatermarkedImage({
     useState<ImageArea>(
       DEFAULT_AREA
     );
+
+
+  /* =======================================================
+     COMPUTE IMAGE AREA
+  ======================================================= */
 
   const compute =
     () => {
@@ -166,6 +475,7 @@ export function WatermarkedImage({
         return;
       }
 
+
       const {
         width:
           naturalWidth,
@@ -175,6 +485,7 @@ export function WatermarkedImage({
       } =
         naturalRef.current;
 
+
       if (
         !naturalWidth ||
         !naturalHeight
@@ -182,8 +493,10 @@ export function WatermarkedImage({
         return;
       }
 
+
       const rect =
         wrap.getBoundingClientRect();
+
 
       setImageArea(
         getRenderedImageArea(
@@ -196,11 +509,18 @@ export function WatermarkedImage({
       );
     };
 
+
+  /* =======================================================
+     RESIZE
+  ======================================================= */
+
   useEffect(() => {
     compute();
 
+
     const wrap =
       wrapRef.current;
+
 
     if (
       !wrap ||
@@ -210,14 +530,17 @@ export function WatermarkedImage({
       return;
     }
 
+
     const observer =
       new ResizeObserver(
         compute
       );
 
+
     observer.observe(
       wrap
     );
+
 
     return () =>
       observer.disconnect();
@@ -226,83 +549,10 @@ export function WatermarkedImage({
     fit,
   ]);
 
-  const enabled =
-    watermark &&
-    watermark.color !==
-      'none';
 
-  const opacity =
-    enabled
-      ? normalizeOpacity(
-          watermark.opacity
-        )
-      : 0;
-
-  const rgb =
-    watermark?.color ===
-    'black'
-      ? '0,0,0'
-      : '255,255,255';
-
-  const gridSize =
-    clamp(
-      watermark?.gridSize ??
-        180,
-      60,
-      500
-    );
-
-  /*
-   * CSSのダイヤ格子は、
-   * 45°と-45°の線を
-   * 重ねて作る。
-   */
-  const lineColor =
-    `rgba(${rgb}, ${opacity})`;
-
-  const textColor =
-    `rgba(${rgb}, ${opacity})`;
-
-  /*
-   * サムネイルなど小さい表示では
-   * 元のgridSizeをそのまま使うと
-   * 格子が巨大になりすぎる。
-   *
-   * 画像表示幅に合わせて
-   * 自動で縮小する。
-   */
-  const referenceWidth =
-    imageArea.width >
-    0
-      ? imageArea.width
-      : 500;
-
-  const responsiveGridSize =
-    clamp(
-      gridSize *
-        (
-          referenceWidth /
-          800
-        ),
-      40,
-      gridSize
-    );
-
-  const textSize =
-    clamp(
-      referenceWidth *
-        0.035,
-      9,
-      28
-    );
-
-  const textPadding =
-    clamp(
-      referenceWidth *
-        0.025,
-      7,
-      24
-    );
+  /* =======================================================
+     RENDER
+  ======================================================= */
 
   return (
     <div
@@ -328,6 +578,7 @@ export function WatermarkedImage({
         ...style,
       }}
     >
+
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={
@@ -345,14 +596,15 @@ export function WatermarkedImage({
           const image =
             event.currentTarget;
 
-          naturalRef.current =
-            {
-              width:
-                image.naturalWidth,
 
-              height:
-                image.naturalHeight,
-            };
+          naturalRef.current = {
+            width:
+              image.naturalWidth,
+
+            height:
+              image.naturalHeight,
+          };
+
 
           compute();
         }}
@@ -374,135 +626,49 @@ export function WatermarkedImage({
         }}
       />
 
-      {enabled &&
-        imageArea.width >
-          0 &&
+
+      {/* ===============================================
+          実際に描画された画像範囲だけへ透かし
+      =============================================== */}
+
+      {imageArea.width >
+        0 &&
         imageArea.height >
           0 && (
-          <div
-            aria-hidden="true"
-            style={{
-              position:
-                'absolute',
+        <div
+          style={{
+            position:
+              'absolute',
 
-              left:
-                imageArea.left,
+            left:
+              imageArea.left,
 
-              top:
-                imageArea.top,
+            top:
+              imageArea.top,
 
-              width:
-                imageArea.width,
+            width:
+              imageArea.width,
 
-              height:
-                imageArea.height,
+            height:
+              imageArea.height,
 
-              overflow:
-                'hidden',
+            overflow:
+              'hidden',
 
-              pointerEvents:
-                'none',
-            }}
-          >
-            {/* =========================
-                DIAGONAL GRID
-            ========================= */}
-
-            {watermark.grid !==
-              false && (
-              <div
-                style={{
-                  position:
-                    'absolute',
-
-                  inset:
-                    '-30%',
-
-                  /*
-                   * 大きな斜めダイヤ格子
-                   */
-                  backgroundImage: `
-                    repeating-linear-gradient(
-                      45deg,
-                      transparent 0,
-                      transparent calc(${responsiveGridSize}px - 1px),
-                      ${lineColor} calc(${responsiveGridSize}px - 1px),
-                      ${lineColor} ${responsiveGridSize}px
-                    ),
-                    repeating-linear-gradient(
-                      -45deg,
-                      transparent 0,
-                      transparent calc(${responsiveGridSize}px - 1px),
-                      ${lineColor} calc(${responsiveGridSize}px - 1px),
-                      ${lineColor} ${responsiveGridSize}px
-                    )
-                  `,
-
-                  /*
-                   * insetを広げたぶん
-                   * 格子が端で切れない。
-                   */
-                  transform:
-                    'translateZ(0)',
-                }}
-              />
-            )}
-
-            {/* =========================
-                ID
-            ========================= */}
-
-            {watermark.text && (
-              <div
-                style={{
-                  position:
-                    'absolute',
-
-                  right:
-                    textPadding,
-
-                  bottom:
-                    textPadding,
-
-                  color:
-                    textColor,
-
-                  fontSize:
-                    `${textSize}px`,
-
-                  lineHeight:
-                    1,
-
-                  fontWeight:
-                    500,
-
-                  letterSpacing:
-                    '.01em',
-
-                  whiteSpace:
-                    'nowrap',
-
-                  userSelect:
-                    'none',
-
-                  /*
-                   * ごく軽い縁。
-                   * 透かし色を邪魔しない程度。
-                   */
-                  textShadow:
-                    watermark.color ===
-                    'white'
-                      ? '0 1px 2px rgba(0,0,0,.08)'
-                      : '0 1px 2px rgba(255,255,255,.05)',
-                }}
-              >
-                {
-                  watermark.text
-                }
-              </div>
-            )}
-          </div>
-        )}
+            pointerEvents:
+              'none',
+          }}
+        >
+          <WatermarkOverlay
+            watermark={
+              watermark
+            }
+            referenceWidth={
+              imageArea.width
+            }
+          />
+        </div>
+      )}
     </div>
   );
 }
