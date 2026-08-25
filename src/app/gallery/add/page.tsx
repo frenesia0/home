@@ -1284,7 +1284,7 @@ export default function AddIllustrationPage() {
                       'tachie',
                       'TACHIE',
                     ],
-                  ].map
+                  ].map(
                     ([
                       value,
                       label,
