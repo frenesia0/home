@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import {
   fetchGalleryPosts,
+  getGalleryImages,
   subscribeGallery,
   type GalleryCategory,
   type GalleryCharacterTag,
@@ -12,6 +13,20 @@ import {
 } from '@/lib/galleryData';
 
 type FilterTag = 'all' | GalleryCharacterTag;
+
+function optimizeCloudinaryUrl(url: string) {
+  if (!url.includes('/upload/')) return url;
+
+  return url.replace(
+    '/upload/',
+    '/upload/f_auto,q_auto:best,c_limit,w_1200/'
+  );
+}
+
+function tagLabel(tag: GalleryCharacterTag) {
+  if (tag === 'song-inspired') return 'SONG INSPIRED';
+  return tag.toUpperCase();
+}
 
 export default function GalleryPage() {
   const router = useRouter();
@@ -73,7 +88,6 @@ export default function GalleryPage() {
         if (!normalizedQuery) return true;
 
         const searchableText = [
-          item.title,
           item.date,
           item.category,
           ...item.tags,
@@ -234,6 +248,13 @@ export default function GalleryPage() {
         >
           REFERENCE
         </button>
+
+        <button
+          onClick={() => setTag('song-inspired')}
+          style={pillStyle(tag === 'song-inspired')}
+        >
+          SONG INSPIRED
+        </button>
       </section>
 
       {loading && (
@@ -267,64 +288,99 @@ export default function GalleryPage() {
             gap: '28px 22px',
           }}
         >
-          {filtered.map((item) => (
-            <article key={item.id}>
-              <div
-                style={{
-                  aspectRatio: '1 / 1',
-                  background: 'rgba(255,255,255,.08)',
-                  borderRadius: '8px',
-                  marginBottom: '12px',
-                  overflow: 'hidden',
-                }}
-              >
-                <img
-                  src={item.imageUrl}
-                  alt={item.title}
-                  loading="lazy"
+          {filtered.map((item) => {
+            const images = getGalleryImages(item);
+            const firstImage = images[0];
+            const imageCount = images.length;
+
+            return (
+              <article key={item.id}>
+                <div
                   style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                    display: 'block',
+                    position: 'relative',
+                    aspectRatio: '1 / 1',
+                    background: 'rgba(255,255,255,.08)',
+                    borderRadius: '8px',
+                    marginBottom: '10px',
+                    overflow: 'hidden',
                   }}
-                />
-              </div>
+                >
+                  {firstImage ? (
+                    <img
+                      src={optimizeCloudinaryUrl(firstImage.url)}
+                      alt="illustration"
+                      loading="lazy"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        display: 'block',
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        display: 'grid',
+                        placeItems: 'center',
+                        color: 'rgba(255,255,255,.35)',
+                        fontSize: '12px',
+                      }}
+                    >
+                      NO IMAGE
+                    </div>
+                  )}
 
-              <h2
-                style={{
-                  fontSize: '15px',
-                  margin: '0 0 5px',
-                  fontWeight: 600,
-                }}
-              >
-                {item.title}
-              </h2>
+                  {imageCount > 1 && (
+                    <div
+                      aria-label={`${imageCount}枚の画像`}
+                      style={{
+                        position: 'absolute',
+                        top: '10px',
+                        right: '10px',
+                        minWidth: '30px',
+                        height: '30px',
+                        padding: '0 8px',
+                        borderRadius: '999px',
+                        display: 'grid',
+                        placeItems: 'center',
+                        background: 'rgba(0,0,0,.68)',
+                        border: '1px solid rgba(255,255,255,.28)',
+                        color: '#fff',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        backdropFilter: 'blur(6px)',
+                      }}
+                    >
+                      {imageCount}
+                    </div>
+                  )}
+                </div>
 
-              <p
-                style={{
-                  margin: '0 0 5px',
-                  fontSize: '11px',
-                  color: 'rgba(255,255,255,.55)',
-                }}
-              >
-                {item.date}
-              </p>
+                <p
+                  style={{
+                    margin: '0 0 5px',
+                    fontSize: '11px',
+                    color: 'rgba(255,255,255,.55)',
+                  }}
+                >
+                  {item.date}
+                </p>
 
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: '11px',
-                  color: 'rgba(255,255,255,.7)',
-                }}
-              >
-                {item.category.toUpperCase()} ·{' '}
-                {item.tags
-                  .map((itemTag) => itemTag.toUpperCase())
-                  .join(' / ')}
-              </p>
-            </article>
-          ))}
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: '11px',
+                    color: 'rgba(255,255,255,.7)',
+                  }}
+                >
+                  {item.category.toUpperCase()} ·{' '}
+                  {item.tags.map(tagLabel).join(' / ')}
+                </p>
+              </article>
+            );
+          })}
         </div>
       )}
 
