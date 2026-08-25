@@ -44,7 +44,7 @@ export interface Backend {
   /* ---- 연결 점검 ---- */
   check(): Promise<BackendCheck>;
 
-   /* ---- 인증 ---- */
+  /* ---- 인증 ---- */
   currentUser(): Promise<BackendUser | null>;
   onAuthChange(cb: (u: BackendUser | null) => void): () => void;
 
@@ -58,10 +58,19 @@ export interface Backend {
   signOut(): Promise<void>;
   resetPassword(email: string): Promise<{ ok: boolean; error?: string }>;
   updateProfile(patch: { nickname?: string; avatarUrl?: string | null; avatarColor?: string | null }): Promise<{ ok: boolean; error?: string }>;
+
   /** 첫 계정을 이 홈의 관리자로 등록 (관리자가 아직 없을 때만) */
   claimOwner(): Promise<{ ok: boolean; error?: string }>;
+
   /** 가입 회원 목록 — 역극 참여자 선택·회원 관리 화면용 */
   listMembers(): Promise<{ id: string; nickname: string; role: 'admin' | 'member'; email?: string }[]>;
+
+  /**
+   * 現在ログイン中ユーザーの認証トークンを取得する。
+   * FirebaseではIDトークンを返す。
+   * 削除APIで管理者本人か確認するために使用する。
+   */
+  getIdToken?(): Promise<string | null>;
 
   /* ---- 목록(콘텐츠) ---- */
   fetchList<T extends ListItem>(coll: string): Promise<T[]>;
@@ -75,6 +84,7 @@ export interface Backend {
 
   /* ---- 이미지·파일 ---- */
   uploadFile(blob: Blob, ext: string): Promise<string>;   // → 공개 URL
+
   /** 저장소에 있는 파일 전부 — 어디서도 참조하지 않는 파일을 찾아 지우는 데 쓴다.
    *  글을 지워도 이미지는 저장소에 남기 때문에(참조가 다른 곳에 남아 있을 수 있어 자동 삭제는 위험)
    *  관리자가 환경설정에서 직접 확인하고 정리한다. */
@@ -94,13 +104,16 @@ export const COLLECTION_OF: Record<string, string> = {
   'ohome.guest.v1': 'guestbook',
   'ohome.chars.v1': 'characters',
   'ohome.rels.v1': 'relations',
-  'ohome.backup.v1': 'gallery',
+  'ohome.backup.v1': 'legacy_gallery',
   'ohome.road.v1': 'roadview',
   'ohome.trpg.v1': 'trpg_logs',
-  // TRPG 로그 본문 — 목록 문서와 분리 저장 (v2.0). 목록 노출(listHidden)과 열람 권한(visibility)이
+
+  // TRPG 로그 본문 — 목록 문서と分離保存 (v2.0).
+  // 목록 노출(listHidden)과 열람 권한(visibility)이
   // Firestore에서는 같은 read 규칙을 타므로(질의로 노출된 문서는 단일 조회도 전부 읽힌다),
   // "나만보기여도 목록엔 표시" 조건을 안전하게 만족하려면 본문을 아예 다른 문서에 둬야 한다
   'ohome.trpgbody.v1': 'trpg_log_bodies',
+
   'ohome.tchars.v1': 'trpg_chars',
   'ohome.dotori.v1': 'dotori',
   'ohome.playlog.v1': 'playlog',
@@ -111,12 +124,15 @@ export const COLLECTION_OF: Record<string, string> = {
   'ohome.comm.v1': 'commissions',
   'ohome.commapply.v1': 'applicants',
   'ohome.moods.v1': 'moods',
+
   // 댓글 — 글 안이 아니라 자기 문서로 (v2.0). 글 안에 두면 댓글을 달 때마다 글을 UPDATE 해야 해서
   // 「글 수정은 작성자·관리자만」 규칙에 걸려 일반 회원이 관리자 글에 댓글을 달 수 없었다
   'ohome.comments.v1': 'comments',
+
   // 자관 문답 답변 — 자관 안이 아니라 자기 문서로 (v2.0). 댓글과 같은 이유:
   // 자관 안에 두면 답을 달 때마다 자관을 UPDATE 해야 해서 일반 회원이 답할 수 없었다
   'ohome.qaanswers.v1': 'qa_answers',
+
   // 역극 발화 — 방 안이 아니라 자기 문서로 (v2.0). 같은 이유로, 방 안에 두면 말할 때마다
   // 방을 UPDATE 해야 해서 남이 만든 방에서 참여자가 발화할 수 없었다
   'ohome.rpmsgs.v1': 'rp_messages',
@@ -130,12 +146,24 @@ export function diffList<T extends ListItem>(prev: T[], next: T[]) {
   const nextIds = new Set(next.map(it => it.id));
   const inserts: { item: T; sort: number }[] = [];
   const updates: { item: T; sort: number }[] = [];
+
   next.forEach((it, i) => {
     const before = prevMap.get(it.id);
-    if (!before) inserts.push({ item: it, sort: i });
-    else if (before.i !== i || JSON.stringify(before.it) !== JSON.stringify(it)) updates.push({ item: it, sort: i });
+
+    if (!before) {
+      inserts.push({ item: it, sort: i });
+    } else if (
+      before.i !== i ||
+      JSON.stringify(before.it) !== JSON.stringify(it)
+    ) {
+      updates.push({ item: it, sort: i });
+    }
   });
-  const deletes = prev.filter(it => !nextIds.has(it.id)).map(it => it.id);
+
+  const deletes = prev
+    .filter(it => !nextIds.has(it.id))
+    .map(it => it.id);
+
   return { inserts, updates, deletes };
 }
 
@@ -150,10 +178,16 @@ export function metaOf(item: ListItem, uid: string | null) {
   const rawAuthor = typeof item.authorId === 'string' ? item.authorId : '';
   const authorId = rawAuthor || uid || null;
   const hasListHidden = typeof item.listHidden === 'boolean';
+
   const visibility = hasListHidden
     ? (item.listHidden ? 'private' : 'public')
     : (typeof item.visibility === 'string' ? item.visibility : 'public');
-  return { authorId, visibility, editorIds: editorIdsOf(item) };
+
+  return {
+    authorId,
+    visibility,
+    editorIds: editorIdsOf(item),
+  };
 }
 
 /**
@@ -167,11 +201,18 @@ export function metaOf(item: ListItem, uid: string | null) {
  */
 export function editorIdsOf(item: ListItem): string[] {
   const grants = item.grants;
-  if (!Array.isArray(grants)) return [];
+
+  if (!Array.isArray(grants)) {
+    return [];
+  }
+
   return grants
-    .filter((g): g is { userId: string; level: string } =>
-      !!g && typeof g === 'object'
-      && typeof (g as { userId?: unknown }).userId === 'string'
-      && (g as { level?: unknown }).level === 'edit')
+    .filter(
+      (g): g is { userId: string; level: string } =>
+        !!g &&
+        typeof g === 'object' &&
+        typeof (g as { userId?: unknown }).userId === 'string' &&
+        (g as { level?: unknown }).level === 'edit'
+    )
     .map(g => g.userId);
 }
