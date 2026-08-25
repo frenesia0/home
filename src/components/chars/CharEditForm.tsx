@@ -52,7 +52,13 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
   const [nameSize, setNameSize] = useState(initial?.nameSize ?? 38);   // 詳細ページの大きな名前サイズ (v2.0)
   const [bodyFontId, setBodyFontId] = useState(initial?.bodyFontId ?? 'default');
   const [specs, setSpecs] = useState<SpecRow[]>(
-    (initial?.specs ?? [{ label: '性別', value: '' }, { label: '身長', value: '' }]).map(s => ({ ...s, id: newId() })));
+    (
+      initial?.specs ?? [
+        { label: '性別', value: '' },
+        { label: '身長', value: '' },
+        { label: '体重', value: '' },
+      ]
+    ).map(s => ({ ...s, id: newId() })));
   const [colors, setColors] = useState<ColorRow[]>((initial?.colors ?? []).map(c => ({ ...c, id: newId() })));
   const [colorTipMode, setColorTipMode] = useState<'hex' | 'both' | 'label'>(initial?.colorTipMode ?? 'hex');
   const [basicHtml, setBasicHtml] = useState(initial?.basicHtml ?? '');
@@ -109,6 +115,16 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
       own: initial?.own ?? true,
       grants: grants.length ? grants : undefined,
     });
+  };
+
+  const specValuePlaceholder = (label: string) => {
+    const normalized = label.trim();
+
+    if (normalized === '性別') return '例：男性';
+    if (normalized === '身長') return '例：186cm';
+    if (normalized === '体重') return '例：100kg';
+
+    return '値';
   };
 
   const rowInp: React.CSSProperties = { fontSize: 12, padding: '7px 10px' };
@@ -187,7 +203,7 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
               <span className="drag-h">⠿</span>
               <KInput placeholder="項目" value={s.label} style={{ ...rowInp, width: 90 }}
                 onChange={e => setSpecs(l => l.map(x => x.id === s.id ? { ...x, label: e.target.value } : x))} />
-              <KInput placeholder="値" value={s.value} style={rowInp}
+              <KInput placeholder={specValuePlaceholder(s.label)} value={s.value} style={rowInp}
                 onChange={e => setSpecs(l => l.map(x => x.id === s.id ? { ...x, value: e.target.value } : x))} />
               <span className="fx" onClick={() => {
                 const remove = () => setSpecs(l => l.filter(x => x.id !== s.id));
