@@ -3,74 +3,62 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
+import {
+  fetchGalleryPosts,
+  subscribeGallery,
+  type GalleryCategory,
+  type GalleryCharacterTag,
+  type GalleryPost,
+} from '@/lib/galleryData';
 
-type Category = 'original' | 'commission';
-type CharacterTag = 'shiki' | 'solas' | 'reference';
-type FilterTag = 'all' | CharacterTag;
-
-type GalleryPost = {
-  id: string;
-  title: string;
-  date: string;
-  category: Category;
-  tags: CharacterTag[];
-};
-
-const STORAGE_KEY = 'shiki-solas-gallery-posts';
-
-const demoPosts: GalleryPost[] = [
-  {
-    id: 'demo-1',
-    title: 'Illustration 01',
-    date: '2026-08-25',
-    category: 'original',
-    tags: ['shiki'],
-  },
-  {
-    id: 'demo-2',
-    title: 'Illustration 02',
-    date: '2026-07-10',
-    category: 'commission',
-    tags: ['solas'],
-  },
-  {
-    id: 'demo-3',
-    title: 'Illustration 03',
-    date: '2026-06-18',
-    category: 'original',
-    tags: ['shiki', 'solas', 'reference'],
-  },
-];
+type FilterTag = 'all' | GalleryCharacterTag;
 
 export default function GalleryPage() {
   const router = useRouter();
   const { isAdmin } = useAuth();
 
-  const [category, setCategory] = useState<Category>('original');
+  const [category, setCategory] = useState<GalleryCategory>('original');
   const [tag, setTag] = useState<FilterTag>('all');
   const [query, setQuery] = useState('');
-  const [savedPosts, setSavedPosts] = useState<GalleryPost[]>([]);
+  const [illustrations, setIllustrations] = useState<GalleryPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    let alive = true;
 
-    if (!saved) {
-      setSavedPosts([]);
-      return;
-    }
+    const load = async () => {
+      try {
+        const posts = await fetchGalleryPosts();
 
-    try {
-      const parsed = JSON.parse(saved) as GalleryPost[];
-      setSavedPosts(parsed);
-    } catch {
-      setSavedPosts([]);
-    }
+        if (alive) {
+          setIllustrations(posts);
+          setError('');
+        }
+      } catch (err) {
+        if (alive) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : 'ギャラリーを読み込めませんでした。'
+          );
+        }
+      } finally {
+        if (alive) setLoading(false);
+      }
+    };
+
+    void load();
+
+    const off = subscribeGallery(() => {
+      void load();
+    });
+
+    return () => {
+      alive = false;
+      off();
+    };
   }, []);
-
-  const illustrations = useMemo(
-    () => [...savedPosts, ...demoPosts],
-    [savedPosts]
-  );
 
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -169,11 +157,7 @@ export default function GalleryPage() {
         )}
       </div>
 
-      <div
-        style={{
-          marginBottom: '22px',
-        }}
-      >
+      <div style={{ marginBottom: '22px' }}>
         <input
           type="search"
           value={query}
@@ -252,65 +236,99 @@ export default function GalleryPage() {
         </button>
       </section>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-          gap: '28px 22px',
-        }}
-      >
-        {filtered.map((item) => (
-          <article key={item.id}>
-            <div
-              style={{
-                aspectRatio: '1 / 1',
-                background: 'rgba(255,255,255,.82)',
-                borderRadius: '8px',
-                marginBottom: '12px',
-                display: 'grid',
-                placeItems: 'center',
-                color: '#17191d',
-                fontSize: '12px',
-              }}
-            >
-              IMAGE
-            </div>
+      {loading && (
+        <p
+          style={{
+            padding: '60px 0',
+            textAlign: 'center',
+            color: 'rgba(255,255,255,.45)',
+          }}
+        >
+          LOADING...
+        </p>
+      )}
 
-            <h2
-              style={{
-                fontSize: '15px',
-                margin: '0 0 5px',
-                fontWeight: 600,
-              }}
-            >
-              {item.title}
-            </h2>
+      {error && (
+        <p
+          style={{
+            padding: '20px 0',
+            color: '#ff8d8d',
+          }}
+        >
+          {error}
+        </p>
+      )}
 
-            <p
-              style={{
-                margin: '0 0 5px',
-                fontSize: '11px',
-                color: 'rgba(255,255,255,.55)',
-              }}
-            >
-              {item.date}
-            </p>
+      {!loading && !error && (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+            gap: '28px 22px',
+          }}
+        >
+          {filtered.map((item) => (
+            <article key={item.id}>
+              <div
+                style={{
+                  aspectRatio: '1 / 1',
+                  background: 'rgba(255,255,255,.08)',
+                  borderRadius: '8px',
+                  marginBottom: '12px',
+                  overflow: 'hidden',
+                }}
+              >
+                <img
+                  src={item.imageUrl}
+                  alt={item.title}
+                  loading="lazy"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    display: 'block',
+                  }}
+                />
+              </div>
 
-            <p
-              style={{
-                margin: 0,
-                fontSize: '11px',
-                color: 'rgba(255,255,255,.7)',
-              }}
-            >
-              {item.category.toUpperCase()} ·{' '}
-              {item.tags.map((itemTag) => itemTag.toUpperCase()).join(' / ')}
-            </p>
-          </article>
-        ))}
-      </div>
+              <h2
+                style={{
+                  fontSize: '15px',
+                  margin: '0 0 5px',
+                  fontWeight: 600,
+                }}
+              >
+                {item.title}
+              </h2>
 
-      {filtered.length === 0 && (
+              <p
+                style={{
+                  margin: '0 0 5px',
+                  fontSize: '11px',
+                  color: 'rgba(255,255,255,.55)',
+                }}
+              >
+                {item.date}
+              </p>
+
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: '11px',
+                  color: 'rgba(255,255,255,.7)',
+                }}
+              >
+                {item.category.toUpperCase()} ·{' '}
+                {item.tags
+                  .map((itemTag) => itemTag.toUpperCase())
+                  .join(' / ')}
+              </p>
+            </article>
+          ))}
+        </div>
+      )}
+
+      {!loading && !error && filtered.length === 0 && (
         <p
           style={{
             padding: '60px 0',
