@@ -43,7 +43,7 @@ export default function PlaceholderPage() {
           color: 'rgba(255,255,255,.62)',
         }}
       >
-        世界観、設定資料、記事風の文章などを載せるための仮ページです。
+        仮ページ
       </p>
 
       <button
