@@ -8,7 +8,6 @@ import { useAuth } from '@/lib/auth';
 import { useToast } from '@/components/ui/Toast';
 import { KInput } from '@/components/ui/Kit';
 import { Modal } from '@/components/ui/Modal';
-import { EditableDesc } from '@/components/ui/PageText';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -186,24 +185,12 @@ export default function LoginPage() {
             fontSize: 24,
             letterSpacing: '.3em',
             textAlign: 'center',
-            margin: '4px 0 6px',
+            margin: '4px 0 18px',
             color: 'var(--ink)',
           }}
         >
           LOGIN
         </h1>
-
-        <div
-          style={{
-            textAlign: 'center',
-            marginBottom: 18,
-          }}
-        >
-          <EditableDesc
-            k="login-desc"
-            def="ログインすると、メンバー限定コンテンツを閲覧できます。"
-          />
-        </div>
 
         {!mock && (
           <>
