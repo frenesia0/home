@@ -16,9 +16,9 @@ import {
 
 import {
   createGalleryWatermark,
+  fetchGalleryPosts,
   getDefaultWatermarkOpacity,
   normalizeWatermarkText,
-  fetchGalleryPosts,
   saveGalleryPosts,
   type GalleryCategory,
   type GalleryCharacter,
@@ -35,6 +35,10 @@ import {
   CropImg,
   type CropValue,
 } from '@/components/ui/CropEditor';
+
+import {
+  WatermarkedImage,
+} from '@/components/gallery/WatermarkedImage';
 
 
 /* =========================================================
@@ -61,8 +65,11 @@ const DEFAULT_CROP: CropValue = {
   scale: 1,
 };
 
-const ORIGINAL_ID =
+const ORIGINAL_WATERMARK_ID =
   '@frenesia0';
+
+const DEFAULT_GRID_SIZE =
+  180;
 
 
 /* =========================================================
@@ -94,7 +101,9 @@ function createGalleryId(
           const number =
             Number(match[1]);
 
-          return Number.isFinite(number)
+          return Number.isFinite(
+            number
+          )
             ? number
             : null;
         })
@@ -122,7 +131,7 @@ function createGalleryId(
 
 function clampOpacity(
   value: number
-): number {
+) {
   return Math.min(
     100,
     Math.max(
@@ -133,135 +142,55 @@ function clampOpacity(
 }
 
 
-function makeWatermark(
-  category: GalleryCategory,
-  snsId = ''
-): GalleryWatermark {
-  return createGalleryWatermark(
-    'white',
-    category === 'commission'
-      ? normalizeWatermarkText(
-          snsId
-        )
-      : ORIGINAL_ID
+function clampGridSize(
+  value: number
+) {
+  return Math.min(
+    500,
+    Math.max(
+      60,
+      Math.round(
+        value / 10
+      ) * 10
+    )
   );
 }
 
 
-/* =========================================================
-   WATERMARK PREVIEW
-========================================================= */
-
-function WatermarkPreview({
-  watermark,
-}: {
-  watermark: GalleryWatermark;
-}) {
+function getAutomaticWatermarkText(
+  category: GalleryCategory,
+  snsId: string
+) {
   if (
-    watermark.color === 'none'
+    category === 'commission'
   ) {
-    return null;
+    return normalizeWatermarkText(
+      snsId
+    );
   }
 
-  const rgb =
-    watermark.color === 'black'
-      ? '0,0,0'
-      : '255,255,255';
+  return ORIGINAL_WATERMARK_ID;
+}
 
-  const opacity =
-    clampOpacity(
-      watermark.opacity
-    ) / 100;
 
-  /*
-   * 格子線は文字より少しだけ控えめにする。
-   * 設定値そのものは同じopacityで、
-   * 視覚上だけ線を細くしている。
-   */
-  const lineColor =
-    `rgba(${rgb}, ${opacity})`;
+function makeWatermark(
+  category: GalleryCategory,
+  snsId: string
+): GalleryWatermark {
+  const watermark =
+    createGalleryWatermark(
+      'white',
+      getAutomaticWatermarkText(
+        category,
+        snsId
+      )
+    );
 
-  const textColor =
-    `rgba(${rgb}, ${opacity})`;
-
-  return (
-    <>
-      {watermark.grid && (
-        <div
-          aria-hidden="true"
-          style={{
-            position: 'absolute',
-            inset: 0,
-            pointerEvents: 'none',
-
-            /*
-             * 大きな斜めダイヤ格子。
-             *
-             * 2本の repeating-linear-gradient を
-             * 交差させている。
-             */
-            backgroundImage: `
-              repeating-linear-gradient(
-                45deg,
-                transparent 0,
-                transparent 88px,
-                ${lineColor} 89px,
-                ${lineColor} 90px,
-                transparent 91px,
-                transparent 180px
-              ),
-              repeating-linear-gradient(
-                -45deg,
-                transparent 0,
-                transparent 88px,
-                ${lineColor} 89px,
-                ${lineColor} 90px,
-                transparent 91px,
-                transparent 180px
-              )
-            `,
-            zIndex: 2,
-          }}
-        />
-      )}
-
-      {watermark.text && (
-        <div
-          aria-hidden="true"
-          style={{
-            position: 'absolute',
-            right: '4%',
-            bottom: '4%',
-            zIndex: 3,
-            pointerEvents: 'none',
-
-            color: textColor,
-
-            fontSize:
-              'clamp(11px, 4vw, 22px)',
-
-            fontWeight: 500,
-
-            letterSpacing:
-              '.01em',
-
-            lineHeight: 1,
-
-            whiteSpace:
-              'nowrap',
-
-            textShadow:
-              watermark.color ===
-              'white'
-                ? '0 1px 3px rgba(0,0,0,.08)'
-                : '0 1px 3px rgba(255,255,255,.05)',
-          }}
-        >
-          {watermark.text}
-        </div>
-      )}
-    </>
-  );
+  return {
+    ...watermark,
+    gridSize:
+      DEFAULT_GRID_SIZE,
+  };
 }
 
 
@@ -279,14 +208,15 @@ export default function AddIllustrationPage() {
   } = useAuth();
 
 
-  /* ---------------------------------------------------------
-     BASIC DATA
-  --------------------------------------------------------- */
+  /* =======================================================
+     BASIC
+  ======================================================= */
 
   const [
     date,
     setDate,
-  ] = useState('');
+  ] =
+    useState('');
 
   const [
     category,
@@ -313,44 +243,49 @@ export default function AddIllustrationPage() {
     >([]);
 
 
-  /* ---------------------------------------------------------
+  /* =======================================================
      SONG
-  --------------------------------------------------------- */
+  ======================================================= */
 
   const [
     songTitle,
     setSongTitle,
-  ] = useState('');
+  ] =
+    useState('');
 
   const [
     songUrl,
     setSongUrl,
-  ] = useState('');
+  ] =
+    useState('');
 
 
-  /* ---------------------------------------------------------
+  /* =======================================================
      COMMISSION
-  --------------------------------------------------------- */
+  ======================================================= */
 
   const [
     artistName,
     setArtistName,
-  ] = useState('');
+  ] =
+    useState('');
 
   const [
     snsId,
     setSnsId,
-  ] = useState('');
+  ] =
+    useState('');
 
   const [
     snsUrl,
     setSnsUrl,
-  ] = useState('');
+  ] =
+    useState('');
 
 
-  /* ---------------------------------------------------------
+  /* =======================================================
      IMAGES
-  --------------------------------------------------------- */
+  ======================================================= */
 
   const [
     images,
@@ -365,8 +300,9 @@ export default function AddIllustrationPage() {
     useState<string[]>([]);
 
   /*
-   * images[index] と
+   * images[index]
    * watermarkSettings[index]
+   *
    * が必ず対応する。
    */
   const [
@@ -378,9 +314,9 @@ export default function AddIllustrationPage() {
     >([]);
 
 
-  /* ---------------------------------------------------------
+  /* =======================================================
      THUMBNAIL
-  --------------------------------------------------------- */
+  ======================================================= */
 
   const [
     thumbnailMode,
@@ -427,9 +363,9 @@ export default function AddIllustrationPage() {
     useState(false);
 
 
-  /* ---------------------------------------------------------
+  /* =======================================================
      STATUS
-  --------------------------------------------------------- */
+  ======================================================= */
 
   const [
     posting,
@@ -450,20 +386,21 @@ export default function AddIllustrationPage() {
     useState('');
 
 
-  /* =========================================================
+  /* =======================================================
      DERIVED
-  ========================================================= */
+  ======================================================= */
 
   const isSongParody =
-    category === 'original' &&
+    category ===
+      'original' &&
     tags.includes(
       'song-parody'
     );
 
 
-  /* =========================================================
-     PREVIEW URLS
-  ========================================================= */
+  /* =======================================================
+     IMAGE PREVIEW URLs
+  ======================================================= */
 
   useEffect(() => {
     const urls =
@@ -486,8 +423,14 @@ export default function AddIllustrationPage() {
           )
       );
     };
-  }, [images]);
+  }, [
+    images,
+  ]);
 
+
+  /* =======================================================
+     CUSTOM THUMBNAIL URL
+  ======================================================= */
 
   useEffect(() => {
     if (
@@ -518,9 +461,9 @@ export default function AddIllustrationPage() {
   ]);
 
 
-  /* =========================================================
-     THUMBNAIL SAFETY
-  ========================================================= */
+  /* =======================================================
+     THUMBNAIL INDEX SAFETY
+  ======================================================= */
 
   useEffect(() => {
     if (
@@ -541,9 +484,9 @@ export default function AddIllustrationPage() {
   ]);
 
 
-  /* =========================================================
+  /* =======================================================
      SONG RESET
-  ========================================================= */
+  ======================================================= */
 
   useEffect(() => {
     if (
@@ -557,64 +500,48 @@ export default function AddIllustrationPage() {
   ]);
 
 
-  /* =========================================================
-     COMMISSION ID AUTO LINK
-  ========================================================= */
+  /* =======================================================
+     COMMISSION SNS ID AUTO SYNC
+  ======================================================= */
 
-  /*
-   * COMMISSIONの場合、
-   * SNS IDを変更したら、
-   * まだ自分でウォーターマーク文字を変更していない画像は
-   * SNS IDへ追従させる。
-   *
-   * ORIGINALへ戻した場合は
-   * @frenesia0 に戻す。
-   */
   useEffect(() => {
+    if (
+      category !==
+      'commission'
+    ) {
+      return;
+    }
+
+    const nextText =
+      normalizeWatermarkText(
+        snsId
+      );
+
     setWatermarkSettings(
       (current) =>
         current.map(
           (watermark) => {
-            if (
-              category ===
-              'original'
-            ) {
-              const isAutoText =
-                !watermark.text ||
-                watermark.text ===
-                  normalizeWatermarkText(
-                    snsId
-                  );
-
-              if (
-                !isAutoText &&
-                watermark.text !==
-                  ORIGINAL_ID
-              ) {
-                return watermark;
-              }
-
-              return {
-                ...watermark,
-                text:
-                  ORIGINAL_ID,
-              };
-            }
-
             /*
-             * COMMISSION
+             * ORIGINALの初期値か空欄なら
+             * 絵師さんIDへ自動変更。
+             *
+             * すでに手動で別IDへ変更した場合は
+             * 勝手に上書きしない。
              */
             if (
               watermark.text ===
-                ORIGINAL_ID ||
-              !watermark.text
+                ORIGINAL_WATERMARK_ID ||
+              watermark.text ===
+                '' ||
+              watermark.text ===
+                normalizeWatermarkText(
+                  snsId
+                )
             ) {
               return {
                 ...watermark,
                 text:
-                  normalizeWatermarkText(
-                    snsId
-                  ),
+                  nextText,
               };
             }
 
@@ -628,9 +555,9 @@ export default function AddIllustrationPage() {
   ]);
 
 
-  /* =========================================================
+  /* =======================================================
      THUMBNAIL SOURCE
-  ========================================================= */
+  ======================================================= */
 
   const thumbnailSrc =
     useMemo(() => {
@@ -656,9 +583,9 @@ export default function AddIllustrationPage() {
     ]);
 
 
-  /* =========================================================
+  /* =======================================================
      CATEGORY
-  ========================================================= */
+  ======================================================= */
 
   const changeCategory = (
     next:
@@ -679,7 +606,9 @@ export default function AddIllustrationPage() {
       setWatermarkSettings(
         (current) =>
           current.map(
-            (watermark) => ({
+            (
+              watermark
+            ) => ({
               ...watermark,
 
               text:
@@ -689,24 +618,32 @@ export default function AddIllustrationPage() {
             })
           )
       );
-    } else {
-      setWatermarkSettings(
-        (current) =>
-          current.map(
-            (watermark) => ({
-              ...watermark,
-              text:
-                ORIGINAL_ID,
-            })
-          )
-      );
+
+      return;
     }
+
+    /*
+     * ORIGINALへ戻した場合
+     */
+    setWatermarkSettings(
+      (current) =>
+        current.map(
+          (
+            watermark
+          ) => ({
+            ...watermark,
+
+            text:
+              ORIGINAL_WATERMARK_ID,
+          })
+        )
+    );
   };
 
 
-  /* =========================================================
-     CHARACTER / TAG
-  ========================================================= */
+  /* =======================================================
+     CHARACTER
+  ======================================================= */
 
   const toggleCharacter = (
     character:
@@ -730,6 +667,10 @@ export default function AddIllustrationPage() {
   };
 
 
+  /* =======================================================
+     TAG
+  ======================================================= */
+
   const toggleTag = (
     tag:
       GalleryTag
@@ -751,9 +692,9 @@ export default function AddIllustrationPage() {
   };
 
 
-  /* =========================================================
-     IMAGE ADD
-  ========================================================= */
+  /* =======================================================
+     ADD IMAGES
+  ======================================================= */
 
   const handleImageChange = (
     files:
@@ -774,13 +715,15 @@ export default function AddIllustrationPage() {
       );
 
     if (
-      selected.length === 0
+      selected.length ===
+      0
     ) {
       return;
     }
 
     const wasEmpty =
-      images.length === 0;
+      images.length ===
+      0;
 
     setImages(
       (current) => [
@@ -790,8 +733,8 @@ export default function AddIllustrationPage() {
     );
 
     /*
-     * 新しく追加した画像のぶんだけ
-     * ウォーターマーク設定を作る。
+     * 新規画像の数だけ
+     * watermark設定も追加
      */
     setWatermarkSettings(
       (current) => [
@@ -821,46 +764,54 @@ export default function AddIllustrationPage() {
   };
 
 
-  /* =========================================================
-     IMAGE REMOVE
-  ========================================================= */
+  /* =======================================================
+     REMOVE IMAGE
+  ======================================================= */
 
   const removeImage = (
-    index: number
+    index:
+      number
   ) => {
     setImages(
       (current) =>
         current.filter(
-          (_, i) =>
-            i !== index
+          (
+            _,
+            i
+          ) =>
+            i !==
+            index
         )
     );
 
     setWatermarkSettings(
       (current) =>
         current.filter(
-          (_, i) =>
-            i !== index
+          (
+            _,
+            i
+          ) =>
+            i !==
+            index
         )
     );
 
-    /*
-     * 削除した画像より後ろを
-     * サムネイルにしていた場合は
-     * indexを1つ前へずらす。
-     */
     setThumbnailIndex(
       (current) => {
         if (
-          current === index
+          current ===
+          index
         ) {
           return 0;
         }
 
         if (
-          current > index
+          current >
+          index
         ) {
-          return current - 1;
+          return (
+            current - 1
+          );
         }
 
         return current;
@@ -873,9 +824,9 @@ export default function AddIllustrationPage() {
   };
 
 
-  /* =========================================================
+  /* =======================================================
      WATERMARK UPDATE
-  ========================================================= */
+  ======================================================= */
 
   const updateWatermark = (
     index: number,
@@ -900,29 +851,59 @@ export default function AddIllustrationPage() {
   };
 
 
+  /* =======================================================
+     WATERMARK COLOR
+  ======================================================= */
+
   const changeWatermarkColor = (
     index: number,
     color:
       GalleryWatermarkColor
   ) => {
+    if (
+      color === 'none'
+    ) {
+      updateWatermark(
+        index,
+        {
+          color:
+            'none',
+
+          opacity:
+            0,
+
+          grid:
+            false,
+        }
+      );
+
+      return;
+    }
+
     updateWatermark(
       index,
       {
         color,
 
+        /*
+         * WHITE → 25
+         * BLACK → 5
+         */
         opacity:
           getDefaultWatermarkOpacity(
             color
           ),
 
         grid:
-          color === 'none'
-            ? false
-            : true,
+          true,
       }
     );
   };
 
+
+  /* =======================================================
+     WATERMARK OPACITY
+  ======================================================= */
 
   const changeWatermarkOpacity = (
     index: number,
@@ -940,13 +921,34 @@ export default function AddIllustrationPage() {
   };
 
 
-  /* =========================================================
+  /* =======================================================
+     GRID SIZE
+  ======================================================= */
+
+  const changeGridSize = (
+    index: number,
+    value: number
+  ) => {
+    updateWatermark(
+      index,
+      {
+        gridSize:
+          clampGridSize(
+            value
+          ),
+      }
+    );
+  };
+
+
+  /* =======================================================
      CLOUDINARY
-  ========================================================= */
+  ======================================================= */
 
   const uploadToCloudinary =
     async (
-      file: File
+      file:
+        File
     ): Promise<GalleryImage> => {
       const cloudName =
         process.env
@@ -1018,9 +1020,9 @@ export default function AddIllustrationPage() {
     };
 
 
-  /* =========================================================
+  /* =======================================================
      SUBMIT
-  ========================================================= */
+  ======================================================= */
 
   const handleSubmit =
     async (
@@ -1041,7 +1043,8 @@ export default function AddIllustrationPage() {
       }
 
       if (
-        images.length === 0
+        images.length ===
+        0
       ) {
         setError(
           '画像を1枚以上選択してください。'
@@ -1082,13 +1085,21 @@ export default function AddIllustrationPage() {
         return;
       }
 
-      if (posting) {
+      if (
+        posting
+      ) {
         return;
       }
 
-      setPosting(true);
+      setPosting(
+        true
+      );
+
       setError('');
-      setUploadProgress('');
+
+      setUploadProgress(
+        ''
+      );
 
       try {
         const previous =
@@ -1101,8 +1112,15 @@ export default function AddIllustrationPage() {
           );
 
         const uploadedImages:
-          GalleryImage[] = [];
+          GalleryImage[] =
+            [];
 
+        /*
+         * 投稿画像を一枚ずつアップロード。
+         *
+         * ここで同じindexの
+         * watermarkSettingsを合体させる。
+         */
         for (
           let i = 0;
           i < images.length;
@@ -1117,23 +1135,46 @@ export default function AddIllustrationPage() {
               images[i]
             );
 
-          /*
-           * ここで画像と
-           * ウォーターマーク設定を合体。
-           */
-          uploadedImages.push({
-            ...uploaded,
+          const watermark =
+            watermarkSettings[
+              i
+            ] ??
+            makeWatermark(
+              category,
+              snsId
+            );
 
-            watermark:
-              watermarkSettings[
-                i
-              ] ??
-              makeWatermark(
-                category,
-                snsId
-              ),
-          });
+          uploadedImages.push(
+            {
+              ...uploaded,
+
+              watermark: {
+                ...watermark,
+
+                opacity:
+                  clampOpacity(
+                    watermark.opacity
+                  ),
+
+                gridSize:
+                  clampGridSize(
+                    watermark.gridSize ??
+                      DEFAULT_GRID_SIZE
+                  ),
+
+                text:
+                  normalizeWatermarkText(
+                    watermark.text
+                  ),
+              },
+            }
+          );
         }
+
+
+        /* ---------------------------------------------------
+           CUSTOM THUMBNAIL
+        --------------------------------------------------- */
 
         let uploadedCustomThumbnail:
           GalleryImage | undefined;
@@ -1153,9 +1194,15 @@ export default function AddIllustrationPage() {
             );
         }
 
+
         setUploadProgress(
           '投稿情報を保存中...'
         );
+
+
+        /* ---------------------------------------------------
+           POST
+        --------------------------------------------------- */
 
         const newPost:
           GalleryPost = {
@@ -1238,6 +1285,7 @@ export default function AddIllustrationPage() {
               .toISOString(),
         };
 
+
         await saveGalleryPosts(
           previous,
           [
@@ -1247,27 +1295,36 @@ export default function AddIllustrationPage() {
           user.id
         );
 
+
         router.push(
           `/gallery/${newId}`
         );
 
         router.refresh();
-      } catch (err) {
+      } catch (
+        err
+      ) {
         setError(
-          err instanceof Error
+          err instanceof
+            Error
             ? err.message
             : '投稿に失敗しました。'
         );
       } finally {
-        setPosting(false);
-        setUploadProgress('');
+        setPosting(
+          false
+        );
+
+        setUploadProgress(
+          ''
+        );
       }
     };
 
 
-  /* =========================================================
-     STYLES
-  ========================================================= */
+  /* =======================================================
+     COMMON STYLES
+  ======================================================= */
 
   const fieldStyle = {
     display:
@@ -1329,11 +1386,13 @@ export default function AddIllustrationPage() {
   };
 
 
-  /* =========================================================
+  /* =======================================================
      ACCESS DENIED
-  ========================================================= */
+  ======================================================= */
 
-  if (!isAdmin) {
+  if (
+    !isAdmin
+  ) {
     return (
       <main
         style={{
@@ -1362,6 +1421,7 @@ export default function AddIllustrationPage() {
         </p>
 
         <button
+          type="button"
           onClick={() =>
             router.push(
               '/gallery'
@@ -1375,9 +1435,9 @@ export default function AddIllustrationPage() {
   }
 
 
-  /* =========================================================
+  /* =======================================================
      RENDER
-  ========================================================= */
+  ======================================================= */
 
   return (
     <>
@@ -1397,6 +1457,11 @@ export default function AddIllustrationPage() {
             '#f5f5f5',
         }}
       >
+
+        {/* =================================================
+            TITLE
+        ================================================= */}
+
         <h1
           style={{
             margin:
@@ -1454,7 +1519,9 @@ export default function AddIllustrationPage() {
 
           <section>
 
-            {/* IMAGE PREVIEW */}
+            {/* ===============================================
+                IMAGE PREVIEW
+            =============================================== */}
 
             <div
               style={{
@@ -1519,37 +1586,25 @@ export default function AddIllustrationPage() {
                               'hidden',
 
                             background:
-                              'rgba(0,0,0,.2)',
+                              'rgba(0,0,0,.22)',
 
                             aspectRatio:
                               '1 / 1',
                           }}
                         >
-                          <img
+                          <WatermarkedImage
                             src={
                               url
                             }
                             alt={`preview ${index + 1}`}
-                            style={{
-                              width:
-                                '100%',
-
-                              height:
-                                '100%',
-
-                              objectFit:
-                                'contain',
-
-                              display:
-                                'block',
-                            }}
-                          />
-
-                          <WatermarkPreview
                             watermark={
                               watermark
                             }
+                            fit="contain"
                           />
+
+
+                          {/* NUMBER */}
 
                           <span
                             style={{
@@ -1563,7 +1618,7 @@ export default function AddIllustrationPage() {
                                 '8px',
 
                               zIndex:
-                                5,
+                                10,
 
                               minWidth:
                                 '26px',
@@ -1596,6 +1651,9 @@ export default function AddIllustrationPage() {
                             {index + 1}
                           </span>
 
+
+                          {/* DELETE */}
+
                           <button
                             type="button"
                             onClick={() =>
@@ -1614,7 +1672,7 @@ export default function AddIllustrationPage() {
                                 '8px',
 
                               zIndex:
-                                5,
+                                10,
 
                               width:
                                 '28px',
@@ -1670,7 +1728,9 @@ export default function AddIllustrationPage() {
             </div>
 
 
-            {/* IMAGE SELECT */}
+            {/* ===============================================
+                IMAGE SELECT
+            =============================================== */}
 
             <label
               style={{
@@ -1706,9 +1766,9 @@ export default function AddIllustrationPage() {
             </label>
 
 
-            {/* =================================================
-                WATERMARK SETTINGS
-            ================================================= */}
+            {/* ===============================================
+                WATERMARK
+            =============================================== */}
 
             {images.length >
               0 && (
@@ -1723,7 +1783,7 @@ export default function AddIllustrationPage() {
                     'grid',
 
                   gap:
-                    '18px',
+                    '20px',
                 }}
               >
                 <legend
@@ -1741,10 +1801,10 @@ export default function AddIllustrationPage() {
                 <p
                   style={{
                     margin:
-                      '0',
+                      0,
 
                     color:
-                      'rgba(255,255,255,.5)',
+                      'rgba(255,255,255,.48)',
 
                     fontSize:
                       '11px',
@@ -1753,9 +1813,10 @@ export default function AddIllustrationPage() {
                       1.7,
                   }}
                 >
-                  画像ごとにウォーターマークを設定できます。
+                  画像ごとに透かしを調整できます。
                   WHITEは25%、BLACKは5%が初期値です。
                 </p>
+
 
                 {images.map(
                   (
@@ -1775,9 +1836,13 @@ export default function AddIllustrationPage() {
                       watermark.color ===
                       'none';
 
+                    const gridDisabled =
+                      disabled ||
+                      !watermark.grid;
+
                     return (
                       <div
-                        key={`${file.name}-watermark-${index}`}
+                        key={`${file.name}-${index}-wm`}
                         style={{
                           padding:
                             '16px',
@@ -1795,9 +1860,12 @@ export default function AddIllustrationPage() {
                             'grid',
 
                           gap:
-                            '16px',
+                            '18px',
                         }}
                       >
+
+                        {/* IMAGE NAME */}
+
                         <div
                           style={{
                             display:
@@ -1830,6 +1898,9 @@ export default function AddIllustrationPage() {
                               file.name
                             }
                             style={{
+                              minWidth:
+                                0,
+
                               maxWidth:
                                 '220px',
 
@@ -1843,7 +1914,7 @@ export default function AddIllustrationPage() {
                                 'nowrap',
 
                               color:
-                                'rgba(255,255,255,.42)',
+                                'rgba(255,255,255,.4)',
 
                               fontSize:
                                 '10px',
@@ -1854,7 +1925,9 @@ export default function AddIllustrationPage() {
                         </div>
 
 
-                        {/* COLOR */}
+                        {/* ===================================
+                            COLOR
+                        =================================== */}
 
                         <div
                           style={{
@@ -1868,13 +1941,13 @@ export default function AddIllustrationPage() {
                           <span
                             style={{
                               color:
-                                'rgba(255,255,255,.55)',
+                                'rgba(255,255,255,.5)',
 
                               fontSize:
                                 '10px',
 
                               letterSpacing:
-                                '.1em',
+                                '.12em',
                             }}
                           >
                             COLOR
@@ -1898,10 +1971,12 @@ export default function AddIllustrationPage() {
                                   'white',
                                   'WHITE',
                                 ],
+
                                 [
                                   'black',
                                   'BLACK',
                                 ],
+
                                 [
                                   'none',
                                   'NONE',
@@ -1918,10 +1993,10 @@ export default function AddIllustrationPage() {
 
                                 return (
                                   <button
+                                    type="button"
                                     key={
                                       value
                                     }
-                                    type="button"
                                     onClick={() =>
                                       changeWatermarkColor(
                                         index,
@@ -1972,7 +2047,9 @@ export default function AddIllustrationPage() {
                         </div>
 
 
-                        {/* OPACITY */}
+                        {/* ===================================
+                            OPACITY
+                        =================================== */}
 
                         <div
                           style={{
@@ -1980,11 +2057,11 @@ export default function AddIllustrationPage() {
                               'grid',
 
                             gap:
-                              '8px',
+                              '9px',
 
                             opacity:
                               disabled
-                                ? 0.38
+                                ? 0.35
                                 : 1,
                           }}
                         >
@@ -2003,13 +2080,13 @@ export default function AddIllustrationPage() {
                             <span
                               style={{
                                 color:
-                                  'rgba(255,255,255,.55)',
+                                  'rgba(255,255,255,.5)',
 
                                 fontSize:
                                   '10px',
 
                                 letterSpacing:
-                                  '.1em',
+                                  '.12em',
                               }}
                             >
                               OPACITY
@@ -2077,6 +2154,7 @@ export default function AddIllustrationPage() {
                               −
                             </button>
 
+
                             <input
                               type="range"
                               min="0"
@@ -2103,6 +2181,7 @@ export default function AddIllustrationPage() {
                                   '100%',
                               }}
                             />
+
 
                             <button
                               type="button"
@@ -2144,7 +2223,207 @@ export default function AddIllustrationPage() {
                         </div>
 
 
-                        {/* ID */}
+                        {/* ===================================
+                            GRID SIZE
+                        =================================== */}
+
+                        <div
+                          style={{
+                            display:
+                              'grid',
+
+                            gap:
+                              '9px',
+
+                            opacity:
+                              gridDisabled
+                                ? 0.35
+                                : 1,
+                          }}
+                        >
+                          <div
+                            style={{
+                              display:
+                                'flex',
+
+                              justifyContent:
+                                'space-between',
+
+                              alignItems:
+                                'center',
+                            }}
+                          >
+                            <span
+                              style={{
+                                color:
+                                  'rgba(255,255,255,.5)',
+
+                                fontSize:
+                                  '10px',
+
+                                letterSpacing:
+                                  '.12em',
+                              }}
+                            >
+                              GRID SIZE
+                            </span>
+
+                            <strong
+                              style={{
+                                fontSize:
+                                  '12px',
+                              }}
+                            >
+                              {watermark.gridSize ??
+                                DEFAULT_GRID_SIZE}
+                            </strong>
+                          </div>
+
+
+                          <div
+                            style={{
+                              display:
+                                'grid',
+
+                              gridTemplateColumns:
+                                '38px 1fr 38px',
+
+                              gap:
+                                '8px',
+
+                              alignItems:
+                                'center',
+                            }}
+                          >
+                            <button
+                              type="button"
+                              disabled={
+                                gridDisabled
+                              }
+                              onClick={() =>
+                                changeGridSize(
+                                  index,
+                                  (
+                                    watermark.gridSize ??
+                                    DEFAULT_GRID_SIZE
+                                  ) - 10
+                                )
+                              }
+                              style={{
+                                height:
+                                  '36px',
+
+                                borderRadius:
+                                  '8px',
+
+                                border:
+                                  '1px solid rgba(255,255,255,.2)',
+
+                                background:
+                                  'rgba(255,255,255,.05)',
+
+                                color:
+                                  '#fff',
+
+                                cursor:
+                                  gridDisabled
+                                    ? 'default'
+                                    : 'pointer',
+                              }}
+                            >
+                              −
+                            </button>
+
+
+                            <input
+                              type="range"
+                              min="60"
+                              max="500"
+                              step="10"
+                              disabled={
+                                gridDisabled
+                              }
+                              value={
+                                watermark.gridSize ??
+                                DEFAULT_GRID_SIZE
+                              }
+                              onChange={(
+                                e
+                              ) =>
+                                changeGridSize(
+                                  index,
+                                  Number(
+                                    e.target.value
+                                  )
+                                )
+                              }
+                              style={{
+                                width:
+                                  '100%',
+                              }}
+                            />
+
+
+                            <button
+                              type="button"
+                              disabled={
+                                gridDisabled
+                              }
+                              onClick={() =>
+                                changeGridSize(
+                                  index,
+                                  (
+                                    watermark.gridSize ??
+                                    DEFAULT_GRID_SIZE
+                                  ) + 10
+                                )
+                              }
+                              style={{
+                                height:
+                                  '36px',
+
+                                borderRadius:
+                                  '8px',
+
+                                border:
+                                  '1px solid rgba(255,255,255,.2)',
+
+                                background:
+                                  'rgba(255,255,255,.05)',
+
+                                color:
+                                  '#fff',
+
+                                cursor:
+                                  gridDisabled
+                                    ? 'default'
+                                    : 'pointer',
+                              }}
+                            >
+                              ＋
+                            </button>
+                          </div>
+
+                          <span
+                            style={{
+                              color:
+                                'rgba(255,255,255,.36)',
+
+                              fontSize:
+                                '9px',
+
+                              lineHeight:
+                                1.5,
+                            }}
+                          >
+                            小さいほど格子が細かく、大きいほど格子が大きくなります。
+                          </span>
+                        </div>
+
+
+                        {/* ===================================
+                            ID
+                        =================================== */}
 
                         <label
                           style={{
@@ -2156,20 +2435,20 @@ export default function AddIllustrationPage() {
 
                             opacity:
                               disabled
-                                ? 0.38
+                                ? 0.35
                                 : 1,
                           }}
                         >
                           <span
                             style={{
                               color:
-                                'rgba(255,255,255,.55)',
+                                'rgba(255,255,255,.5)',
 
                               fontSize:
                                 '10px',
 
                               letterSpacing:
-                                '.1em',
+                                '.12em',
                             }}
                           >
                             ID
@@ -2209,7 +2488,7 @@ export default function AddIllustrationPage() {
                               category ===
                               'commission'
                                 ? '@artist'
-                                : ORIGINAL_ID
+                                : ORIGINAL_WATERMARK_ID
                             }
                             style={
                               inputStyle
@@ -2218,7 +2497,9 @@ export default function AddIllustrationPage() {
                         </label>
 
 
-                        {/* GRID */}
+                        {/* ===================================
+                            DIAGONAL GRID
+                        =================================== */}
 
                         <label
                           style={{
@@ -2236,7 +2517,7 @@ export default function AddIllustrationPage() {
 
                             opacity:
                               disabled
-                                ? 0.38
+                                ? 0.35
                                 : 1,
                           }}
                         >
@@ -2264,7 +2545,7 @@ export default function AddIllustrationPage() {
                             <span
                               style={{
                                 color:
-                                  'rgba(255,255,255,.45)',
+                                  'rgba(255,255,255,.4)',
 
                                 fontSize:
                                   '10px',
@@ -2303,9 +2584,9 @@ export default function AddIllustrationPage() {
             )}
 
 
-            {/* =================================================
+            {/* ===============================================
                 THUMBNAIL
-            ================================================= */}
+            =============================================== */}
 
             <fieldset
               style={{
@@ -2323,6 +2604,7 @@ export default function AddIllustrationPage() {
               >
                 THUMBNAIL
               </legend>
+
 
               <div
                 style={{
@@ -2365,6 +2647,7 @@ export default function AddIllustrationPage() {
                   投稿画像から選ぶ
                 </label>
 
+
                 <label
                   style={
                     choiceStyle
@@ -2392,6 +2675,8 @@ export default function AddIllustrationPage() {
                 </label>
               </div>
 
+
+              {/* POST THUMBNAIL */}
 
               {thumbnailMode ===
                 'post' && (
@@ -2496,6 +2781,8 @@ export default function AddIllustrationPage() {
               )}
 
 
+              {/* CUSTOM THUMBNAIL */}
+
               {thumbnailMode ===
                 'custom' && (
                 <label
@@ -2531,6 +2818,8 @@ export default function AddIllustrationPage() {
                 </label>
               )}
 
+
+              {/* THUMBNAIL CROP PREVIEW */}
 
               {thumbnailSrc && (
                 <div
@@ -2608,7 +2897,9 @@ export default function AddIllustrationPage() {
             }}
           >
 
-            {/* DATE */}
+            {/* ===============================================
+                DATE
+            =============================================== */}
 
             <label
               style={
@@ -2642,7 +2933,9 @@ export default function AddIllustrationPage() {
             </label>
 
 
-            {/* CATEGORY */}
+            {/* ===============================================
+                CATEGORY
+            =============================================== */}
 
             <fieldset
               style={
@@ -2665,6 +2958,9 @@ export default function AddIllustrationPage() {
 
                   gap:
                     '24px',
+
+                  flexWrap:
+                    'wrap',
                 }}
               >
                 <label
@@ -2688,6 +2984,7 @@ export default function AddIllustrationPage() {
 
                   ORIGINAL
                 </label>
+
 
                 <label
                   style={
@@ -2714,7 +3011,9 @@ export default function AddIllustrationPage() {
             </fieldset>
 
 
-            {/* CHARACTER */}
+            {/* ===============================================
+                CHARACTER
+            =============================================== */}
 
             <fieldset
               style={
@@ -2764,6 +3063,7 @@ export default function AddIllustrationPage() {
                   SHIKI
                 </label>
 
+
                 <label
                   style={
                     choiceStyle
@@ -2789,7 +3089,9 @@ export default function AddIllustrationPage() {
             </fieldset>
 
 
-            {/* ORIGINAL */}
+            {/* ===============================================
+                ORIGINAL
+            =============================================== */}
 
             {category ===
               'original' && (
@@ -2826,18 +3128,22 @@ export default function AddIllustrationPage() {
                           'reference',
                           'REFERENCE',
                         ],
+
                         [
                           'song-parody',
                           'SONG PARODY',
                         ],
+
                         [
                           'manga',
                           'MANGA',
                         ],
+
                         [
                           'rakugaki',
                           'RAKUGAKI',
                         ],
+
                         [
                           'tachie',
                           'TACHIE',
@@ -2877,6 +3183,8 @@ export default function AddIllustrationPage() {
                   </div>
                 </fieldset>
 
+
+                {/* SONG */}
 
                 {isSongParody && (
                   <fieldset
@@ -2945,6 +3253,7 @@ export default function AddIllustrationPage() {
                       />
                     </label>
 
+
                     <label
                       style={
                         fieldStyle
@@ -2978,7 +3287,9 @@ export default function AddIllustrationPage() {
             )}
 
 
-            {/* COMMISSION */}
+            {/* ===============================================
+                COMMISSION
+            =============================================== */}
 
             {category ===
               'commission' && (
@@ -3001,6 +3312,7 @@ export default function AddIllustrationPage() {
                 >
                   ARTIST
                 </legend>
+
 
                 <label
                   style={
@@ -3031,6 +3343,7 @@ export default function AddIllustrationPage() {
                   />
                 </label>
 
+
                 <label
                   style={
                     fieldStyle
@@ -3052,6 +3365,13 @@ export default function AddIllustrationPage() {
                         e.target.value
                       )
                     }
+                    onBlur={() =>
+                      setSnsId(
+                        normalizeWatermarkText(
+                          snsId
+                        )
+                      )
+                    }
                     placeholder="@example"
                     style={
                       inputStyle
@@ -3061,7 +3381,7 @@ export default function AddIllustrationPage() {
                   <span
                     style={{
                       color:
-                        'rgba(255,255,255,.42)',
+                        'rgba(255,255,255,.4)',
 
                       fontSize:
                         '10px',
@@ -3070,9 +3390,10 @@ export default function AddIllustrationPage() {
                         1.5,
                     }}
                   >
-                    新しい画像のウォーターマークIDにも使用します。
+                    新しく追加した画像の透かしIDにも自動で使用します。
                   </span>
                 </label>
+
 
                 <label
                   style={
@@ -3105,7 +3426,9 @@ export default function AddIllustrationPage() {
             )}
 
 
-            {/* STATUS */}
+            {/* ===============================================
+                STATUS
+            =============================================== */}
 
             {uploadProgress && (
               <p
@@ -3120,6 +3443,7 @@ export default function AddIllustrationPage() {
                 {uploadProgress}
               </p>
             )}
+
 
             {error && (
               <p
@@ -3136,7 +3460,9 @@ export default function AddIllustrationPage() {
             )}
 
 
-            {/* SUBMIT */}
+            {/* ===============================================
+                SUBMIT
+            =============================================== */}
 
             <button
               type="submit"
@@ -3243,7 +3569,14 @@ export default function AddIllustrationPage() {
         ) {
           .gallery-add-page {
             padding:
-              36px 18px 120px !important;
+              36px 18px
+              calc(
+                150px +
+                env(
+                  safe-area-inset-bottom
+                )
+              )
+              !important;
           }
 
           .gallery-add-form {
