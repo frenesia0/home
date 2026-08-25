@@ -323,6 +323,16 @@ export async function createFirebaseBackend(cfg: FirebaseCfg): Promise<Backend> 
       });
     },
 
+    /**
+     * 現在ログイン中のFirebaseユーザーのIDトークンを返す。
+     * Cloudinary削除APIなど、サーバー側で管理者本人か確認するときに使う。
+     */
+    async getIdToken() {
+      const u = auth.currentUser;
+      if (!u) return null;
+      return await u.getIdToken();
+    },
+
     async fetchList<T extends ListItem>(coll: string): Promise<T[]> {
       const sets = await readSets();
       // 반드시 getDocsFromServer — 일반 getDocs는 로컬(오프라인) 캐시가 있으면 그걸로 조용히 성공해
