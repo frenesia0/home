@@ -18,7 +18,7 @@ type UsageValue = {
 type UsageSuccess = {
   ok: true;
 
-  // samples/ を除いた、君自身の画像
+  // samples/ を除いた、実際に保存している画像
   imageCount: number;
   totalBytes: number;
 
@@ -55,10 +55,7 @@ function formatBytes(
     return `${bytes} B`;
   }
 
-  if (
-    bytes <
-    1024 * 1024
-  ) {
+  if (bytes < 1024 * 1024) {
     return `${(
       bytes / 1024
     ).toFixed(1)} KB`;
@@ -91,7 +88,7 @@ function formatPercent(
     value === undefined ||
     !Number.isFinite(value)
   ) {
-    return null;
+    return '—';
   }
 
   if (value === 0) {
@@ -107,6 +104,25 @@ function formatPercent(
   }
 
   return `${value.toFixed(1)}%`;
+}
+
+function formatCredit(
+  value: number | null | undefined
+) {
+  if (
+    value === null ||
+    value === undefined ||
+    !Number.isFinite(value)
+  ) {
+    return '—';
+  }
+
+  return value.toLocaleString(
+    undefined,
+    {
+      maximumFractionDigits: 2,
+    }
+  );
 }
 
 function clampPercent(
@@ -171,62 +187,61 @@ export default function AdminPage() {
 
     let alive = true;
 
-    const load =
-      async () => {
-        setLoading(true);
-        setError('');
+    const load = async () => {
+      setLoading(true);
+      setError('');
 
-        try {
-          const token =
-            await getAdminToken();
+      try {
+        const token =
+          await getAdminToken();
 
-          const response =
-            await fetch(
-              '/api/cloudinary/usage',
-              {
-                method: 'GET',
-                headers: {
-                  Authorization:
-                    `Bearer ${token}`,
-                },
-                cache:
-                  'no-store',
-              }
-            );
+        const response =
+          await fetch(
+            '/api/cloudinary/usage',
+            {
+              method: 'GET',
+              headers: {
+                Authorization:
+                  `Bearer ${token}`,
+              },
+              cache:
+                'no-store',
+            }
+          );
 
-          const data =
-            (await response.json()) as
-              UsageResponse;
+        const data =
+          (await response.json()) as
+            UsageResponse;
 
-          if (
-            !response.ok ||
-            !('ok' in data) ||
-            !data.ok
-          ) {
-            throw new Error(
-              'error' in data
-                ? data.error
-                : 'Cloudinaryの使用容量を取得できませんでした。'
-            );
-          }
-
-          if (alive) {
-            setUsage(data);
-          }
-        } catch (err) {
-          if (alive) {
-            setError(
-              err instanceof Error
-                ? err.message
-                : 'Cloudinaryの使用容量を取得できませんでした。'
-            );
-          }
-        } finally {
-          if (alive) {
-            setLoading(false);
-          }
+        if (
+          !response.ok ||
+          !('ok' in data) ||
+          !data.ok
+        ) {
+          throw new Error(
+            'error' in data
+              ? data.error
+              : 'Cloudinaryの使用容量を取得できませんでした。'
+          );
         }
-      };
+
+        if (alive) {
+          setUsage(data);
+        }
+      } catch (err) {
+        if (alive) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : 'Cloudinaryの使用容量を取得できませんでした。'
+          );
+        }
+      } finally {
+        if (alive) {
+          setLoading(false);
+        }
+      }
+    };
 
     void load();
 
@@ -235,60 +250,40 @@ export default function AdminPage() {
     };
   }, [isAdmin]);
 
-  const hasStorageLimit =
-    !!usage &&
-    usage.storageLimit !== null &&
-    usage.storageLimit > 0;
-
-  const storagePercent =
+  const creditPercent =
     useMemo(() => {
-      if (!usage) {
+      if (!usage?.credits) {
         return null;
       }
 
       if (
-        usage.storagePercent !== null
+        typeof usage.credits
+          .used_percent === 'number'
       ) {
-        return usage.storagePercent;
+        return usage.credits
+          .used_percent;
       }
 
       if (
-        usage.storageUsage !== null &&
-        usage.storageLimit !== null &&
-        usage.storageLimit > 0
+        typeof usage.credits
+          .usage === 'number' &&
+        typeof usage.credits
+          .limit === 'number' &&
+        usage.credits.limit > 0
       ) {
         return (
-          usage.storageUsage /
-          usage.storageLimit
+          usage.credits.usage /
+          usage.credits.limit
         ) * 100;
       }
 
       return null;
     }, [usage]);
 
-  const creditPercent =
-    usage?.credits?.used_percent ??
-    (
-      usage?.credits?.usage !==
-        undefined &&
-      usage?.credits?.limit !==
-        undefined &&
-      usage.credits.limit > 0
-        ? (
-            usage.credits.usage /
-            usage.credits.limit
-          ) * 100
-        : null
+  const creditBarPercent =
+    clampPercent(
+      creditPercent
     );
-
-  const barPercent =
-    hasStorageLimit
-      ? clampPercent(
-          storagePercent
-        )
-      : clampPercent(
-          creditPercent
-        );
 
   if (!isAdmin) {
     return (
@@ -296,20 +291,16 @@ export default function AdminPage() {
         style={{
           maxWidth: 900,
           margin: '0 auto',
-          padding:
-            '80px 32px',
+          padding: '80px 32px',
           color: '#f5f5f5',
-          textAlign:
-            'center',
+          textAlign: 'center',
         }}
       >
         <h1
           style={{
-            margin:
-              '0 0 12px',
+            margin: '0 0 12px',
             fontSize: 30,
-            letterSpacing:
-              '.08em',
+            letterSpacing: '.08em',
           }}
         >
           ACCESS DENIED
@@ -333,16 +324,14 @@ export default function AdminPage() {
           }
           style={{
             marginTop: 28,
-            padding:
-              '10px 18px',
+            padding: '10px 18px',
             borderRadius: 8,
             border:
               '1px solid rgba(255,255,255,.24)',
             background:
               'transparent',
             color: '#f5f5f5',
-            cursor:
-              'pointer',
+            cursor: 'pointer',
           }}
         >
           ← HOME
@@ -356,8 +345,7 @@ export default function AdminPage() {
       style={{
         maxWidth: 1100,
         margin: '0 auto',
-        padding:
-          '56px 32px 90px',
+        padding: '56px 32px 90px',
         color: '#f5f5f5',
       }}
     >
@@ -368,11 +356,9 @@ export default function AdminPage() {
       >
         <h1
           style={{
-            margin:
-              '0 0 8px',
+            margin: '0 0 8px',
             fontSize: 32,
-            letterSpacing:
-              '.08em',
+            letterSpacing: '.08em',
           }}
         >
           ADMIN
@@ -384,8 +370,7 @@ export default function AdminPage() {
             color:
               'rgba(255,255,255,.52)',
             fontSize: 13,
-            letterSpacing:
-              '.04em',
+            letterSpacing: '.04em',
           }}
         >
           site management
@@ -401,6 +386,7 @@ export default function AdminPage() {
           marginBottom: 24,
         }}
       >
+        {/* CLOUDINARY */}
         <article
           style={{
             padding: 22,
@@ -413,14 +399,12 @@ export default function AdminPage() {
         >
           <div
             style={{
-              display:
-                'flex',
+              display: 'flex',
               justifyContent:
                 'space-between',
-              alignItems:
-                'center',
+              alignItems: 'center',
               gap: 12,
-              marginBottom: 14,
+              marginBottom: 20,
             }}
           >
             <p
@@ -433,18 +417,16 @@ export default function AdminPage() {
                   'rgba(255,255,255,.42)',
               }}
             >
-              CLOUDINARY STORAGE
+              CLOUDINARY
             </p>
 
             {usage?.plan && (
               <span
                 style={{
-                  padding:
-                    '4px 8px',
+                  padding: '4px 8px',
                   border:
                     '1px solid rgba(255,255,255,.14)',
-                  borderRadius:
-                    999,
+                  borderRadius: 999,
                   fontSize: 9,
                   letterSpacing:
                     '.08em',
@@ -471,8 +453,7 @@ export default function AdminPage() {
             <p
               style={{
                 margin: 0,
-                color:
-                  '#ff9b9b',
+                color: '#ff9b9b',
                 fontSize: 12,
               }}
             >
@@ -480,172 +461,206 @@ export default function AdminPage() {
             </p>
           ) : usage ? (
             <>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems:
-                    'baseline',
-                  gap: 8,
-                  flexWrap:
-                    'wrap',
-                }}
-              >
-                <strong
-                  style={{
-                    fontSize: 34,
-                    letterSpacing:
-                      '-.02em',
-                  }}
-                >
-                  {formatBytes(
-                    usage.totalBytes
-                  )}
-                </strong>
-
-                {hasStorageLimit && (
-                  <span
-                    style={{
-                      color:
-                        'rgba(255,255,255,.42)',
-                      fontSize: 13,
-                    }}
-                  >
-                    /{' '}
-                    {formatBytes(
-                      usage.storageLimit
-                    )}
-                  </span>
-                )}
-              </div>
-
-              <div
-                style={{
-                  display:
-                    'flex',
-                  gap: 14,
-                  flexWrap:
-                    'wrap',
-                  margin:
-                    '5px 0 20px',
-                  fontSize: 11,
-                  color:
-                    'rgba(255,255,255,.5)',
-                }}
-              >
-                <span>
-                  {
-                    usage.imageCount
-                  }{' '}
-                  IMAGES
-                </span>
-
-                {hasStorageLimit &&
-                  storagePercent !==
-                    null && (
-                    <span>
-                      {formatPercent(
-                        storagePercent
-                      )}{' '}
-                      USED
-                    </span>
-                  )}
-              </div>
-
-              <div
-                style={{
-                  height: 7,
-                  borderRadius:
-                    999,
-                  overflow:
-                    'hidden',
-                  background:
-                    'rgba(255,255,255,.08)',
-                }}
-              >
-                <div
-                  style={{
-                    width:
-                      `${barPercent}%`,
-                    minWidth:
-                      barPercent > 0
-                        ? 2
-                        : 0,
-                    height:
-                      '100%',
-                    background:
-                      'rgba(255,255,255,.75)',
-                    borderRadius:
-                      999,
-                    transition:
-                      'width .35s ease',
-                  }}
-                />
-              </div>
-
-              {hasStorageLimit ? (
+              {/* STORAGE */}
+              <div>
                 <p
                   style={{
-                    margin:
-                      '10px 0 0',
-                    fontSize: 10,
+                    margin: '0 0 8px',
+                    fontSize: 9,
+                    letterSpacing:
+                      '.15em',
                     color:
-                      'rgba(255,255,255,.36)',
+                      'rgba(255,255,255,.38)',
                   }}
                 >
-                  {formatBytes(
-                    usage.storageUsage
-                  )}{' '}
-                  registered by Cloudinary
+                  STORAGE
                 </p>
-              ) : (
+
                 <div
                   style={{
-                    marginTop: 12,
+                    display: 'flex',
+                    alignItems:
+                      'baseline',
+                    gap: 10,
+                    flexWrap: 'wrap',
                   }}
                 >
-                  <p
+                  <strong
                     style={{
-                      margin:
-                        '0 0 5px',
-                      fontSize: 10,
-                      color:
-                        'rgba(255,255,255,.38)',
+                      fontSize: 34,
+                      letterSpacing:
+                        '-.02em',
                     }}
                   >
-                    STORAGE LIMIT IS NOT REPORTED SEPARATELY
-                  </p>
+                    {formatBytes(
+                      usage.totalBytes
+                    )}
+                  </strong>
 
-                  {creditPercent !==
-                    null && (
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color:
+                        'rgba(255,255,255,.46)',
+                    }}
+                  >
+                    / {usage.imageCount}{' '}
+                    IMAGES
+                  </span>
+                </div>
+
+                <p
+                  style={{
+                    margin: '7px 0 0',
+                    fontSize: 10,
+                    color:
+                      'rgba(255,255,255,.32)',
+                  }}
+                >
+                  CURRENT IMAGE STORAGE
+                </p>
+              </div>
+
+              {/* 区切り線 */}
+              <div
+                style={{
+                  height: 1,
+                  background:
+                    'rgba(255,255,255,.10)',
+                  margin: '22px 0',
+                }}
+              />
+
+              {/* CREDITS */}
+              <div>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent:
+                      'space-between',
+                    alignItems:
+                      'flex-end',
+                    gap: 14,
+                    marginBottom: 10,
+                  }}
+                >
+                  <div>
                     <p
                       style={{
-                        margin: 0,
-                        fontSize: 11,
+                        margin:
+                          '0 0 7px',
+                        fontSize: 9,
+                        letterSpacing:
+                          '.15em',
                         color:
-                          'rgba(255,255,255,.55)',
+                          'rgba(255,255,255,.38)',
                       }}
                     >
-                      CLOUDINARY CREDITS:{' '}
-                      {formatPercent(
-                        creditPercent
-                      )}{' '}
-                      USED
-                      {usage.credits
-  ?.limit !==
-  undefined &&
-  usage.credits
-    ?.usage !==
-    undefined
-  ? ` (${usage.credits.usage} / ${usage.credits.limit} CREDITS)`
-  : ''}
+                      CREDITS
                     </p>
+
+                    <strong
+                      style={{
+                        fontSize: 18,
+                        letterSpacing:
+                          '.01em',
+                      }}
+                    >
+                      {formatCredit(
+                        usage.credits
+                          ?.usage
+                      )}
+                      {' / '}
+                      {formatCredit(
+                        usage.credits
+                          ?.limit
+                      )}
+                      {' CREDITS'}
+                    </strong>
+                  </div>
+
+                  <strong
+                    style={{
+                      fontSize: 13,
+                      color:
+                        'rgba(255,255,255,.72)',
+                      whiteSpace:
+                        'nowrap',
+                    }}
+                  >
+                    {formatPercent(
+                      creditPercent
+                    )}{' '}
+                    USED
+                  </strong>
+                </div>
+
+                {/* 本物のCredit使用率ゲージ */}
+                <div
+                  style={{
+                    height: 7,
+                    borderRadius: 999,
+                    overflow: 'hidden',
+                    background:
+                      'rgba(255,255,255,.08)',
+                  }}
+                >
+                  <div
+                    style={{
+                      width:
+                        `${creditBarPercent}%`,
+                      minWidth:
+                        creditBarPercent >
+                        0
+                          ? 3
+                          : 0,
+                      height: '100%',
+                      background:
+                        'rgba(255,255,255,.78)',
+                      borderRadius: 999,
+                      transition:
+                        'width .35s ease',
+                    }}
+                  />
+                </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent:
+                      'space-between',
+                    gap: 12,
+                    marginTop: 9,
+                    fontSize: 9,
+                    color:
+                      'rgba(255,255,255,.30)',
+                    letterSpacing:
+                      '.04em',
+                  }}
+                >
+                  <span>
+                    TOTAL CLOUDINARY USAGE
+                  </span>
+
+                  {typeof usage
+                    .credits?.limit ===
+                    'number' && (
+                    <span>
+                      PLAN LIMIT:{' '}
+                      {formatCredit(
+                        usage.credits
+                          .limit
+                      )}{' '}
+                      CREDITS
+                    </span>
                   )}
                 </div>
-              )}
+              </div>
             </>
           ) : null}
         </article>
 
+        {/* UNUSED IMAGES */}
         <article
           style={{
             padding: 22,
@@ -658,8 +673,7 @@ export default function AdminPage() {
         >
           <p
             style={{
-              margin:
-                '0 0 12px',
+              margin: '0 0 12px',
               fontSize: 10,
               letterSpacing:
                 '.16em',
@@ -672,8 +686,7 @@ export default function AdminPage() {
 
           <h2
             style={{
-              margin:
-                '0 0 8px',
+              margin: '0 0 8px',
               fontSize: 19,
               letterSpacing:
                 '.03em',
@@ -684,8 +697,7 @@ export default function AdminPage() {
 
           <p
             style={{
-              margin:
-                '0 0 20px',
+              margin: '0 0 20px',
               color:
                 'rgba(255,255,255,.5)',
               fontSize: 12,
@@ -703,8 +715,7 @@ export default function AdminPage() {
               )
             }
             style={{
-              padding:
-                '10px 16px',
+              padding: '10px 16px',
               borderRadius: 8,
               border:
                 '1px solid rgba(255,255,255,.26)',
@@ -712,8 +723,7 @@ export default function AdminPage() {
                 'transparent',
               color: '#f5f5f5',
               fontWeight: 700,
-              cursor:
-                'pointer',
+              cursor: 'pointer',
               letterSpacing:
                 '.02em',
             }}
@@ -726,13 +736,10 @@ export default function AdminPage() {
       <button
         type="button"
         onClick={() =>
-          router.push(
-            '/gallery'
-          )
+          router.push('/gallery')
         }
         style={{
-          padding:
-            '10px 16px',
+          padding: '10px 16px',
           borderRadius: 8,
           border:
             '1px solid rgba(255,255,255,.2)',
@@ -740,8 +747,7 @@ export default function AdminPage() {
             'transparent',
           color:
             'rgba(255,255,255,.68)',
-          cursor:
-            'pointer',
+          cursor: 'pointer',
           fontSize: 12,
         }}
       >
