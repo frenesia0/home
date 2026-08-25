@@ -3,30 +3,34 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
+import {
+  fetchGalleryPosts,
+  saveGalleryPosts,
+  type GalleryCategory,
+  type GalleryCharacterTag,
+  type GalleryPost,
+} from '@/lib/galleryData';
 
-type Category = 'original' | 'commission';
-type CharacterTag = 'shiki' | 'solas' | 'reference';
-
-type GalleryPost = {
-  id: string;
-  title: string;
-  date: string;
-  category: Category;
-  tags: CharacterTag[];
+type CloudinaryUploadResponse = {
+  secure_url?: string;
+  public_id?: string;
+  error?: {
+    message?: string;
+  };
 };
-
-const STORAGE_KEY = 'shiki-solas-gallery-posts';
 
 export default function NewIllustrationPage() {
   const router = useRouter();
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
 
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
-  const [category, setCategory] = useState<Category>('original');
-  const [tags, setTags] = useState<CharacterTag[]>([]);
+  const [category, setCategory] = useState<GalleryCategory>('original');
+  const [tags, setTags] = useState<GalleryCharacterTag[]>([]);
   const [image, setImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [posting, setPosting] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!image) {
@@ -40,7 +44,7 @@ export default function NewIllustrationPage() {
     return () => URL.revokeObjectURL(url);
   }, [image]);
 
-  const toggleTag = (tag: CharacterTag) => {
+  const toggleTag = (tag: GalleryCharacterTag) => {
     setTags((current) =>
       current.includes(tag)
         ? current.filter((item) => item !== tag)
@@ -48,35 +52,89 @@ export default function NewIllustrationPage() {
     );
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const uploadToCloudinary = async (file: File) => {
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME?.trim();
+    const uploadPreset =
+      process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET?.trim();
 
-    const newPost: GalleryPost = {
-      id: crypto.randomUUID(),
-      title,
-      date,
-      category,
-      tags,
-    };
-
-    const saved = localStorage.getItem(STORAGE_KEY);
-
-    let currentPosts: GalleryPost[] = [];
-
-    if (saved) {
-      try {
-        currentPosts = JSON.parse(saved);
-      } catch {
-        currentPosts = [];
-      }
+    if (!cloudName || !uploadPreset) {
+      throw new Error('Cloudinaryの設定が見つかりません。');
     }
 
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify([newPost, ...currentPosts])
+    const form = new FormData();
+    form.append('file', file);
+    form.append('upload_preset', uploadPreset);
+
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+      {
+        method: 'POST',
+        body: form,
+      }
     );
 
-    router.push('/gallery');
+    const result = (await response.json()) as CloudinaryUploadResponse;
+
+    if (!response.ok || !result.secure_url || !result.public_id) {
+      throw new Error(
+        result.error?.message || '画像のアップロードに失敗しました。'
+      );
+    }
+
+    return {
+      imageUrl: result.secure_url,
+      publicId: result.public_id,
+    };
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    if (!isAdmin || !user) {
+      setError('管理者としてログインしてください。');
+      return;
+    }
+
+    if (!image) {
+      setError('画像を選択してください。');
+      return;
+    }
+
+    if (posting) return;
+
+    setPosting(true);
+    setError('');
+
+    try {
+      const { imageUrl, publicId } = await uploadToCloudinary(image);
+      const previous = await fetchGalleryPosts();
+
+      const newPost: GalleryPost = {
+        id: crypto.randomUUID(),
+        title: title.trim(),
+        date,
+        category,
+        tags,
+        imageUrl,
+        cloudinaryPublicId: publicId,
+        authorId: user.id,
+        visibility: 'public',
+        createdAt: new Date().toISOString(),
+      };
+
+      await saveGalleryPosts(previous, [newPost, ...previous], user.id);
+
+      router.push('/gallery');
+      router.refresh();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : '投稿に失敗しました。'
+      );
+    } finally {
+      setPosting(false);
+    }
   };
 
   const fieldStyle = {
@@ -128,7 +186,7 @@ export default function NewIllustrationPage() {
             marginBottom: '28px',
           }}
         >
-          This page is available to the administrator only.
+          このページは管理者のみ利用できます。
         </p>
 
         <button
@@ -143,7 +201,7 @@ export default function NewIllustrationPage() {
             fontWeight: 700,
           }}
         >
-          BACK TO GALLERY
+          GALLERYへ戻る
         </button>
       </main>
     );
@@ -175,7 +233,7 @@ export default function NewIllustrationPage() {
           fontSize: '13px',
         }}
       >
-        Add a new work to the archive.
+        新しい作品をギャラリーに追加します。
       </p>
 
       <form
@@ -234,6 +292,7 @@ export default function NewIllustrationPage() {
               accept="image/*"
               onChange={(e) => setImage(e.target.files?.[0] ?? null)}
               style={{ color: '#f5f5f5' }}
+              required
             />
           </label>
         </section>
@@ -358,8 +417,21 @@ export default function NewIllustrationPage() {
             </div>
           </fieldset>
 
+          {error && (
+            <p
+              style={{
+                margin: 0,
+                color: '#ff8d8d',
+                fontSize: '13px',
+              }}
+            >
+              {error}
+            </p>
+          )}
+
           <button
             type="submit"
+            disabled={posting}
             style={{
               marginTop: '6px',
               padding: '13px 20px',
@@ -368,10 +440,11 @@ export default function NewIllustrationPage() {
               background: '#f1f1f1',
               color: '#17191d',
               fontWeight: 700,
-              cursor: 'pointer',
+              cursor: posting ? 'wait' : 'pointer',
+              opacity: posting ? 0.65 : 1,
             }}
           >
-            POST
+            {posting ? 'UPLOADING...' : 'POST'}
           </button>
         </section>
       </form>
