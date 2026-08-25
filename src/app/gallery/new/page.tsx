@@ -408,6 +408,7 @@ export default function NewIllustrationPage() {
               multiple
               onChange={(e) => handleImageChange(e.target.files)}
               style={{ color: '#f5f5f5' }}
+              required
             />
 
             {images.length > 0 && (
