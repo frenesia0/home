@@ -9,12 +9,14 @@ import {
   getGalleryCommission,
   getGalleryImages,
   getGalleryTags,
+  getGalleryThumbnailImage,
   subscribeGallery,
   type GalleryCategory,
   type GalleryCharacter,
   type GalleryPost,
   type GalleryTag,
 } from '@/lib/galleryData';
+import { CropImg } from '@/components/ui/CropEditor';
 
 type CharacterFilter = 'all' | GalleryCharacter;
 type TagFilter = 'all' | GalleryTag;
@@ -46,7 +48,7 @@ export default function GalleryPage() {
   const [character, setCharacter] = useState<CharacterFilter>('all');
   const [tag, setTag] = useState<TagFilter>('all');
   const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
-  const [query, setQuery] = useState('');
+
   const [illustrations, setIllustrations] = useState<GalleryPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -71,7 +73,9 @@ export default function GalleryPage() {
           );
         }
       } finally {
-        if (alive) setLoading(false);
+        if (alive) {
+          setLoading(false);
+        }
       }
     };
 
@@ -88,8 +92,6 @@ export default function GalleryPage() {
   }, []);
 
   const filtered = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-
     return illustrations
       .filter((item) => item.category === category)
       .filter((item) => {
@@ -99,25 +101,6 @@ export default function GalleryPage() {
       .filter((item) => {
         if (category === 'commission' || tag === 'all') return true;
         return getGalleryTags(item).includes(tag);
-      })
-      .filter((item) => {
-        if (!normalizedQuery) return true;
-
-        const commission = getGalleryCommission(item);
-
-        const searchableText = [
-          item.date,
-          item.category,
-          ...getGalleryCharacters(item),
-          ...getGalleryTags(item),
-          commission?.artistName ?? '',
-          commission?.snsId ?? '',
-          item.memo ?? '',
-        ]
-          .join(' ')
-          .toLowerCase();
-
-        return searchableText.includes(normalizedQuery);
       })
       .sort((a, b) =>
         sortOrder === 'newest'
@@ -129,7 +112,6 @@ export default function GalleryPage() {
     category,
     character,
     tag,
-    query,
     sortOrder,
   ]);
 
@@ -207,34 +189,17 @@ export default function GalleryPage() {
       <div
         style={{
           display: 'flex',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '10px',
+          justifyContent: 'flex-end',
           marginBottom: '22px',
         }}
       >
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search illustrations..."
-          style={{
-            width: '100%',
-            maxWidth: '520px',
-            padding: '11px 14px',
-            borderRadius: '9px',
-            border: '1px solid rgba(255,255,255,.2)',
-            background: 'rgba(255,255,255,.06)',
-            color: '#f5f5f5',
-            outline: 'none',
-          }}
-        />
-
         <button
           type="button"
           onClick={() =>
             setSortOrder((current) =>
-              current === 'newest' ? 'oldest' : 'newest'
+              current === 'newest'
+                ? 'oldest'
+                : 'newest'
             )
           }
           style={{
@@ -370,6 +335,13 @@ export default function GalleryPage() {
             >
               RAKUGAKI
             </button>
+
+            <button
+              onClick={() => setTag('tachie')}
+              style={pillStyle(tag === 'tachie')}
+            >
+              TACHIE
+            </button>
           </div>
         </section>
       )}
@@ -405,14 +377,15 @@ export default function GalleryPage() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+            gridTemplateColumns:
+              'repeat(auto-fill, minmax(220px, 1fr))',
             gap: '28px 22px',
           }}
         >
           {filtered.map((item) => {
             const images = getGalleryImages(item);
-            const firstImage = images[0];
             const imageCount = images.length;
+            const thumbnail = getGalleryThumbnailImage(item);
             const itemCharacters = getGalleryCharacters(item);
             const itemTags = getGalleryTags(item);
             const commission = getGalleryCommission(item);
@@ -429,17 +402,11 @@ export default function GalleryPage() {
                     overflow: 'hidden',
                   }}
                 >
-                  {firstImage ? (
-                    <img
-                      src={optimizeCloudinaryUrl(firstImage.url)}
-                      alt="illustration"
-                      loading="lazy"
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                        display: 'block',
-                      }}
+                  {thumbnail ? (
+                    <CropImg
+                      src={optimizeCloudinaryUrl(thumbnail.url)}
+                      crop={item.thumbnailCrop}
+                      alt="illustration thumbnail"
                     />
                   ) : (
                     <div
@@ -519,7 +486,7 @@ export default function GalleryPage() {
                       color: 'rgba(255,255,255,.58)',
                     }}
                   >
-                    Artist: {commission.artistName}
+                    Artist: {commission.artistName}様
                     {commission.snsId
                       ? ` / ${commission.snsId}`
                       : ''}
@@ -531,17 +498,19 @@ export default function GalleryPage() {
         </div>
       )}
 
-      {!loading && !error && filtered.length === 0 && (
-        <p
-          style={{
-            padding: '60px 0',
-            textAlign: 'center',
-            color: 'rgba(255,255,255,.45)',
-          }}
-        >
-          NO ILLUSTRATIONS
-        </p>
-      )}
+      {!loading &&
+        !error &&
+        filtered.length === 0 && (
+          <p
+            style={{
+              padding: '60px 0',
+              textAlign: 'center',
+              color: 'rgba(255,255,255,.45)',
+            }}
+          >
+            NO ILLUSTRATIONS
+          </p>
+        )}
     </main>
   );
 }
