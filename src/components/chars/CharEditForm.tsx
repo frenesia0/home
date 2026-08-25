@@ -84,38 +84,104 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
   };
 
   const save = async () => {
-    if (!name.trim()) { toast('名前を入力してください'); return; }
-    // ページURL (v1.9) — 形式・重複チェック
-    if (isNew && slug) {
-      if (!isValidSlug(slug)) { toast('URLには半角英小文字・数字・ハイフンのみ使用できます'); return; }
-      if (existingIds?.includes(slug)) { toast('すでに使用中のURLです。別のURLを入力してください'); return; }
+  if (!name.trim()) {
+    toast('名前を入力してください');
+    return;
+  }
+
+  // ページURLの形式・重複チェック
+  if (isNew && slug) {
+    if (!isValidSlug(slug)) {
+      toast(
+        'URLには半角英小文字・数字・ハイフンのみ使用できます'
+      );
+      return;
     }
-    const artIds = await Promise.all(arts.map(a => (a.file ? putBlob(a.file) : Promise.resolve(a.ref!))));
+
+    if (existingIds?.includes(slug)) {
+      toast(
+        'すでに使用中のURLです。別のURLを入力してください'
+      );
+      return;
+    }
+  }
+
+  try {
+    const artIds = await Promise.all(
+      arts.map((a) =>
+        a.file
+          ? putBlob(a.file)
+          : Promise.resolve(a.ref!)
+      )
+    );
+
     onSave({
-      id: initial?.id ?? (slug || newId()),
-      // 入力したまま保存 — 以前は大文字へ変換していたため小文字名が使えなかった
+      id:
+        initial?.id ??
+        (slug || newId()),
+
       name: name.trim(),
       sub: sub.trim(),
       color,
       themeMode,
-      colors: colors.filter(x => x.hex).map(({ hex, label }) => ({ hex, label })),
+
+      colors: colors
+        .filter((x) => x.hex)
+        .map(({ hex, label }) => ({
+          hex,
+          label,
+        })),
+
       colorTipMode,
-      specs: specs.filter(s => s.label.trim()).map(({ label, value }) => ({ label: label.trim(), value })),
-      tabs,   // タイトルが空でも維持 — フィルタで消える不具合を修正 (v1.9)
+
+      specs: specs
+        .filter((s) =>
+          s.label.trim()
+        )
+        .map(({ label, value }) => ({
+          label: label.trim(),
+          value,
+        })),
+
+      tabs,
       basicHtml,
       visibility,
       fontId,
       nameSize,
       bodyFontId,
-      thumbClass: initial?.thumbClass ?? '',
+
+      thumbClass:
+        initial?.thumbClass ??
+        '',
+
       arts: artIds,
-      thumbId: artIds[0],       // サムネイル = 1枚目のアート + クロップ
+      thumbId: artIds[0],
       thumbCrop,
       artId: artIds[0],
-      own: initial?.own ?? true,
-      grants: grants.length ? grants : undefined,
+
+      own:
+        initial?.own ??
+        true,
+
+      grants:
+        grants.length
+          ? grants
+          : undefined,
     });
-  };
+  } catch (err) {
+    console.error(
+      'Character save failed:',
+      err
+    );
+
+    const message =
+      err instanceof Error
+        ? err.message
+        : 'キャラクターの保存に失敗しました。';
+
+    toast(message);
+  }
+};
 
   const specValuePlaceholder = (label: string) => {
     const normalized = label.trim();
