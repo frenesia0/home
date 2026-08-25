@@ -23,6 +23,7 @@ interface AuthCtx {
   user: User | null;          // null = 비로그인
   isAdmin: boolean;
   login: (id: string, password: string) => Promise<Result>;
+  loginWithGoogle: () => Promise<Result>;
   signup: (id: string, password: string, nickname: string, inviteCode: string, email?: string) => Promise<Result>;
   findId: (email: string) => Promise<Result & { foundId?: string }>;
   resetPassword: (email: string) => Promise<Result & { tempPassword?: string }>;
@@ -124,6 +125,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { ok: true };
   }, [server, be]);
 
+  const loginWithGoogle = useCallback(async (): Promise<Result> => {
+  if (!server || !be) {
+    return {
+      ok: false,
+      error: 'Google 로그인에는 Firebase 연결이 필요합니다.',
+    };
+  }
+
+  if (!be.signInWithGoogle) {
+    return {
+      ok: false,
+      error: '현재 연결된 백엔드에서는 Google 로그인을 사용할 수 없습니다.',
+    };
+  }
+
+  const r = await be.signInWithGoogle();
+
+  if (!r.ok) {
+    return {
+      ok: false,
+      error: r.error ?? 'Google 로그인에 실패했습니다.',
+    };
+  }
+
+  try {
+    const u = await be.currentUser();
+    if (u) setUser(u as User);
+  } catch {
+    /* onAuthChange에서도 갱신됨 */
+  }
+
+  return { ok: true };
+}, [server, be]);
+
   // 회원가입 — 가입코드(초대코드) 방식
   const signup = useCallback(async (id: string, password: string, nickname: string, code: string): Promise<Result> => {
     if (!id || !password || !nickname) return { ok: false, error: '아이디·비밀번호·닉네임을 모두 입력해 주세요.' };
@@ -218,7 +253,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <Ctx.Provider value={{
       user, isAdmin: user?.role === 'admin',
-      login, signup, findId, resetPassword, logout, updateProfile, mock: !server,
+      login, loginWithGoogle, signup, findId, resetPassword, logout, updateProfile, mock: !server,
     }}>
       {children}
     </Ctx.Provider>
