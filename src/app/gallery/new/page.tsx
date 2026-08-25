@@ -8,6 +8,7 @@ import {
   saveGalleryPosts,
   type GalleryCategory,
   type GalleryCharacterTag,
+  type GalleryImage,
   type GalleryPost,
 } from '@/lib/galleryData';
 
@@ -23,26 +24,24 @@ export default function NewIllustrationPage() {
   const router = useRouter();
   const { isAdmin, user } = useAuth();
 
-  const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
   const [category, setCategory] = useState<GalleryCategory>('original');
   const [tags, setTags] = useState<GalleryCharacterTag[]>([]);
-  const [image, setImage] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [images, setImages] = useState<File[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+
   const [posting, setPosting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!image) {
-      setPreviewUrl(null);
-      return;
-    }
+    const urls = images.map((image) => URL.createObjectURL(image));
+    setPreviewUrls(urls);
 
-    const url = URL.createObjectURL(image);
-    setPreviewUrl(url);
-
-    return () => URL.revokeObjectURL(url);
-  }, [image]);
+    return () => {
+      urls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [images]);
 
   const toggleTag = (tag: GalleryCharacterTag) => {
     setTags((current) =>
@@ -52,7 +51,25 @@ export default function NewIllustrationPage() {
     );
   };
 
-  const uploadToCloudinary = async (file: File) => {
+  const handleImageChange = (files: FileList | null) => {
+    if (!files) {
+      setImages([]);
+      return;
+    }
+
+    const selected = Array.from(files).filter((file) =>
+      file.type.startsWith('image/')
+    );
+
+    setImages(selected);
+    setError('');
+  };
+
+  const removeImage = (index: number) => {
+    setImages((current) => current.filter((_, i) => i !== index));
+  };
+
+  const uploadToCloudinary = async (file: File): Promise<GalleryImage> => {
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME?.trim();
     const uploadPreset =
       process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET?.trim();
@@ -82,7 +99,7 @@ export default function NewIllustrationPage() {
     }
 
     return {
-      imageUrl: result.secure_url,
+      url: result.secure_url,
       publicId: result.public_id,
     };
   };
@@ -95,8 +112,13 @@ export default function NewIllustrationPage() {
       return;
     }
 
-    if (!image) {
-      setError('画像を選択してください。');
+    if (images.length === 0) {
+      setError('画像を1枚以上選択してください。');
+      return;
+    }
+
+    if (!date) {
+      setError('日付を選択してください。');
       return;
     }
 
@@ -104,25 +126,41 @@ export default function NewIllustrationPage() {
 
     setPosting(true);
     setError('');
+    setUploadProgress('');
 
     try {
-      const { imageUrl, publicId } = await uploadToCloudinary(image);
+      const uploadedImages: GalleryImage[] = [];
+
+      // 一度に大量送信せず、順番にアップロードする
+      for (let i = 0; i < images.length; i += 1) {
+        setUploadProgress(
+          `画像をアップロード中... ${i + 1} / ${images.length}`
+        );
+
+        const uploaded = await uploadToCloudinary(images[i]);
+        uploadedImages.push(uploaded);
+      }
+
+      setUploadProgress('投稿情報を保存中...');
+
       const previous = await fetchGalleryPosts();
 
       const newPost: GalleryPost = {
         id: crypto.randomUUID(),
-        title: title.trim(),
         date,
         category,
         tags,
-        imageUrl,
-        cloudinaryPublicId: publicId,
+        images: uploadedImages,
         authorId: user.id,
         visibility: 'public',
         createdAt: new Date().toISOString(),
       };
 
-      await saveGalleryPosts(previous, [newPost, ...previous], user.id);
+      await saveGalleryPosts(
+        previous,
+        [newPost, ...previous],
+        user.id
+      );
 
       router.push('/gallery');
       router.refresh();
@@ -134,6 +172,7 @@ export default function NewIllustrationPage() {
       );
     } finally {
       setPosting(false);
+      setUploadProgress('');
     }
   };
 
@@ -210,7 +249,7 @@ export default function NewIllustrationPage() {
   return (
     <main
       style={{
-        maxWidth: '920px',
+        maxWidth: '1040px',
         margin: '0 auto',
         padding: '56px 32px 80px',
         color: '#f5f5f5',
@@ -240,7 +279,7 @@ export default function NewIllustrationPage() {
         onSubmit={handleSubmit}
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(260px, 360px) 1fr',
+          gridTemplateColumns: 'minmax(300px, 440px) 1fr',
           gap: '40px',
           alignItems: 'start',
         }}
@@ -248,34 +287,99 @@ export default function NewIllustrationPage() {
         <section>
           <div
             style={{
-              aspectRatio: '4 / 5',
+              minHeight: '360px',
               borderRadius: '12px',
-              overflow: 'hidden',
               border: '1px solid rgba(255,255,255,.2)',
               background: 'rgba(255,255,255,.06)',
-              display: 'grid',
-              placeItems: 'center',
+              padding: '14px',
             }}
           >
-            {previewUrl ? (
-              <img
-                src={previewUrl}
-                alt="preview"
+            {previewUrls.length > 0 ? (
+              <div
                 style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain',
+                  display: 'grid',
+                  gridTemplateColumns:
+                    previewUrls.length === 1
+                      ? '1fr'
+                      : 'repeat(2, minmax(0, 1fr))',
+                  gap: '10px',
                 }}
-              />
+              >
+                {previewUrls.map((url, index) => (
+                  <div
+                    key={`${url}-${index}`}
+                    style={{
+                      position: 'relative',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      background: 'rgba(0,0,0,.2)',
+                      aspectRatio: '1 / 1',
+                    }}
+                  >
+                    <img
+                      src={url}
+                      alt={`preview ${index + 1}`}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        display: 'block',
+                      }}
+                    />
+
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: '8px',
+                        left: '8px',
+                        minWidth: '26px',
+                        height: '26px',
+                        padding: '0 7px',
+                        display: 'grid',
+                        placeItems: 'center',
+                        borderRadius: '999px',
+                        background: 'rgba(0,0,0,.7)',
+                        color: '#fff',
+                        fontSize: '11px',
+                      }}
+                    >
+                      {index + 1}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      aria-label={`${index + 1}枚目を削除`}
+                      style={{
+                        position: 'absolute',
+                        top: '8px',
+                        right: '8px',
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '999px',
+                        border: '1px solid rgba(255,255,255,.35)',
+                        background: 'rgba(0,0,0,.72)',
+                        color: '#fff',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
             ) : (
-              <span
+              <div
                 style={{
+                  minHeight: '330px',
+                  display: 'grid',
+                  placeItems: 'center',
                   color: 'rgba(255,255,255,.4)',
                   fontSize: '12px',
                 }}
               >
                 IMAGE PREVIEW
-              </span>
+              </div>
             )}
           </div>
 
@@ -285,15 +389,24 @@ export default function NewIllustrationPage() {
               marginTop: '14px',
             }}
           >
-            <span>IMAGE</span>
+            <span>IMAGES</span>
 
             <input
               type="file"
               accept="image/*"
-              onChange={(e) => setImage(e.target.files?.[0] ?? null)}
+              multiple
+              onChange={(e) => handleImageChange(e.target.files)}
               style={{ color: '#f5f5f5' }}
-              required
             />
+
+            <small
+              style={{
+                color: 'rgba(255,255,255,.5)',
+                lineHeight: 1.6,
+              }}
+            >
+              複数枚選択できます。左上の番号が表示順です。
+            </small>
           </label>
         </section>
 
@@ -303,19 +416,6 @@ export default function NewIllustrationPage() {
             gap: '26px',
           }}
         >
-          <label style={fieldStyle}>
-            <span>TITLE</span>
-
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Illustration title"
-              required
-              style={inputStyle}
-            />
-          </label>
-
           <label style={fieldStyle}>
             <span>DATE</span>
 
@@ -414,8 +514,29 @@ export default function NewIllustrationPage() {
                 />
                 REFERENCE
               </label>
+
+              <label style={choiceStyle}>
+                <input
+                  type="checkbox"
+                  checked={tags.includes('song-inspired')}
+                  onChange={() => toggleTag('song-inspired')}
+                />
+                SONG INSPIRED
+              </label>
             </div>
           </fieldset>
+
+          {uploadProgress && (
+            <p
+              style={{
+                margin: 0,
+                color: 'rgba(255,255,255,.72)',
+                fontSize: '13px',
+              }}
+            >
+              {uploadProgress}
+            </p>
+          )}
 
           {error && (
             <p
