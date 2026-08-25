@@ -4,7 +4,7 @@
 // アートは複数枚対応 — 1枚目が代表フルアート兼、一覧サムネイル（3:4クロップ）の元画像 (6.1)
 import React, { useEffect, useState } from 'react';
 import { Character, CharTab, ColorChip, Visibility, CharGrant } from '@/lib/charStore';
-import { GrantsEditor } from '@/components/character/GrantsEditor';
+import { GrantsEditor } from '@/components/chars/GrantsEditor';
 import { newId } from '@/lib/postStore';
 import { putBlob, getBlob, useBlobUrl } from '@/lib/blobStore';
 import { useFonts } from '@/lib/fontStore';
