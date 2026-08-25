@@ -370,9 +370,11 @@ export default function GalleryDetailPage() {
           }}
         >
           <section
+            className="gallery-detail-viewer"
             style={{
               position: 'relative',
-              minHeight: '620px',
+              height:
+                'clamp(420px, calc(100dvh - 220px), 820px)',
               background: '#0c0f12',
               display: 'grid',
               placeItems: 'center',
@@ -390,7 +392,6 @@ export default function GalleryDetailPage() {
                 style={{
                   width: '100%',
                   height: '100%',
-                  minHeight: '620px',
                 }}
               />
             ) : (
@@ -767,6 +768,22 @@ export default function GalleryDetailPage() {
           </aside>
         </div>
       </div>
+
+      <style jsx global>{`
+        @media (max-width: 760px) {
+          .gallery-detail-viewer {
+            height:
+              clamp(
+                360px,
+                calc(
+                  100dvh -
+                  250px
+                ),
+                720px
+              ) !important;
+          }
+        }
+      `}</style>
     </main>
   );
 }
