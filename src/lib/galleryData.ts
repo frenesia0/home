@@ -26,6 +26,8 @@ export interface GalleryCommission {
   snsUrl?: string;
 }
 
+export type GalleryThumbnailMode = 'post' | 'custom';
+
 export interface GalleryPost {
   id: string;
   title?: string;
@@ -39,18 +41,18 @@ export interface GalleryPost {
   // 1投稿に複数画像
   images?: GalleryImage[];
 
-  /**
-   * Gallery一覧の代表サムネイル設定。
-   * 複数枚投稿でも、好きな画像を代表に選べる。
-   * 0 = 1枚目、1 = 2枚目...
-   */
+  // Gallery一覧のサムネイル方式
+  // post: 投稿画像から選択 / custom: サムネイル専用画像
+  thumbnailMode?: GalleryThumbnailMode;
+
+  // post方式で使う投稿画像。0 = 1枚目、1 = 2枚目...
   thumbnailIndex?: number;
 
-  /**
-   * 選んだ代表画像の1:1トリミング情報。
-   * 元画像自体は切り取らず、一覧で見せる範囲だけ記録する。
-   */
+  // サムネイルの1:1表示範囲
   thumbnailCrop?: CropValue;
+
+  // custom方式で使う一覧専用画像。投稿本文の画像枚数には含めない
+  customThumbnail?: GalleryImage;
 
   // COMMISSIONのときだけ使用
   commission?: GalleryCommission;
@@ -120,10 +122,22 @@ export function getGalleryThumbnailIndex(post: GalleryPost): number {
 
 /**
  * サムネイルに使う代表画像を取得する。
+ * 専用画像が選ばれている場合はそちらを優先する。
  */
 export function getGalleryThumbnailImage(
   post: GalleryPost
 ): GalleryImage | null {
+  if (
+    post.thumbnailMode === 'custom' &&
+    post.customThumbnail &&
+    typeof post.customThumbnail.url === 'string' &&
+    post.customThumbnail.url.length > 0 &&
+    typeof post.customThumbnail.publicId === 'string' &&
+    post.customThumbnail.publicId.length > 0
+  ) {
+    return post.customThumbnail;
+  }
+
   const images = getGalleryImages(post);
 
   if (images.length === 0) return null;
