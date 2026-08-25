@@ -1530,10 +1530,11 @@ export default function GalleryPage() {
           max-width: 620px
         ) {
           .gallery-page {
-            padding:
-              40px 18px
-              70px !important;
-          }
+  padding:
+    40px 18px
+    calc(160px + env(safe-area-inset-bottom))
+    !important;
+}
 
           .gallery-heading {
             gap:
