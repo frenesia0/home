@@ -76,6 +76,40 @@ function isSortOrder(
   return value === 'newest' || value === 'oldest';
 }
 
+/**
+ * 初期値と同じ条件はURLへ書かない。
+ * ORIGINAL / ALL CHARACTER / ALL TAG / NEWEST は省略する。
+ */
+function buildGalleryQuery(
+  category: GalleryCategory,
+  character: CharacterFilter,
+  tag: TagFilter,
+  sortOrder: SortOrder
+) {
+  const params = new URLSearchParams();
+
+  if (category !== 'original') {
+    params.set('category', category);
+  }
+
+  if (character !== 'all') {
+    params.set('character', character);
+  }
+
+  if (
+    category === 'original' &&
+    tag !== 'all'
+  ) {
+    params.set('tag', tag);
+  }
+
+  if (sortOrder !== 'newest') {
+    params.set('sort', sortOrder);
+  }
+
+  return params.toString();
+}
+
 export default function GalleryPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -154,15 +188,21 @@ export default function GalleryPage() {
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams();
-    params.set('category', category);
-    params.set('character', character);
-    params.set('tag', tag);
-    params.set('sort', sortOrder);
+    const query = buildGalleryQuery(
+      category,
+      character,
+      tag,
+      sortOrder
+    );
 
-    router.replace(`/gallery?${params.toString()}`, {
-      scroll: false,
-    });
+    router.replace(
+      query
+        ? `/gallery?${query}`
+        : '/gallery',
+      {
+        scroll: false,
+      }
+    );
   }, [
     category,
     character,
@@ -195,23 +235,30 @@ export default function GalleryPage() {
     sortOrder,
   ]);
 
-  const currentQuery = useMemo(() => {
-    const params = new URLSearchParams();
-    params.set('category', category);
-    params.set('character', character);
-    params.set('tag', tag);
-    params.set('sort', sortOrder);
-    return params.toString();
-  }, [
-    category,
-    character,
-    tag,
-    sortOrder,
-  ]);
+  const currentQuery = useMemo(
+    () =>
+      buildGalleryQuery(
+        category,
+        character,
+        tag,
+        sortOrder
+      ),
+    [
+      category,
+      character,
+      tag,
+      sortOrder,
+    ]
+  );
 
   const openIllustration = (id: string) => {
+    const base =
+      `/gallery/${encodeURIComponent(id)}`;
+
     router.push(
-      `/gallery/${encodeURIComponent(id)}?${currentQuery}`
+      currentQuery
+        ? `${base}?${currentQuery}`
+        : base
     );
   };
 
