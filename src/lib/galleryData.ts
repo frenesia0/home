@@ -108,24 +108,13 @@ export interface GalleryWatermark {
 /**
  * ORIGINAL用の標準ウォーターマーク
  */
-export const DEFAULT_ORIGINAL_WATERMARK:
-  GalleryWatermark = {
-  color:
-    'white',
-
-  opacity:
-    25,
-
-  text:
-    '@frenesia0',
-
-  grid:
-    true,
-
-  gridSize:
-    180,
+export const DEFAULT_ORIGINAL_WATERMARK: GalleryWatermark = {
+  color: 'none',
+  opacity: 0,
+  text: '@frenesia0',
+  grid: false,
+  gridSize: 180,
 };
-
 
 /**
  * 色ごとの初期不透明度
@@ -191,12 +180,8 @@ export function normalizeWatermarkText(
  * 新しいウォーターマーク設定を作る
  */
 export function createGalleryWatermark(
-  color:
-    GalleryWatermarkColor =
-      'white',
-
-  text =
-    '@frenesia0'
+  color: GalleryWatermarkColor = 'none',
+  text = '@frenesia0'
 ): GalleryWatermark {
   return {
     color,
