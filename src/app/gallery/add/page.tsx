@@ -179,7 +179,7 @@ function makeWatermark(
 ): GalleryWatermark {
   const watermark =
     createGalleryWatermark(
-      'white',
+      'none',
       getAutomaticWatermarkText(
         category,
         snsId
@@ -258,7 +258,8 @@ export default function AddIllustrationPage() {
     setSongUrl,
   ] =
     useState('');
-    const [
+
+  const [
     songAudio,
     setSongAudio,
   ] =
@@ -495,7 +496,7 @@ export default function AddIllustrationPage() {
      SONG RESET
   ======================================================= */
 
-    useEffect(() => {
+  useEffect(() => {
     if (
       !isSongParody
     ) {
@@ -609,7 +610,7 @@ export default function AddIllustrationPage() {
       next ===
       'commission'
     ) {
-            setTags([]);
+      setTags([]);
       setSongTitle('');
       setSongUrl('');
       setSongAudio(
@@ -1031,9 +1032,12 @@ export default function AddIllustrationPage() {
           result.public_id,
       };
     };
+
+
   const uploadAudioToCloudinary =
     async (
-      file: File
+      file:
+        File
     ): Promise<string> => {
       const cloudName =
         process.env
@@ -1096,6 +1100,7 @@ export default function AddIllustrationPage() {
 
       return result.secure_url;
     };
+
 
   /* =======================================================
      SUBMIT
@@ -1247,6 +1252,8 @@ export default function AddIllustrationPage() {
             }
           );
         }
+
+
         /* ---------------------------------------------------
            SONG AUDIO
         --------------------------------------------------- */
@@ -1267,6 +1274,7 @@ export default function AddIllustrationPage() {
               songAudio
             );
         }
+
 
         /* ---------------------------------------------------
            CUSTOM THUMBNAIL
@@ -1353,14 +1361,14 @@ export default function AddIllustrationPage() {
                 }
               : undefined,
 
-                    song:
+          song:
             isSongParody &&
             (
               songTitle.trim() ||
               songUrl.trim() ||
               uploadedSongAudioUrl
             )
-              ? {
+              ? ({
                   title:
                     songTitle.trim() ||
                     undefined,
@@ -1371,7 +1379,7 @@ export default function AddIllustrationPage() {
 
                   audioUrl:
                     uploadedSongAudioUrl,
-                }
+                } as GalleryPost['song'])
               : undefined,
 
           authorId:
@@ -2068,6 +2076,11 @@ export default function AddIllustrationPage() {
                             {(
                               [
                                 [
+                                  'none',
+                                  'NONE',
+                                ],
+
+                                [
                                   'white',
                                   'WHITE',
                                 ],
@@ -2075,11 +2088,6 @@ export default function AddIllustrationPage() {
                                 [
                                   'black',
                                   'BLACK',
-                                ],
-
-                                [
-                                  'none',
-                                  'NONE',
                                 ],
                               ] as const
                             ).map(
@@ -2676,77 +2684,6 @@ export default function AddIllustrationPage() {
                             }
                           />
                         </label>
-                                            <label
-                      style={
-                        fieldStyle
-                      }
-                    >
-                      <span>
-                        MP3
-                      </span>
-
-                      <input
-                        type="file"
-                        accept=".mp3,audio/mpeg"
-                        onChange={(
-                          e
-                        ) => {
-                          const file =
-                            e.target
-                              .files?.[0] ??
-                            null;
-
-                          if (
-                            file &&
-                            file.type &&
-                            file.type !==
-                              'audio/mpeg'
-                          ) {
-                            setSongAudio(
-                              null
-                            );
-
-                            setError(
-                              'MP3ファイルを選択してください。'
-                            );
-
-                            e.currentTarget.value =
-                              '';
-
-                            return;
-                          }
-
-                          setSongAudio(
-                            file
-                          );
-
-                          setError('');
-                        }}
-                        style={{
-                          color:
-                            '#f5f5f5',
-                        }}
-                      />
-
-                      {songAudio && (
-                        <span
-                          style={{
-                            color:
-                              'rgba(255,255,255,.5)',
-
-                            fontSize:
-                              '10px',
-
-                            lineHeight:
-                              1.5,
-                          }}
-                        >
-                          選択中: {
-                            songAudio.name
-                          }
-                        </span>
-                      )}
-                    </label>
                       </div>
                     );
                   }
@@ -3451,6 +3388,79 @@ export default function AddIllustrationPage() {
                           inputStyle
                         }
                       />
+                    </label>
+
+
+                    <label
+                      style={
+                        fieldStyle
+                      }
+                    >
+                      <span>
+                        MP3
+                      </span>
+
+                      <input
+                        type="file"
+                        accept=".mp3,audio/mpeg"
+                        onChange={(
+                          e
+                        ) => {
+                          const file =
+                            e.target
+                              .files?.[0] ??
+                            null;
+
+                          if (
+                            file &&
+                            file.type &&
+                            file.type !==
+                              'audio/mpeg'
+                          ) {
+                            setSongAudio(
+                              null
+                            );
+
+                            setError(
+                              'MP3ファイルを選択してください。'
+                            );
+
+                            e.currentTarget.value =
+                              '';
+
+                            return;
+                          }
+
+                          setSongAudio(
+                            file
+                          );
+
+                          setError('');
+                        }}
+                        style={{
+                          color:
+                            '#f5f5f5',
+                        }}
+                      />
+
+                      {songAudio && (
+                        <span
+                          style={{
+                            color:
+                              'rgba(255,255,255,.5)',
+
+                            fontSize:
+                              '10px',
+
+                            lineHeight:
+                              1.5,
+                          }}
+                        >
+                          選択中: {
+                            songAudio.name
+                          }
+                        </span>
+                      )}
                     </label>
                   </fieldset>
                 )}
