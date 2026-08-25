@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth';
 import {
   fetchGalleryPosts,
   getGalleryCharacters,
+  getGalleryCommission,
   getGalleryImages,
   getGalleryTags,
   subscribeGallery,
@@ -17,6 +18,7 @@ import {
 
 type CharacterFilter = 'all' | GalleryCharacter;
 type TagFilter = 'all' | GalleryTag;
+type SortOrder = 'newest' | 'oldest';
 
 function optimizeCloudinaryUrl(url: string) {
   if (!url.includes('/upload/')) return url;
@@ -43,6 +45,7 @@ export default function GalleryPage() {
   const [category, setCategory] = useState<GalleryCategory>('original');
   const [character, setCharacter] = useState<CharacterFilter>('all');
   const [tag, setTag] = useState<TagFilter>('all');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
   const [query, setQuery] = useState('');
   const [illustrations, setIllustrations] = useState<GalleryPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,25 +97,41 @@ export default function GalleryPage() {
         return getGalleryCharacters(item).includes(character);
       })
       .filter((item) => {
-        if (tag === 'all') return true;
+        if (category === 'commission' || tag === 'all') return true;
         return getGalleryTags(item).includes(tag);
       })
       .filter((item) => {
         if (!normalizedQuery) return true;
+
+        const commission = getGalleryCommission(item);
 
         const searchableText = [
           item.date,
           item.category,
           ...getGalleryCharacters(item),
           ...getGalleryTags(item),
+          commission?.artistName ?? '',
+          commission?.snsId ?? '',
+          item.memo ?? '',
         ]
           .join(' ')
           .toLowerCase();
 
         return searchableText.includes(normalizedQuery);
       })
-      .sort((a, b) => b.date.localeCompare(a.date));
-  }, [illustrations, category, character, tag, query]);
+      .sort((a, b) =>
+        sortOrder === 'newest'
+          ? b.date.localeCompare(a.date)
+          : a.date.localeCompare(b.date)
+      );
+  }, [
+    illustrations,
+    category,
+    character,
+    tag,
+    query,
+    sortOrder,
+  ]);
 
   const pillStyle = (active: boolean) => ({
     padding: '8px 14px',
@@ -169,7 +188,7 @@ export default function GalleryPage() {
 
         {isAdmin && (
           <button
-            onClick={() => router.push('/gallery/new')}
+            onClick={() => router.push('/gallery/add')}
             style={{
               padding: '10px 16px',
               borderRadius: '8px',
@@ -185,7 +204,15 @@ export default function GalleryPage() {
         )}
       </div>
 
-      <div style={{ marginBottom: '22px' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '10px',
+          marginBottom: '22px',
+        }}
+      >
         <input
           type="search"
           value={query}
@@ -202,6 +229,26 @@ export default function GalleryPage() {
             outline: 'none',
           }}
         />
+
+        <button
+          type="button"
+          onClick={() =>
+            setSortOrder((current) =>
+              current === 'newest' ? 'oldest' : 'newest'
+            )
+          }
+          style={{
+            padding: '10px 14px',
+            borderRadius: '9px',
+            border: '1px solid rgba(255,255,255,.2)',
+            background: 'rgba(255,255,255,.06)',
+            color: '#f5f5f5',
+            cursor: 'pointer',
+            fontSize: '11px',
+          }}
+        >
+          {sortOrder === 'newest' ? 'NEWEST' : 'OLDEST'}
+        </button>
       </div>
 
       <section
@@ -269,61 +316,67 @@ export default function GalleryPage() {
         </div>
       </section>
 
-      <section style={{ marginBottom: '36px' }}>
-        <p
-          style={{
-            margin: '0 0 9px',
-            fontSize: '10px',
-            letterSpacing: '.14em',
-            color: 'rgba(255,255,255,.45)',
-          }}
-        >
-          TAG
-        </p>
-
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '8px',
-          }}
-        >
-          <button
-            onClick={() => setTag('all')}
-            style={pillStyle(tag === 'all')}
+      {category === 'original' && (
+        <section style={{ marginBottom: '36px' }}>
+          <p
+            style={{
+              margin: '0 0 9px',
+              fontSize: '10px',
+              letterSpacing: '.14em',
+              color: 'rgba(255,255,255,.45)',
+            }}
           >
-            ALL TAG
-          </button>
+            TAG
+          </p>
 
-          <button
-            onClick={() => setTag('reference')}
-            style={pillStyle(tag === 'reference')}
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '8px',
+            }}
           >
-            REFERENCE
-          </button>
+            <button
+              onClick={() => setTag('all')}
+              style={pillStyle(tag === 'all')}
+            >
+              ALL TAG
+            </button>
 
-          <button
-            onClick={() => setTag('song-parody')}
-            style={pillStyle(tag === 'song-parody')}
-          >
-            SONG PARODY
-          </button>
+            <button
+              onClick={() => setTag('reference')}
+              style={pillStyle(tag === 'reference')}
+            >
+              REFERENCE
+            </button>
 
-          <button
-            onClick={() => setTag('manga')}
-            style={pillStyle(tag === 'manga')}
-          >
-            MANGA
-          </button>
+            <button
+              onClick={() => setTag('song-parody')}
+              style={pillStyle(tag === 'song-parody')}
+            >
+              SONG PARODY
+            </button>
 
-          <button
-            onClick={() => setTag('rakugaki')}
-            style={pillStyle(tag === 'rakugaki')}
-          >
-            RAKUGAKI
-          </button>
-        </div>
-      </section>
+            <button
+              onClick={() => setTag('manga')}
+              style={pillStyle(tag === 'manga')}
+            >
+              MANGA
+            </button>
+
+            <button
+              onClick={() => setTag('rakugaki')}
+              style={pillStyle(tag === 'rakugaki')}
+            >
+              RAKUGAKI
+            </button>
+          </div>
+        </section>
+      )}
+
+      {category === 'commission' && (
+        <div style={{ marginBottom: '36px' }} />
+      )}
 
       {loading && (
         <p
@@ -362,6 +415,7 @@ export default function GalleryPage() {
             const imageCount = images.length;
             const itemCharacters = getGalleryCharacters(item);
             const itemTags = getGalleryTags(item);
+            const commission = getGalleryCommission(item);
 
             return (
               <article key={item.id}>
@@ -445,12 +499,32 @@ export default function GalleryPage() {
                     color: 'rgba(255,255,255,.7)',
                   }}
                 >
-                  {[
-                    item.category.toUpperCase(),
-                    ...itemCharacters.map(characterLabel),
-                    ...itemTags.map(tagLabel),
-                  ].join(' · ')}
+                  {item.category === 'commission'
+                    ? [
+                        'COMMISSION',
+                        ...itemCharacters.map(characterLabel),
+                      ].join(' · ')
+                    : [
+                        'ORIGINAL',
+                        ...itemCharacters.map(characterLabel),
+                        ...itemTags.map(tagLabel),
+                      ].join(' · ')}
                 </p>
+
+                {item.category === 'commission' && commission && (
+                  <p
+                    style={{
+                      margin: '5px 0 0',
+                      fontSize: '11px',
+                      color: 'rgba(255,255,255,.58)',
+                    }}
+                  >
+                    Artist: {commission.artistName}
+                    {commission.snsId
+                      ? ` / ${commission.snsId}`
+                      : ''}
+                  </p>
+                )}
               </article>
             );
           })}
