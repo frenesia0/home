@@ -78,8 +78,79 @@ const DEFAULT_GRID_SIZE =
 
 function createGalleryId(
   date: string,
+  category: GalleryCategory,
+  snsId: string,
   existingPosts: GalleryPost[]
 ): string {
+  /*
+   * COMMISSION
+   * SNS IDを作品IDとして使用する。
+   *
+   * 例:
+   * nemui_noda4
+   * @nemui_noda4
+   * @@nemui_noda4
+   *
+   * ↓ すべて
+   *
+   * @nemui_noda4
+   */
+  if (
+    category === 'commission' &&
+    snsId.trim()
+  ) {
+    const normalizedSnsId =
+      `@${snsId
+        .trim()
+        .replace(/^@+/, '')}`;
+
+    /*
+     * まだ同じIDが存在しなければ
+     * そのまま使用する。
+     */
+    const exactExists =
+      existingPosts.some(
+        (post) =>
+          post.id === normalizedSnsId
+      );
+
+    if (!exactExists) {
+      return normalizedSnsId;
+    }
+
+    /*
+     * 同じSNS IDの作品が既にある場合
+     *
+     * @artist
+     * @artist-02
+     * @artist-03
+     *
+     * のように連番にする。
+     */
+    let nextNumber = 2;
+
+    while (
+      existingPosts.some(
+        (post) =>
+          post.id ===
+          `${normalizedSnsId}-${String(
+            nextNumber
+          ).padStart(2, '0')}`
+      )
+    ) {
+      nextNumber += 1;
+    }
+
+    return `${normalizedSnsId}-${String(
+      nextNumber
+    ).padStart(2, '0')}`;
+  }
+
+  /*
+   * ORIGINAL
+   * またはCOMMISSIONでSNS IDが空の場合は
+   * 従来の日付IDを使用する。
+   */
   const datePart =
     date.replaceAll('-', '');
 
@@ -1190,6 +1261,8 @@ export default function AddIllustrationPage() {
         const newId =
           createGalleryId(
             date,
+            category,
+            snsId,
             previous
           );
 
