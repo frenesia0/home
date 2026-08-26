@@ -3104,6 +3104,14 @@ export default function EditIllustrationPage() {
                         'tachie',
                         'TACHIE',
                       ],
+                      [
+                        'single-illustration',
+                        '一枚絵',
+                      ],
+                      [
+                        'deformed',
+                        'デフォルメ',
+                      ],
                     ].map(
                       ([
                         value,
