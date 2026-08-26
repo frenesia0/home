@@ -1955,40 +1955,44 @@ export default function GalleryPage() {
 
           .gallery-banner {
             grid-template-columns:
-              minmax(150px, 0.92fr)
-              minmax(0, 1.08fr);
-            min-height: 132px;
-            margin-bottom: 18px;
+              minmax(0, 0.44fr)
+              minmax(0, 0.56fr);
+            aspect-ratio: 6 / 1;
+            min-height: 0;
+            margin-bottom: 14px;
           }
 
           .gallery-banner-copy {
             padding:
-              20px 16px 18px;
+              11px 14px 10px;
           }
 
           .gallery-banner-copy h1 {
             font-size:
-              28px !important;
-            margin-bottom: 7px;
+              24px !important;
+            margin-bottom: 5px;
+            white-space: nowrap;
           }
 
           .gallery-banner-copy p {
-            max-width: 160px;
-            font-size: 10px;
-            line-height: 1.45;
-            letter-spacing: .025em;
+            max-width: none;
+            font-size: 8.5px;
+            line-height: 1.2;
+            letter-spacing: .018em;
+            white-space: nowrap;
           }
 
           .gallery-banner-hero {
-            min-height: 132px;
+            min-height: 0;
+            height: 100%;
           }
 
           .gallery-banner-hero::before {
             box-shadow:
-              inset 10px 0 14px rgba(31,35,42,.9),
-              inset -8px 0 12px rgba(31,35,42,.42),
-              inset 0 8px 10px rgba(31,35,42,.48),
-              inset 0 -8px 10px rgba(31,35,42,.48);
+              inset 8px 0 10px rgba(31,35,42,.88),
+              inset -6px 0 8px rgba(31,35,42,.34),
+              inset 0 5px 7px rgba(31,35,42,.42),
+              inset 0 -5px 7px rgba(31,35,42,.42);
           }
 
           .gallery-banner-hero::after {
@@ -1996,17 +2000,17 @@ export default function GalleryPage() {
               linear-gradient(
                 90deg,
                 #1f232a 0,
-                rgba(31,35,42,.72) 8px,
-                transparent 20px,
-                transparent calc(100% - 14px),
-                rgba(31,35,42,.28) calc(100% - 6px),
+                rgba(31,35,42,.66) 6px,
+                transparent 15px,
+                transparent calc(100% - 11px),
+                rgba(31,35,42,.22) calc(100% - 5px),
                 #1f232a 100%
               ),
               linear-gradient(
                 180deg,
                 #1f232a 0,
-                transparent 14px,
-                transparent calc(100% - 14px),
+                transparent 9px,
+                transparent calc(100% - 9px),
                 #1f232a 100%
               );
           }
@@ -2111,6 +2115,29 @@ export default function GalleryPage() {
         @media (
           max-width: 390px
         ) {
+          .gallery-banner {
+            grid-template-columns:
+              minmax(0, 0.46fr)
+              minmax(0, 0.54fr);
+          }
+
+          .gallery-banner-copy {
+            padding-left:
+              11px;
+            padding-right:
+              9px;
+          }
+
+          .gallery-banner-copy h1 {
+            font-size:
+              21px !important;
+          }
+
+          .gallery-banner-copy p {
+            font-size:
+              7.5px;
+          }
+
           .gallery-page {
             padding-left:
               14px !important;
