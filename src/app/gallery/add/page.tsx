@@ -3332,12 +3332,12 @@ export default function AddIllustrationPage() {
 
                         [
                           'single-illustration',
-                          '一枚絵',
+                          'SINGLE ILLUSTRATION',
                         ],
 
                         [
                           'deformed',
-                          'デフォルメ',
+                          'DEFORMED',
                         ],
                       ] as const
                     ).map(
