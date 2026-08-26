@@ -93,6 +93,345 @@ function tagLabel(
   return tag.toUpperCase();
 }
 
+
+/**
+ * GALLERY HERO専用。
+ *
+ * HEROの編集画面は 5:2 を基準にしている。
+ * PCとスマホでは実際の表示枠の横長さが違うため、
+ * heroCrop をそのまま使うと同じ画像でも注目位置がずれて見える。
+ *
+ * ここでは保存済みの5:2トリミングから「画像内のどこを
+ * フレーム中央に置いていたか」を逆算し、現在の表示比率へ
+ * x / y を変換する。
+ *
+ * そのためPCとスマホで枠の比率が違っても、
+ * できるだけ同じ箇所が見える。
+ */
+function FocusSyncedHeroImg({
+  src,
+  crop,
+  alt,
+}: {
+  src: string;
+  crop?: {
+    x: number;
+    y: number;
+    scale: number;
+  };
+  alt?: string;
+}) {
+  const wrapRef =
+    useRef<HTMLDivElement>(
+      null
+    );
+
+  const [
+    imageAspect,
+    setImageAspect,
+  ] =
+    useState<number | null>(
+      null
+    );
+
+  const [
+    frameAspect,
+    setFrameAspect,
+  ] =
+    useState(5 / 2);
+
+  const REFERENCE_ASPECT =
+    5 / 2;
+
+  useEffect(() => {
+    const image =
+      new Image();
+
+    image.onload = () => {
+      if (
+        image.naturalWidth >
+          0 &&
+        image.naturalHeight >
+          0
+      ) {
+        setImageAspect(
+          image.naturalWidth /
+            image.naturalHeight
+        );
+      }
+    };
+
+    image.src =
+      src;
+
+    return () => {
+      image.onload =
+        null;
+    };
+  }, [src]);
+
+  useEffect(() => {
+    const element =
+      wrapRef.current;
+
+    if (!element) {
+      return;
+    }
+
+    const measure = () => {
+      const rect =
+        element.getBoundingClientRect();
+
+      if (
+        rect.width > 1 &&
+        rect.height > 1
+      ) {
+        setFrameAspect(
+          rect.width /
+            rect.height
+        );
+      }
+    };
+
+    measure();
+
+    if (
+      typeof ResizeObserver ===
+      'undefined'
+    ) {
+      return;
+    }
+
+    const observer =
+      new ResizeObserver(
+        measure
+      );
+
+    observer.observe(
+      element
+    );
+
+    return () =>
+      observer.disconnect();
+  }, []);
+
+  const adjustedCrop =
+    useMemo(() => {
+      if (
+        !crop ||
+        !imageAspect ||
+        !frameAspect
+      ) {
+        return crop;
+      }
+
+      const scale =
+        Math.max(
+          1,
+          crop.scale ||
+            1
+        );
+
+      /*
+       * まず5:2基準のcropから、
+       * 画像内の注目点(focusX / focusY)を逆算する。
+       *
+       * 0.5 / 0.5 が画像の真ん中。
+       */
+      const referenceWide =
+        imageAspect >=
+        REFERENCE_ASPECT;
+
+      let focusX =
+        0.5;
+      let focusY =
+        0.5;
+
+      if (referenceWide) {
+        focusX =
+          0.5 -
+          crop.x *
+            REFERENCE_ASPECT /
+            (
+              imageAspect *
+              scale
+            );
+
+        focusY =
+          0.5 -
+          crop.y /
+            scale;
+      } else {
+        focusX =
+          0.5 -
+          crop.x /
+            scale;
+
+        focusY =
+          0.5 -
+          crop.y *
+            imageAspect /
+            (
+              REFERENCE_ASPECT *
+              scale
+            );
+      }
+
+      focusX =
+        Math.min(
+          1,
+          Math.max(
+            0,
+            focusX
+          )
+        );
+
+      focusY =
+        Math.min(
+          1,
+          Math.max(
+            0,
+            focusY
+          )
+        );
+
+      /*
+       * 次に、同じfocusX / focusYが現在の枠でも
+       * フレーム中央へ来るようにx / yへ戻す。
+       */
+      const targetWide =
+        imageAspect >=
+        frameAspect;
+
+      let x =
+        0;
+      let y =
+        0;
+
+      let maxX =
+        0;
+      let maxY =
+        0;
+
+      if (targetWide) {
+        x =
+          (0.5 - focusX) *
+          imageAspect *
+          scale /
+          frameAspect;
+
+        y =
+          (0.5 - focusY) *
+          scale;
+
+        maxX =
+          Math.max(
+            0,
+            (
+              imageAspect *
+              scale /
+              frameAspect -
+              1
+            ) / 2
+          );
+
+        maxY =
+          Math.max(
+            0,
+            (
+              scale -
+              1
+            ) / 2
+          );
+      } else {
+        x =
+          (0.5 - focusX) *
+          scale;
+
+        y =
+          (0.5 - focusY) *
+          frameAspect *
+          scale /
+          imageAspect;
+
+        maxX =
+          Math.max(
+            0,
+            (
+              scale -
+              1
+            ) / 2
+          );
+
+        maxY =
+          Math.max(
+            0,
+            (
+              frameAspect *
+              scale /
+              imageAspect -
+              1
+            ) / 2
+          );
+      }
+
+      /*
+       * 画像の外側が見えてしまわない範囲にだけ収める。
+       * 端に近い注目点では完全一致より「余白を出さない」
+       * 方を優先する。
+       */
+      x =
+        Math.min(
+          maxX,
+          Math.max(
+            -maxX,
+            x
+          )
+        );
+
+      y =
+        Math.min(
+          maxY,
+          Math.max(
+            -maxY,
+            y
+          )
+        );
+
+      return {
+        x,
+        y,
+        scale,
+      };
+    }, [
+      crop,
+      imageAspect,
+      frameAspect,
+    ]);
+
+  return (
+    <div
+      ref={wrapRef}
+      style={{
+        position:
+          'absolute',
+        inset: 0,
+        overflow:
+          'hidden',
+      }}
+    >
+      <CropImg
+        src={src}
+        crop={
+          adjustedCrop
+        }
+        alt={alt}
+      />
+    </div>
+  );
+}
+
+
 function isCategory(
   value: string | null
 ): value is GalleryCategory {
@@ -881,7 +1220,7 @@ export default function GalleryPage() {
             className="gallery-banner-hero"
             aria-hidden="true"
           >
-            <CropImg
+            <FocusSyncedHeroImg
               src={optimizeCloudinaryUrl(
                 heroImage.url
               )}
