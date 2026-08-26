@@ -1957,27 +1957,29 @@ export default function GalleryPage() {
             grid-template-columns:
               minmax(0, 0.44fr)
               minmax(0, 0.56fr);
-            aspect-ratio: 6 / 1;
+            aspect-ratio: 4.45 / 1;
             min-height: 0;
-            margin-bottom: 14px;
+            margin-bottom: 16px;
           }
 
           .gallery-banner-copy {
             padding:
-              11px 14px 10px;
+              14px 16px 13px;
           }
 
           .gallery-banner-copy h1 {
             font-size:
-              24px !important;
-            margin-bottom: 5px;
+              20px !important;
+            margin-bottom: 7px;
+            letter-spacing:
+              .16em !important;
             white-space: nowrap;
           }
 
           .gallery-banner-copy p {
             max-width: none;
             font-size: 8.5px;
-            line-height: 1.2;
+            line-height: 1.25;
             letter-spacing: .018em;
             white-space: nowrap;
           }
@@ -1989,10 +1991,10 @@ export default function GalleryPage() {
 
           .gallery-banner-hero::before {
             box-shadow:
-              inset 8px 0 10px rgba(31,35,42,.88),
-              inset -6px 0 8px rgba(31,35,42,.34),
-              inset 0 5px 7px rgba(31,35,42,.42),
-              inset 0 -5px 7px rgba(31,35,42,.42);
+              inset 10px 0 12px rgba(31,35,42,.9),
+              inset -6px 0 8px rgba(31,35,42,.3),
+              inset 0 5px 7px rgba(31,35,42,.4),
+              inset 0 -5px 7px rgba(31,35,42,.4);
           }
 
           .gallery-banner-hero::after {
@@ -2119,23 +2121,25 @@ export default function GalleryPage() {
             grid-template-columns:
               minmax(0, 0.46fr)
               minmax(0, 0.54fr);
+            aspect-ratio:
+              4.2 / 1;
           }
 
           .gallery-banner-copy {
-            padding-left:
-              11px;
-            padding-right:
-              9px;
+            padding:
+              12px 10px 11px;
           }
 
           .gallery-banner-copy h1 {
             font-size:
-              21px !important;
+              18px !important;
+            letter-spacing:
+              .14em !important;
           }
 
           .gallery-banner-copy p {
             font-size:
-              7.5px;
+              7.2px;
           }
 
           .gallery-page {
