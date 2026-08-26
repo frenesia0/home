@@ -134,6 +134,9 @@ export default function EditIllustrationPage() {
   const [removeAudio, setRemoveAudio] =
     useState(false);
 
+  const [newAudioPreviewUrl, setNewAudioPreviewUrl] =
+    useState<string | null>(null);
+
   const [existingImages, setExistingImages] =
     useState<GalleryImage[]>([]);
   const [newImages, setNewImages] =
@@ -236,6 +239,8 @@ export default function EditIllustrationPage() {
         setSongAudioUrl(
           song?.audioUrl ?? ''
         );
+        setRemoveAudio(false);
+        setNewAudioFile(null);
 
         const imgs =
           getGalleryImages(found);
@@ -333,6 +338,23 @@ export default function EditIllustrationPage() {
     return () =>
       URL.revokeObjectURL(url);
   }, [newCustomThumbnail]);
+
+  useEffect(() => {
+    if (!newAudioFile) {
+      setNewAudioPreviewUrl(null);
+      return;
+    }
+
+    const url =
+      URL.createObjectURL(
+        newAudioFile
+      );
+
+    setNewAudioPreviewUrl(url);
+
+    return () =>
+      URL.revokeObjectURL(url);
+  }, [newAudioFile]);
 
   useEffect(() => {
     if (!isSongParody) {
@@ -2563,37 +2585,116 @@ export default function EditIllustrationPage() {
                       />
                     </label>
 
-                    <label
-                      style={
-                        fieldStyle
-                      }
-                    >
-                      <span>
-                        MP3 / AUDIO
-                      </span>
-
-                      <input
-                        type="file"
-                        accept="audio/*,.mp3"
-                        onChange={(e) => {
-                          setNewAudioFile(
-                            e.target
-                              .files?.[0] ??
-                              null
-                          );
-                          setRemoveAudio(
-                            false
-                          );
-                        }}
+                    {songAudioUrl &&
+                      !removeAudio && (
+                      <div
                         style={{
-                          color:
-                            '#f5f5f5',
+                          display:
+                            'grid',
+                          gap:
+                            '10px',
+                          padding:
+                            '12px',
+                          borderRadius:
+                            '9px',
+                          border:
+                            '1px solid rgba(255,255,255,.14)',
+                          background:
+                            'rgba(255,255,255,.04)',
                         }}
-                      />
-                    </label>
+                      >
+                        <div
+                          style={{
+                            display:
+                              'flex',
+                            justifyContent:
+                              'space-between',
+                            alignItems:
+                              'center',
+                            gap:
+                              '12px',
+                          }}
+                        >
+                          <div
+                            style={{
+                              display:
+                                'grid',
+                              gap:
+                                '3px',
+                            }}
+                          >
+                            <strong
+                              style={{
+                                fontSize:
+                                  '11px',
+                                letterSpacing:
+                                  '.08em',
+                              }}
+                            >
+                              CURRENT AUDIO
+                            </strong>
+
+                            <span
+                              style={{
+                                fontSize:
+                                  '10px',
+                                color:
+                                  'rgba(255,255,255,.48)',
+                              }}
+                            >
+                              登録済み音源
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRemoveAudio(
+                                true
+                              );
+                              setNewAudioFile(
+                                null
+                              );
+                            }}
+                            style={{
+                              border:
+                                '1px solid rgba(255,255,255,.2)',
+                              borderRadius:
+                                '7px',
+                              background:
+                                'transparent',
+                              color:
+                                '#fff',
+                              padding:
+                                '6px 9px',
+                              cursor:
+                                'pointer',
+                              fontSize:
+                                '10px',
+                            }}
+                          >
+                            音源を削除
+                          </button>
+                        </div>
+
+                        <audio
+                          controls
+                          preload="metadata"
+                          src={
+                            songAudioUrl
+                          }
+                          style={{
+                            width:
+                              '100%',
+                          }}
+                        >
+                          お使いのブラウザは音声再生に対応していません。
+                        </audio>
+                      </div>
+                    )}
 
                     {songAudioUrl &&
-                      !removeAudio &&
+                      removeAudio &&
                       !newAudioFile && (
                       <div
                         style={{
@@ -2609,8 +2710,10 @@ export default function EditIllustrationPage() {
                             '10px 12px',
                           borderRadius:
                             '8px',
+                          border:
+                            '1px solid rgba(255,120,120,.28)',
                           background:
-                            'rgba(255,255,255,.06)',
+                            'rgba(255,80,80,.06)',
                         }}
                       >
                         <span
@@ -2618,22 +2721,19 @@ export default function EditIllustrationPage() {
                             fontSize:
                               '11px',
                             color:
-                              'rgba(255,255,255,.62)',
+                              'rgba(255,180,180,.9)',
                           }}
                         >
-                          登録済み音源あり
+                          保存すると登録済み音源を削除します
                         </span>
 
                         <button
                           type="button"
-                          onClick={() => {
+                          onClick={() =>
                             setRemoveAudio(
-                              true
-                            );
-                            setNewAudioFile(
-                              null
-                            );
-                          }}
+                              false
+                            )
+                          }
                           style={{
                             border:
                               '1px solid rgba(255,255,255,.2)',
@@ -2647,25 +2747,162 @@ export default function EditIllustrationPage() {
                               '6px 9px',
                             cursor:
                               'pointer',
+                            fontSize:
+                              '10px',
                           }}
                         >
-                          音源を削除
+                          元に戻す
                         </button>
                       </div>
                     )}
 
-                    {newAudioFile && (
-                      <p
+                    <label
+                      style={
+                        fieldStyle
+                      }
+                    >
+                      <span>
+                        {songAudioUrl
+                          ? 'REPLACE AUDIO'
+                          : 'MP3 / AUDIO'}
+                      </span>
+
+                      <input
+                        type="file"
+                        accept="audio/*,.mp3"
+                        onChange={(e) => {
+                          const file =
+                            e.target
+                              .files?.[0] ??
+                            null;
+
+                          setNewAudioFile(
+                            file
+                          );
+
+                          if (
+                            file
+                          ) {
+                            setRemoveAudio(
+                              false
+                            );
+                          }
+                        }}
                         style={{
-                          margin: 0,
-                          fontSize:
-                            '11px',
                           color:
-                            'rgba(255,255,255,.58)',
+                            '#f5f5f5',
+                        }}
+                      />
+                    </label>
+
+                    {newAudioFile && (
+                      <div
+                        style={{
+                          display:
+                            'grid',
+                          gap:
+                            '9px',
+                          padding:
+                            '12px',
+                          borderRadius:
+                            '9px',
+                          border:
+                            '1px solid rgba(255,255,255,.14)',
+                          background:
+                            'rgba(255,255,255,.04)',
                         }}
                       >
-                        新しい音源: {newAudioFile.name}
-                      </p>
+                        <div
+                          style={{
+                            display:
+                              'flex',
+                            justifyContent:
+                              'space-between',
+                            alignItems:
+                              'center',
+                            gap:
+                              '12px',
+                          }}
+                        >
+                          <div
+                            style={{
+                              display:
+                                'grid',
+                              gap:
+                                '3px',
+                            }}
+                          >
+                            <strong
+                              style={{
+                                fontSize:
+                                  '11px',
+                                letterSpacing:
+                                  '.08em',
+                              }}
+                            >
+                              NEW AUDIO
+                            </strong>
+
+                            <span
+                              style={{
+                                fontSize:
+                                  '10px',
+                                color:
+                                  'rgba(255,255,255,.48)',
+                                wordBreak:
+                                  'break-all',
+                              }}
+                            >
+                              差し替え予定: {
+                                newAudioFile.name
+                              }
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setNewAudioFile(
+                                null
+                              )
+                            }
+                            style={{
+                              border:
+                                '1px solid rgba(255,255,255,.2)',
+                              borderRadius:
+                                '7px',
+                              background:
+                                'transparent',
+                              color:
+                                '#fff',
+                              padding:
+                                '6px 9px',
+                              cursor:
+                                'pointer',
+                              fontSize:
+                                '10px',
+                            }}
+                          >
+                            選択解除
+                          </button>
+                        </div>
+
+                        {newAudioPreviewUrl && (
+                          <audio
+                            controls
+                            preload="metadata"
+                            src={
+                              newAudioPreviewUrl
+                            }
+                            style={{
+                              width:
+                                '100%',
+                            }}
+                          >
+                            お使いのブラウザは音声再生に対応していません。
+                          </audio>
+                        )}
+                      </div>
                     )}
                   </fieldset>
                 )}
