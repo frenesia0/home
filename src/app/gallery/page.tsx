@@ -304,6 +304,14 @@ export default function GalleryPage() {
   ] =
     useState(1);
 
+  const [
+    heroPostId,
+    setHeroPostId,
+  ] =
+    useState<string | null>(
+      null
+    );
+
   useEffect(() => {
     let alive = true;
     let firstSnapshot = true;
@@ -375,6 +383,57 @@ export default function GalleryPage() {
       off();
     };
   }, []);
+
+  useEffect(() => {
+    const candidates =
+      illustrations.filter(
+        (item) =>
+          item.category ===
+            'original' &&
+          getGalleryThumbnailImage(
+            item
+          ) !== null
+      );
+
+    if (
+      candidates.length ===
+      0
+    ) {
+      setHeroPostId(
+        null
+      );
+      return;
+    }
+
+    const currentStillExists =
+      heroPostId &&
+      candidates.some(
+        (item) =>
+          item.id ===
+          heroPostId
+      );
+
+    if (
+      currentStillExists
+    ) {
+      return;
+    }
+
+    const randomIndex =
+      Math.floor(
+        Math.random() *
+          candidates.length
+      );
+
+    setHeroPostId(
+      candidates[
+        randomIndex
+      ]?.id ?? null
+    );
+  }, [
+    illustrations,
+    heroPostId,
+  ]);
 
   useEffect(() => {
     const query =
@@ -598,6 +657,36 @@ export default function GalleryPage() {
         'all .18s ease',
     });
 
+  const categoryPillStyle =
+    (active: boolean) => ({
+      ...pillStyle(active),
+      padding:
+        '11px 22px',
+      minWidth:
+        '118px',
+      fontSize:
+        '13px',
+      fontWeight:
+        700,
+      letterSpacing:
+        '.03em',
+    });
+
+  const heroPost =
+    heroPostId
+      ? illustrations.find(
+          (item) =>
+            item.id === heroPostId
+        ) ?? null
+      : null;
+
+  const heroThumbnail =
+    heroPost
+      ? getGalleryThumbnailImage(
+          heroPost
+        )
+      : null;
+
   return (
     <main
       className="gallery-page"
@@ -619,6 +708,12 @@ export default function GalleryPage() {
       <div
         className="gallery-heading"
         style={{
+          position:
+            'relative',
+          minHeight:
+            heroThumbnail
+              ? '180px'
+              : undefined,
           display:
             'flex',
           justifyContent:
@@ -628,9 +723,36 @@ export default function GalleryPage() {
           gap: '24px',
           marginBottom:
             '34px',
+          overflow:
+            'hidden',
         }}
       >
-        <div>
+        {heroThumbnail && (
+          <div
+            className="gallery-random-hero"
+            aria-hidden="true"
+          >
+            <CropImg
+              src={optimizeCloudinaryUrl(
+                heroThumbnail.url
+              )}
+              crop={
+                heroPost
+                  ?.thumbnailCrop
+              }
+              alt=""
+            />
+          </div>
+        )}
+
+        <div
+          className="gallery-heading-copy"
+          style={{
+            position:
+              'relative',
+            zIndex: 2,
+          }}
+        >
           <h1
             style={{
               margin:
@@ -664,6 +786,9 @@ export default function GalleryPage() {
           <div
             className="gallery-admin-actions"
             style={{
+              position:
+                'relative',
+              zIndex: 2,
               display:
                 'flex',
               gap: '10px',
@@ -1002,48 +1127,6 @@ export default function GalleryPage() {
             <button
               onClick={() =>
                 setTag(
-                  'song-parody'
-                )
-              }
-              style={pillStyle(
-                tag ===
-                  'song-parody'
-              )}
-            >
-              SONG PARODY
-            </button>
-
-            <button
-              onClick={() =>
-                setTag(
-                  'manga'
-                )
-              }
-              style={pillStyle(
-                tag ===
-                  'manga'
-              )}
-            >
-              MANGA
-            </button>
-
-            <button
-              onClick={() =>
-                setTag(
-                  'rakugaki'
-                )
-              }
-              style={pillStyle(
-                tag ===
-                  'rakugaki'
-              )}
-            >
-              RAKUGAKI
-            </button>
-
-            <button
-              onClick={() =>
-                setTag(
                   'tachie'
                 )
               }
@@ -1066,7 +1149,7 @@ export default function GalleryPage() {
                   'single-illustration'
               )}
             >
-              一枚絵
+              SINGLE ILLUSTRATION
             </button>
 
             <button
@@ -1080,7 +1163,49 @@ export default function GalleryPage() {
                   'deformed'
               )}
             >
-              デフォルメ
+              DEFORMED
+            </button>
+
+            <button
+              onClick={() =>
+                setTag(
+                  'rakugaki'
+                )
+              }
+              style={pillStyle(
+                tag ===
+                  'rakugaki'
+              )}
+            >
+              RAKUGAKI
+            </button>
+
+            <button
+              onClick={() =>
+                setTag(
+                  'manga'
+                )
+              }
+              style={pillStyle(
+                tag ===
+                  'manga'
+              )}
+            >
+              MANGA
+            </button>
+
+            <button
+              onClick={() =>
+                setTag(
+                  'song-parody'
+                )
+              }
+              style={pillStyle(
+                tag ===
+                  'song-parody'
+              )}
+            >
+              SONG PARODY
             </button>
           </div>
         </section>
@@ -1489,6 +1614,54 @@ export default function GalleryPage() {
       ====================== */}
 
       <style jsx global>{`
+        .gallery-random-hero {
+          position: absolute;
+          top: -18px;
+          right: 0;
+          width: min(58%, 650px);
+          height: 220px;
+          opacity: 0.72;
+          pointer-events: none;
+          overflow: hidden;
+          filter: saturate(.9) contrast(.96);
+          -webkit-mask-image:
+            radial-gradient(
+              ellipse at 58% 45%,
+              #000 0%,
+              #000 40%,
+              rgba(0,0,0,.88) 54%,
+              rgba(0,0,0,.42) 72%,
+              transparent 90%
+            );
+          mask-image:
+            radial-gradient(
+              ellipse at 58% 45%,
+              #000 0%,
+              #000 40%,
+              rgba(0,0,0,.88) 54%,
+              rgba(0,0,0,.42) 72%,
+              transparent 90%
+            );
+        }
+
+        .gallery-random-hero::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background:
+            linear-gradient(
+              90deg,
+              rgba(20,23,28,1) 0%,
+              rgba(20,23,28,.76) 18%,
+              transparent 50%
+            );
+        }
+
+        .gallery-random-hero > * {
+          width: 100% !important;
+          height: 100% !important;
+        }
+
         .gallery-grid {
           display: grid;
           grid-template-columns:
@@ -1621,6 +1794,23 @@ export default function GalleryPage() {
           .gallery-heading {
             gap:
               18px !important;
+          }
+
+          .gallery-heading {
+            min-height:
+              150px !important;
+          }
+
+          .gallery-random-hero {
+            top: 0;
+            right: -12%;
+            width: 78%;
+            height: 160px;
+            opacity: 0.56;
+          }
+
+          .gallery-heading-copy {
+            max-width: 58%;
           }
 
           .gallery-heading h1 {
