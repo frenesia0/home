@@ -3311,21 +3311,6 @@ export default function AddIllustrationPage() {
                         ],
 
                         [
-                          'song-parody',
-                          'SONG PARODY',
-                        ],
-
-                        [
-                          'manga',
-                          'MANGA',
-                        ],
-
-                        [
-                          'rakugaki',
-                          'RAKUGAKI',
-                        ],
-
-                        [
                           'tachie',
                           'TACHIE',
                         ],
@@ -3338,6 +3323,21 @@ export default function AddIllustrationPage() {
                         [
                           'deformed',
                           'DEFORMED',
+                        ],
+
+                        [
+                          'rakugaki',
+                          'RAKUGAKI',
+                        ],
+
+                        [
+                          'manga',
+                          'MANGA',
+                        ],
+
+                        [
+                          'song-parody',
+                          'SONG PARODY',
                         ],
                       ] as const
                     ).map(
