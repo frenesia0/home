@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import {
   fetchGalleryPosts,
+  getCachedGalleryPosts,
   getGalleryCharacters,
   getGalleryCommission,
   getGalleryImages,
@@ -59,53 +60,84 @@ export default function GalleryDetailPage() {
 
   useEffect(() => {
     let alive = true;
+    let firstSnapshot = true;
 
-    const load = async () => {
-      if (!id) {
-        if (alive) {
-          setPost(null);
-          setLoading(false);
-        }
-        return;
-      }
+    const cachedPosts =
+      getCachedGalleryPosts();
 
-      try {
-        const posts =
-          await fetchGalleryPosts();
+    const applyPosts = (
+      posts: GalleryPost[]
+    ) => {
+      const found =
+        posts.find(
+          item =>
+            item.id === id
+        ) ?? null;
 
-        if (alive) {
-          setAllPosts(posts);
-        }
+      if (!alive) return;
 
-        const found =
-          posts.find(
-            (item) => item.id === id
-          ) ?? null;
-
-        if (alive) {
-          setPost(found);
-          setError('');
-        }
-      } catch (err) {
-        if (alive) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : '作品を読み込めませんでした。'
-          );
-        }
-      } finally {
-        if (alive) {
-          setLoading(false);
-        }
-      }
+      setAllPosts(posts);
+      setPost(found);
+      setImageIndex(0);
+      setError(
+        found
+          ? ''
+          : '作品が見つかりませんでした。'
+      );
+      setLoading(false);
     };
 
-    void load();
+    if (
+      cachedPosts &&
+      cachedPosts.length > 0
+    ) {
+      applyPosts(
+        cachedPosts
+      );
+    } else {
+      setLoading(true);
+    }
 
-    const off = subscribeGallery(() => {
-      void load();
-    });
+    const loadFresh =
+      async () => {
+        try {
+          const posts =
+            await fetchGalleryPosts();
+
+          applyPosts(
+            posts
+          );
+        } catch (err) {
+          if (
+            alive &&
+            !cachedPosts
+          ) {
+            setError(
+              err instanceof Error
+                ? err.message
+                : '作品を読み込めませんでした。'
+            );
+            setLoading(false);
+          }
+        }
+      };
+
+    void loadFresh();
+
+    const off =
+      subscribeGallery(
+        () => {
+          if (
+            firstSnapshot
+          ) {
+            firstSnapshot =
+              false;
+            return;
+          }
+
+          void loadFresh();
+        }
+      );
 
     return () => {
       alive = false;
