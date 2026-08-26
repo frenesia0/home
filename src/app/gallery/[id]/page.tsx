@@ -54,6 +54,9 @@ export default function GalleryDetailPage() {
   const [error, setError] =
     useState('');
 
+  const [allPosts, setAllPosts] =
+    useState<GalleryPost[]>([]);
+
   useEffect(() => {
     let alive = true;
 
@@ -69,6 +72,10 @@ export default function GalleryDetailPage() {
       try {
         const posts =
           await fetchGalleryPosts();
+
+        if (alive) {
+          setAllPosts(posts);
+        }
 
         const found =
           posts.find(
@@ -179,7 +186,47 @@ export default function GalleryDetailPage() {
           textAlign: 'center',
         }}
       >
-        LOADING...
+        <div
+          aria-label="読み込み中"
+          style={{
+            display: 'inline-grid',
+            justifyItems: 'center',
+            gap: '12px',
+          }}
+        >
+          <div
+            style={{
+              width: '28px',
+              height: '28px',
+              borderRadius: '999px',
+              border:
+                '2px solid rgba(255,255,255,.18)',
+              borderTopColor:
+                'rgba(255,255,255,.78)',
+              animation:
+                'galleryDetailSpin .8s linear infinite',
+            }}
+          />
+
+          <span
+            style={{
+              fontSize: '11px',
+              letterSpacing: '.12em',
+              color:
+                'rgba(255,255,255,.52)',
+            }}
+          >
+            LOADING
+          </span>
+        </div>
+
+        <style jsx global>{`
+          @keyframes galleryDetailSpin {
+            to {
+              transform: rotate(360deg);
+            }
+          }
+        `}</style>
       </main>
     );
   }
@@ -269,6 +316,60 @@ export default function GalleryDetailPage() {
   const currentImage =
     images[imageIndex] ?? null;
 
+  const sortedPosts =
+    [...allPosts].sort(
+      (a, b) => {
+        const dateCompare =
+          b.date.localeCompare(
+            a.date
+          );
+
+        if (
+          dateCompare !== 0
+        ) {
+          return dateCompare;
+        }
+
+        return b.id.localeCompare(
+          a.id
+        );
+      }
+    );
+
+  const currentPostIndex =
+    sortedPosts.findIndex(
+      (item) =>
+        item.id === post.id
+    );
+
+  const prevPost =
+    currentPostIndex > 0
+      ? sortedPosts[
+          currentPostIndex - 1
+        ]
+      : null;
+
+  const nextPost =
+    currentPostIndex >= 0 &&
+    currentPostIndex <
+      sortedPosts.length - 1
+      ? sortedPosts[
+          currentPostIndex + 1
+        ]
+      : null;
+
+  const goPost = (
+    target: GalleryPost | null
+  ) => {
+    if (!target) return;
+
+    router.push(
+      `/gallery/${encodeURIComponent(
+        target.id
+      )}`
+    );
+  };
+
   return (
     <main
       className="gallery-detail-page"
@@ -310,12 +411,77 @@ export default function GalleryDetailPage() {
         </button>
 
         <div
+          className="gallery-detail-navgroup"
           style={{
             display: 'flex',
             gap: '8px',
             alignItems: 'center',
+            flexWrap: 'wrap',
+            justifyContent: 'flex-end',
           }}
         >
+          <button
+            type="button"
+            disabled={!prevPost}
+            onClick={() =>
+              goPost(prevPost)
+            }
+            style={{
+              padding: '8px 10px',
+              borderRadius: '8px',
+              border:
+                '1px solid rgba(255,255,255,.2)',
+              background:
+                prevPost
+                  ? 'rgba(255,255,255,.06)'
+                  : 'rgba(255,255,255,.025)',
+              color:
+                prevPost
+                  ? '#fff'
+                  : 'rgba(255,255,255,.28)',
+              cursor:
+                prevPost
+                  ? 'pointer'
+                  : 'default',
+              fontSize: '10px',
+              fontWeight: 700,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            ← PREV
+          </button>
+
+          <button
+            type="button"
+            disabled={!nextPost}
+            onClick={() =>
+              goPost(nextPost)
+            }
+            style={{
+              padding: '8px 10px',
+              borderRadius: '8px',
+              border:
+                '1px solid rgba(255,255,255,.2)',
+              background:
+                nextPost
+                  ? 'rgba(255,255,255,.06)'
+                  : 'rgba(255,255,255,.025)',
+              color:
+                nextPost
+                  ? '#fff'
+                  : 'rgba(255,255,255,.28)',
+              cursor:
+                nextPost
+                  ? 'pointer'
+                  : 'default',
+              fontSize: '10px',
+              fontWeight: 700,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            NEXT →
+          </button>
+
           <span
             style={{
               color:
@@ -814,6 +980,12 @@ export default function GalleryDetailPage() {
             gap: 12px !important;
             margin-bottom:
               16px !important;
+            align-items:
+              flex-start !important;
+          }
+
+          .gallery-detail-navgroup {
+            max-width: 70%;
           }
 
           .gallery-detail-layout {
