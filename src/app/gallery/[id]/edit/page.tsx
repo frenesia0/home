@@ -1338,163 +1338,789 @@ export default function EditIllustrationPage() {
     label: string,
     watermark: GalleryWatermark
   ) => {
-    const disabled = watermark.color === 'none';
-    const gridDisabled = disabled || !watermark.grid;
+    const disabled =
+      watermark.color ===
+      'none';
+
+    const gridDisabled =
+      disabled ||
+      !watermark.grid;
 
     return (
       <div
         key={`${kind}-${index}-watermark`}
         style={{
-          padding: '16px',
-          border: '1px solid rgba(255,255,255,.14)',
-          borderRadius: '10px',
-          background: 'rgba(255,255,255,.025)',
-          display: 'grid',
-          gap: '18px',
+          padding:
+            '16px',
+
+          border:
+            '1px solid rgba(255,255,255,.14)',
+
+          borderRadius:
+            '10px',
+
+          background:
+            'rgba(255,255,255,.025)',
+
+          display:
+            'grid',
+
+          gap:
+            '18px',
         }}
       >
-        <strong style={{ fontSize: '12px', letterSpacing: '.08em' }}>
-          {label}
-        </strong>
+        <div
+          style={{
+            display:
+              'flex',
 
-        <div style={{ display: 'grid', gap: '8px' }}>
-          <span style={{ color: 'rgba(255,255,255,.5)', fontSize: '10px', letterSpacing: '.12em' }}>
-            COLOR
+            justifyContent:
+              'space-between',
+
+            alignItems:
+              'center',
+
+            gap:
+              '12px',
+          }}
+        >
+          <strong
+            style={{
+              fontSize:
+                '12px',
+
+              letterSpacing:
+                '.08em',
+            }}
+          >
+            {label}
+          </strong>
+
+          <span
+            style={{
+              color:
+                'rgba(255,255,255,.38)',
+
+              fontSize:
+                '9px',
+            }}
+          >
+            {kind ===
+            'existing'
+              ? 'SAVED'
+              : 'NEW'}
           </span>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '7px' }}>
-            {([
-              ['none', 'NONE'],
-              ['white', 'WHITE'],
-              ['black', 'BLACK'],
-            ] as const).map(([value, text]) => {
-              const active = watermark.color === value;
-              return (
-                <button
-                  type="button"
-                  key={value}
-                  onClick={() => changeWatermarkColor(kind, index, value)}
-                  style={{
-                    minHeight: '38px',
-                    borderRadius: '8px',
-                    border: active
-                      ? '1px solid rgba(255,255,255,.9)'
-                      : '1px solid rgba(255,255,255,.2)',
-                    background: active
-                      ? 'rgba(255,255,255,.14)'
-                      : 'rgba(255,255,255,.035)',
-                    color: '#f5f5f5',
-                    cursor: 'pointer',
-                    fontSize: '11px',
-                    fontWeight: active ? 700 : 500,
-                  }}
-                >
-                  {text}
-                </button>
-              );
-            })}
-          </div>
         </div>
 
-        <div style={{ display: 'grid', gap: '9px', opacity: disabled ? 0.35 : 1 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ color: 'rgba(255,255,255,.5)', fontSize: '10px', letterSpacing: '.12em' }}>
+
+        {/* ===================================
+            COLOR
+        =================================== */}
+
+        <div
+          style={{
+            display:
+              'grid',
+
+            gap:
+              '8px',
+          }}
+        >
+          <span
+            style={{
+              color:
+                'rgba(255,255,255,.5)',
+
+              fontSize:
+                '10px',
+
+              letterSpacing:
+                '.12em',
+            }}
+          >
+            COLOR
+          </span>
+
+          <div
+            style={{
+              display:
+                'grid',
+
+              gridTemplateColumns:
+                'repeat(3, 1fr)',
+
+              gap:
+                '7px',
+            }}
+          >
+            {(
+              [
+                [
+                  'none',
+                  'NONE',
+                ],
+
+                [
+                  'white',
+                  'WHITE',
+                ],
+
+                [
+                  'black',
+                  'BLACK',
+                ],
+              ] as const
+            ).map(
+              ([
+                value,
+                text,
+              ]) => {
+                const active =
+                  watermark.color ===
+                  value;
+
+                return (
+                  <button
+                    type="button"
+                    key={
+                      value
+                    }
+                    onClick={() =>
+                      changeWatermarkColor(
+                        kind,
+                        index,
+                        value
+                      )
+                    }
+                    style={{
+                      minHeight:
+                        '38px',
+
+                      borderRadius:
+                        '8px',
+
+                      border:
+                        active
+                          ? '1px solid rgba(255,255,255,.9)'
+                          : '1px solid rgba(255,255,255,.2)',
+
+                      background:
+                        active
+                          ? 'rgba(255,255,255,.14)'
+                          : 'rgba(255,255,255,.035)',
+
+                      color:
+                        '#f5f5f5',
+
+                      cursor:
+                        'pointer',
+
+                      fontSize:
+                        '11px',
+
+                      fontWeight:
+                        active
+                          ? 700
+                          : 500,
+
+                      letterSpacing:
+                        '.06em',
+                    }}
+                  >
+                    {text}
+                  </button>
+                );
+              }
+            )}
+          </div>
+
+          <span
+            style={{
+              color:
+                'rgba(255,255,255,.34)',
+
+              fontSize:
+                '9px',
+
+              lineHeight:
+                1.5,
+            }}
+          >
+            NONEが初期値です。WHITEは25%、BLACKは5%で開始します。
+          </span>
+        </div>
+
+
+        {/* ===================================
+            OPACITY
+        =================================== */}
+
+        <div
+          style={{
+            display:
+              'grid',
+
+            gap:
+              '9px',
+
+            opacity:
+              disabled
+                ? 0.35
+                : 1,
+          }}
+        >
+          <div
+            style={{
+              display:
+                'flex',
+
+              justifyContent:
+                'space-between',
+
+              alignItems:
+                'center',
+            }}
+          >
+            <span
+              style={{
+                color:
+                  'rgba(255,255,255,.5)',
+
+                fontSize:
+                  '10px',
+
+                letterSpacing:
+                  '.12em',
+              }}
+            >
               OPACITY
             </span>
-            <strong style={{ fontSize: '12px' }}>{watermark.opacity}%</strong>
+
+            <strong
+              style={{
+                fontSize:
+                  '12px',
+              }}
+            >
+              {watermark.opacity}%
+            </strong>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '38px 1fr 38px', gap: '8px', alignItems: 'center' }}>
+
+          <div
+            style={{
+              display:
+                'grid',
+
+              gridTemplateColumns:
+                '38px 1fr 38px',
+
+              gap:
+                '8px',
+
+              alignItems:
+                'center',
+            }}
+          >
             <button
               type="button"
-              disabled={disabled}
-              onClick={() => updateWatermark(kind, index, { opacity: clampOpacity(watermark.opacity - 1) })}
-              style={{ height: '36px' }}
-            >−</button>
+              disabled={
+                disabled
+              }
+              onClick={() =>
+                updateWatermark(
+                  kind,
+                  index,
+                  {
+                    opacity:
+                      clampOpacity(
+                        watermark.opacity -
+                          1
+                      ),
+                  }
+                )
+              }
+              style={{
+                height:
+                  '36px',
+
+                borderRadius:
+                  '8px',
+
+                border:
+                  '1px solid rgba(255,255,255,.2)',
+
+                background:
+                  'rgba(255,255,255,.05)',
+
+                color:
+                  '#fff',
+
+                cursor:
+                  disabled
+                    ? 'default'
+                    : 'pointer',
+              }}
+            >
+              −
+            </button>
+
             <input
               type="range"
               min="0"
               max="100"
               step="1"
-              disabled={disabled}
-              value={watermark.opacity}
-              onChange={(e) => updateWatermark(kind, index, { opacity: clampOpacity(Number(e.target.value)) })}
-              style={{ width: '100%' }}
+              disabled={
+                disabled
+              }
+              value={
+                watermark.opacity
+              }
+              onChange={(
+                e
+              ) =>
+                updateWatermark(
+                  kind,
+                  index,
+                  {
+                    opacity:
+                      clampOpacity(
+                        Number(
+                          e.target
+                            .value
+                        )
+                      ),
+                  }
+                )
+              }
+              style={{
+                width:
+                  '100%',
+              }}
             />
+
             <button
               type="button"
-              disabled={disabled}
-              onClick={() => updateWatermark(kind, index, { opacity: clampOpacity(watermark.opacity + 1) })}
-              style={{ height: '36px' }}
-            >＋</button>
+              disabled={
+                disabled
+              }
+              onClick={() =>
+                updateWatermark(
+                  kind,
+                  index,
+                  {
+                    opacity:
+                      clampOpacity(
+                        watermark.opacity +
+                          1
+                      ),
+                  }
+                )
+              }
+              style={{
+                height:
+                  '36px',
+
+                borderRadius:
+                  '8px',
+
+                border:
+                  '1px solid rgba(255,255,255,.2)',
+
+                background:
+                  'rgba(255,255,255,.05)',
+
+                color:
+                  '#fff',
+
+                cursor:
+                  disabled
+                    ? 'default'
+                    : 'pointer',
+              }}
+            >
+              ＋
+            </button>
           </div>
         </div>
 
-        <div style={{ display: 'grid', gap: '9px', opacity: gridDisabled ? 0.35 : 1 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ color: 'rgba(255,255,255,.5)', fontSize: '10px', letterSpacing: '.12em' }}>
+
+        {/* ===================================
+            GRID SIZE
+        =================================== */}
+
+        <div
+          style={{
+            display:
+              'grid',
+
+            gap:
+              '9px',
+
+            opacity:
+              gridDisabled
+                ? 0.35
+                : 1,
+          }}
+        >
+          <div
+            style={{
+              display:
+                'flex',
+
+              justifyContent:
+                'space-between',
+
+              alignItems:
+                'center',
+            }}
+          >
+            <span
+              style={{
+                color:
+                  'rgba(255,255,255,.5)',
+
+                fontSize:
+                  '10px',
+
+                letterSpacing:
+                  '.12em',
+              }}
+            >
               GRID SIZE
             </span>
-            <strong style={{ fontSize: '12px' }}>{watermark.gridSize}</strong>
+
+            <strong
+              style={{
+                fontSize:
+                  '12px',
+              }}
+            >
+              {watermark.gridSize ??
+                DEFAULT_GRID_SIZE}
+            </strong>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '38px 1fr 38px', gap: '8px', alignItems: 'center' }}>
+
+          <div
+            style={{
+              display:
+                'grid',
+
+              gridTemplateColumns:
+                '38px 1fr 38px',
+
+              gap:
+                '8px',
+
+              alignItems:
+                'center',
+            }}
+          >
             <button
               type="button"
-              disabled={gridDisabled}
-              onClick={() => updateWatermark(kind, index, { gridSize: clampGridSize(watermark.gridSize - 10) })}
-              style={{ height: '36px' }}
-            >−</button>
+              disabled={
+                gridDisabled
+              }
+              onClick={() =>
+                updateWatermark(
+                  kind,
+                  index,
+                  {
+                    gridSize:
+                      clampGridSize(
+                        (
+                          watermark.gridSize ??
+                          DEFAULT_GRID_SIZE
+                        ) - 10
+                      ),
+                  }
+                )
+              }
+              style={{
+                height:
+                  '36px',
+
+                borderRadius:
+                  '8px',
+
+                border:
+                  '1px solid rgba(255,255,255,.2)',
+
+                background:
+                  'rgba(255,255,255,.05)',
+
+                color:
+                  '#fff',
+
+                cursor:
+                  gridDisabled
+                    ? 'default'
+                    : 'pointer',
+              }}
+            >
+              −
+            </button>
+
             <input
               type="range"
               min="60"
               max="500"
               step="10"
-              disabled={gridDisabled}
-              value={watermark.gridSize}
-              onChange={(e) => updateWatermark(kind, index, { gridSize: clampGridSize(Number(e.target.value)) })}
-              style={{ width: '100%' }}
+              disabled={
+                gridDisabled
+              }
+              value={
+                watermark.gridSize ??
+                DEFAULT_GRID_SIZE
+              }
+              onChange={(
+                e
+              ) =>
+                updateWatermark(
+                  kind,
+                  index,
+                  {
+                    gridSize:
+                      clampGridSize(
+                        Number(
+                          e.target
+                            .value
+                        )
+                      ),
+                  }
+                )
+              }
+              style={{
+                width:
+                  '100%',
+              }}
             />
+
             <button
               type="button"
-              disabled={gridDisabled}
-              onClick={() => updateWatermark(kind, index, { gridSize: clampGridSize(watermark.gridSize + 10) })}
-              style={{ height: '36px' }}
-            >＋</button>
+              disabled={
+                gridDisabled
+              }
+              onClick={() =>
+                updateWatermark(
+                  kind,
+                  index,
+                  {
+                    gridSize:
+                      clampGridSize(
+                        (
+                          watermark.gridSize ??
+                          DEFAULT_GRID_SIZE
+                        ) + 10
+                      ),
+                  }
+                )
+              }
+              style={{
+                height:
+                  '36px',
+
+                borderRadius:
+                  '8px',
+
+                border:
+                  '1px solid rgba(255,255,255,.2)',
+
+                background:
+                  'rgba(255,255,255,.05)',
+
+                color:
+                  '#fff',
+
+                cursor:
+                  gridDisabled
+                    ? 'default'
+                    : 'pointer',
+              }}
+            >
+              ＋
+            </button>
           </div>
+
+          <span
+            style={{
+              color:
+                'rgba(255,255,255,.36)',
+
+              fontSize:
+                '9px',
+
+              lineHeight:
+                1.5,
+            }}
+          >
+            小さいほど格子が細かく、大きいほど格子が大きくなります。
+          </span>
         </div>
 
-        <label style={{ display: 'grid', gap: '8px', opacity: disabled ? 0.35 : 1 }}>
-          <span style={{ color: 'rgba(255,255,255,.5)', fontSize: '10px', letterSpacing: '.12em' }}>
+
+        {/* ===================================
+            ID
+        =================================== */}
+
+        <label
+          style={{
+            display:
+              'grid',
+
+            gap:
+              '8px',
+
+            opacity:
+              disabled
+                ? 0.35
+                : 1,
+          }}
+        >
+          <span
+            style={{
+              color:
+                'rgba(255,255,255,.5)',
+
+              fontSize:
+                '10px',
+
+              letterSpacing:
+                '.12em',
+            }}
+          >
             ID
           </span>
+
           <input
             type="text"
-            disabled={disabled}
-            value={watermark.text}
-            onChange={(e) => updateWatermark(kind, index, { text: e.target.value })}
-            onBlur={() => updateWatermark(kind, index, { text: normalizeWatermarkText(watermark.text) })}
-            placeholder={category === 'commission' ? '@artist' : ORIGINAL_WATERMARK_ID}
-            style={inputStyle}
+            disabled={
+              disabled
+            }
+            value={
+              watermark.text
+            }
+            onChange={(
+              e
+            ) =>
+              updateWatermark(
+                kind,
+                index,
+                {
+                  text:
+                    e.target.value,
+                }
+              )
+            }
+            onBlur={() =>
+              updateWatermark(
+                kind,
+                index,
+                {
+                  text:
+                    normalizeWatermarkText(
+                      watermark.text
+                    ),
+                }
+              )
+            }
+            placeholder={
+              category ===
+              'commission'
+                ? '@artist'
+                : ORIGINAL_WATERMARK_ID
+            }
+            style={
+              inputStyle
+            }
           />
         </label>
 
-        <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', opacity: disabled ? 0.35 : 1 }}>
-          <span style={{ display: 'grid', gap: '3px' }}>
-            <strong style={{ fontSize: '11px', letterSpacing: '.08em' }}>
+
+        {/* ===================================
+            DIAGONAL GRID
+        =================================== */}
+
+        <label
+          style={{
+            display:
+              'flex',
+
+            alignItems:
+              'center',
+
+            justifyContent:
+              'space-between',
+
+            gap:
+              '12px',
+
+            opacity:
+              disabled
+                ? 0.35
+                : 1,
+          }}
+        >
+          <span
+            style={{
+              display:
+                'grid',
+
+              gap:
+                '3px',
+            }}
+          >
+            <strong
+              style={{
+                fontSize:
+                  '11px',
+
+                letterSpacing:
+                  '.08em',
+              }}
+            >
               DIAGONAL GRID
             </strong>
-            <span style={{ color: 'rgba(255,255,255,.4)', fontSize: '10px' }}>
+
+            <span
+              style={{
+                color:
+                  'rgba(255,255,255,.4)',
+
+                fontSize:
+                  '10px',
+              }}
+            >
               大きな斜め格子を画像全体に表示
             </span>
           </span>
+
           <input
             type="checkbox"
-            disabled={disabled}
-            checked={watermark.grid}
-            onChange={(e) => updateWatermark(kind, index, { grid: e.target.checked })}
+            disabled={
+              disabled
+            }
+            checked={
+              watermark.grid
+            }
+            onChange={(
+              e
+            ) =>
+              updateWatermark(
+                kind,
+                index,
+                {
+                  grid:
+                    e.target
+                      .checked,
+                }
+              )
+            }
           />
         </label>
       </div>
     );
   };
+
 
   const fieldStyle = {
     display: 'grid',
@@ -1939,7 +2565,7 @@ export default function EditIllustrationPage() {
               </legend>
 
               <p style={{ margin: 0, color: 'rgba(255,255,255,.48)', fontSize: '11px', lineHeight: 1.7 }}>
-                画像ごとに透かしを編集できます。WHITEは25%、BLACKは5%が初期値です。
+                画像ごとに透かしを編集できます。NONEが初期値で、WHITEは25%、BLACKは5%から開始します。
               </p>
 
               {existingImages.map((image, index) =>
