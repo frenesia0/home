@@ -165,6 +165,14 @@ export default function EditIllustrationPage() {
     useState<string | null>(null);
 
   const [cropOpen, setCropOpen] = useState(false);
+
+  // ギャラリー右上ランダム表示用。
+  // false の作品は候補から除外し、トリミングUIも表示しない。
+  const [heroEnabled, setHeroEnabled] = useState(true);
+  const [heroCrop, setHeroCrop] =
+    useState<CropValue>(DEFAULT_CROP);
+  const [heroCropOpen, setHeroCropOpen] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState('');
@@ -263,6 +271,16 @@ export default function EditIllustrationPage() {
 
       setThumbnailCrop(
         found.thumbnailCrop ??
+          DEFAULT_CROP
+      );
+
+      // 既存作品には heroEnabled が無いので、false のときだけ除外扱い。
+      setHeroEnabled(
+        found.heroEnabled !== false
+      );
+
+      setHeroCrop(
+        found.heroCrop ??
           DEFAULT_CROP
       );
 
@@ -1214,6 +1232,11 @@ export default function EditIllustrationPage() {
               ? finalThumbnailIndex
               : undefined,
           thumbnailCrop,
+          heroEnabled,
+          heroCrop:
+            heroEnabled
+              ? heroCrop
+              : undefined,
           customThumbnail:
             thumbnailMode ===
             'custom'
@@ -2901,6 +2924,109 @@ export default function EditIllustrationPage() {
                   </button>
                 </div>
               )}
+
+              {/* GALLERY HERO */}
+
+              {thumbnailSrc && (
+                <div
+                  style={{
+                    marginTop: '24px',
+                    paddingTop: '20px',
+                    borderTop: '1px solid rgba(255,255,255,.12)',
+                  }}
+                >
+                  <div
+                    style={{
+                      marginBottom: '12px',
+                      fontSize: '11px',
+                      letterSpacing: '.1em',
+                      color: 'rgba(255,255,255,.58)',
+                    }}
+                  >
+                    GALLERY HERO
+                  </div>
+
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '9px',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      color: 'rgba(255,255,255,.76)',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={heroEnabled}
+                      onChange={(event) => {
+                        const checked = event.target.checked;
+                        setHeroEnabled(checked);
+
+                        if (!checked) {
+                          setHeroCropOpen(false);
+                        }
+                      }}
+                    />
+
+                    ギャラリー右上のランダム表示候補に含める
+                  </label>
+
+                  <p
+                    style={{
+                      margin: '8px 0 0',
+                      color: 'rgba(255,255,255,.4)',
+                      fontSize: '10px',
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    OFFにした作品は右上のランダム表示には使われません。
+                  </p>
+
+                  {heroEnabled && (
+                    <div style={{ marginTop: '16px' }}>
+                      <div
+                        style={{
+                          position: 'relative',
+                          width: 'min(360px, 100%)',
+                          aspectRatio: '16 / 9',
+                          overflow: 'hidden',
+                          borderRadius: '10px',
+                          background: 'rgba(255,255,255,.08)',
+                          border: '1px solid rgba(255,255,255,.2)',
+                          marginBottom: '10px',
+                        }}
+                      >
+                        <CropImg
+                          src={thumbnailSrc}
+                          crop={heroCrop}
+                          alt="gallery hero preview"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => setHeroCropOpen(true)}
+                      >
+                        横長表示を調整
+                      </button>
+
+                      <p
+                        style={{
+                          margin: '9px 0 0',
+                          color: 'rgba(255,255,255,.4)',
+                          fontSize: '10px',
+                          lineHeight: 1.6,
+                        }}
+                      >
+                        ギャラリー右上にランダム表示される際の構図です。
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
             </fieldset>
           </section>
 
@@ -3792,6 +3918,24 @@ export default function EditIllustrationPage() {
           }}
         />
       )}
+
+      {thumbnailSrc &&
+        heroEnabled && (
+          <CropEditor
+            open={heroCropOpen}
+            src={thumbnailSrc}
+            aspect="16:9"
+            initial={heroCrop}
+            onClose={() =>
+              setHeroCropOpen(false)
+            }
+            onApply={(crop) => {
+              setHeroCrop(crop);
+              setHeroCropOpen(false);
+            }}
+          />
+        )}
+
     </>
   );
 }
