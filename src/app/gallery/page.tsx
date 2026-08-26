@@ -139,7 +139,8 @@ function buildGalleryQuery(
   category: GalleryCategory,
   character: CharacterFilter,
   tag: TagFilter,
-  sortOrder: SortOrder
+  sortOrder: SortOrder,
+  page: number
 ) {
   const params =
     new URLSearchParams();
@@ -178,6 +179,13 @@ function buildGalleryQuery(
     params.set(
       'sort',
       sortOrder
+    );
+  }
+
+  if (page > 1) {
+    params.set(
+      'page',
+      String(page)
     );
   }
 
@@ -298,11 +306,30 @@ export default function GalleryPage() {
   ] =
     useState('');
 
+  const initialPageRaw =
+    Number(
+      searchParams.get(
+        'page'
+      ) ?? '1'
+    );
+
+  const initialPage =
+    Number.isFinite(
+      initialPageRaw
+    ) &&
+    initialPageRaw >= 1
+      ? Math.floor(
+          initialPageRaw
+        )
+      : 1;
+
   const [
     page,
     setPage,
   ] =
-    useState(1);
+    useState(
+      initialPage
+    );
 
   const [
     heroPostId,
@@ -468,8 +495,9 @@ export default function GalleryPage() {
         (item) =>
           item.category ===
             'original' &&
-          item.heroEnabled !==
-            false &&
+          item.heroEnabled ===
+            true &&
+          item.heroCrop != null &&
           getGalleryThumbnailImage(
             item
           ) !== null
@@ -521,7 +549,8 @@ export default function GalleryPage() {
         category,
         character,
         tag,
-        sortOrder
+        sortOrder,
+        page
       );
 
     router.replace(
@@ -537,6 +566,7 @@ export default function GalleryPage() {
     character,
     tag,
     sortOrder,
+    page,
     router,
   ]);
 
@@ -544,13 +574,24 @@ export default function GalleryPage() {
    * フィルター条件を変更したら
    * 必ず1ページ目へ戻る。
    */
+  const [
+    filtersReady,
+    setFiltersReady,
+  ] = useState(false);
+
   useEffect(() => {
+    if (!filtersReady) {
+      setFiltersReady(true);
+      return;
+    }
+
     setPage(1);
   }, [
     category,
     character,
     tag,
     sortOrder,
+    filtersReady,
   ]);
 
   const filtered =
@@ -670,13 +711,15 @@ export default function GalleryPage() {
           category,
           character,
           tag,
-          sortOrder
+          sortOrder,
+          currentPage
         ),
       [
         category,
         character,
         tag,
         sortOrder,
+        currentPage,
       ]
     );
 
@@ -741,13 +784,13 @@ export default function GalleryPage() {
     (active: boolean) => ({
       ...pillStyle(active),
       padding:
-        '14px 30px',
+        '16px 38px',
       minWidth:
-        '150px',
+        '174px',
       minHeight:
-        '48px',
+        '54px',
       fontSize:
-        '14px',
+        '15px',
       fontWeight:
         800,
       letterSpacing:
@@ -820,9 +863,7 @@ export default function GalleryPage() {
               )}
               crop={
                 heroPost
-                  ?.heroCrop ??
-                heroPost
-                  ?.thumbnailCrop
+                  ?.heroCrop
               }
               alt=""
             />
@@ -1011,7 +1052,7 @@ export default function GalleryPage() {
               'all'
             );
           }}
-          style={pillStyle(
+          style={categoryPillStyle(
             category ===
               'original'
           )}
@@ -1029,7 +1070,7 @@ export default function GalleryPage() {
               'all'
             );
           }}
-          style={pillStyle(
+          style={categoryPillStyle(
             category ===
               'commission'
           )}
@@ -1671,69 +1712,50 @@ export default function GalleryPage() {
       <style jsx global>{`
         .gallery-random-hero {
           position: absolute;
-          top: -20px;
-          right: -10px;
+          top: -12px;
+          right: 0;
           width: min(62%, 680px);
-          height: 225px;
-          opacity: 0.82;
+          aspect-ratio: 16 / 9;
+          opacity: 0.84;
           pointer-events: none;
           overflow: hidden;
           filter:
-            saturate(.92)
-            contrast(.95);
+            saturate(.94)
+            contrast(.97);
           -webkit-mask-image:
-            radial-gradient(
-              ellipse 76% 72%
-              at 57% 48%,
-              #000 0%,
-              #000 28%,
-              rgba(0,0,0,.95) 38%,
-              rgba(0,0,0,.72) 52%,
-              rgba(0,0,0,.34) 68%,
-              rgba(0,0,0,.08) 80%,
-              transparent 91%
-            );
-          mask-image:
-            radial-gradient(
-              ellipse 76% 72%
-              at 57% 48%,
-              #000 0%,
-              #000 28%,
-              rgba(0,0,0,.95) 38%,
-              rgba(0,0,0,.72) 52%,
-              rgba(0,0,0,.34) 68%,
-              rgba(0,0,0,.08) 80%,
-              transparent 91%
-            );
-        }
-
-        .gallery-random-hero::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          z-index: 2;
-          box-shadow:
-            inset 54px 0 48px rgba(20,23,28,.74),
-            inset -38px 0 42px rgba(20,23,28,.44),
-            inset 0 34px 34px rgba(20,23,28,.34),
-            inset 0 -38px 40px rgba(20,23,28,.58);
-          pointer-events: none;
-        }
-
-        .gallery-random-hero::after {
-          content: '';
-          position: absolute;
-          inset: 0;
-          z-index: 3;
-          background:
             linear-gradient(
               90deg,
-              rgba(20,23,28,.98) 0%,
-              rgba(20,23,28,.72) 10%,
-              rgba(20,23,28,.22) 30%,
-              transparent 52%
+              transparent 0,
+              #000 12px,
+              #000 calc(100% - 12px),
+              transparent 100%
+            ),
+            linear-gradient(
+              180deg,
+              transparent 0,
+              #000 10px,
+              #000 calc(100% - 10px),
+              transparent 100%
             );
-          pointer-events: none;
+          -webkit-mask-composite:
+            source-in;
+          mask-image:
+            linear-gradient(
+              90deg,
+              transparent 0,
+              #000 12px,
+              #000 calc(100% - 12px),
+              transparent 100%
+            ),
+            linear-gradient(
+              180deg,
+              transparent 0,
+              #000 10px,
+              #000 calc(100% - 10px),
+              transparent 100%
+            );
+          mask-composite:
+            intersect;
         }
 
         .gallery-random-hero > * {
@@ -1881,23 +1903,11 @@ export default function GalleryPage() {
           }
 
           .gallery-random-hero {
-            top: -4px;
-            right: -18%;
-            width: 86%;
-            height: 165px;
-            opacity: 0.68;
-          }
-
-          .gallery-category-row
-            button {
-            min-width:
-              138px !important;
-            min-height:
-              48px !important;
-            padding:
-              13px 22px !important;
-            font-size:
-              13px !important;
+            top: 0;
+            right: -12%;
+            width: 78%;
+            aspect-ratio: 16 / 9;
+            opacity: 0.76;
           }
 
           .gallery-heading-copy {
