@@ -83,7 +83,7 @@ function defaultWatermarkFor(
       : ORIGINAL_WATERMARK_ID;
 
   return {
-    ...createGalleryWatermark('white', text),
+    ...createGalleryWatermark('none', text),
     gridSize: DEFAULT_GRID_SIZE,
   };
 }
@@ -729,29 +729,125 @@ export default function EditIllustrationPage() {
       };
     };
 
-  const uploadAudioToFirebase =
+  const uploadAudioToCloudinary =
     async (
       file: File
     ): Promise<string> => {
-      const be = backend();
+      const cloudName =
+        process.env
+          .NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+          ?.trim();
 
-      if (!be) {
+      const uploadPreset =
+        process.env
+          .NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET
+          ?.trim();
+
+      if (
+        !cloudName ||
+        !uploadPreset
+      ) {
         throw new Error(
-          'Firebase Storageへ接続できません。'
+          'Cloudinaryの設定が見つかりません。'
         );
       }
 
-      const ext =
-        file.name
-          .split('.')
-          .pop()
-          ?.toLowerCase() ||
-        'mp3';
+      const form =
+        new FormData();
 
-      return await be.uploadFile(
-        file,
-        ext
+      form.append(
+        'file',
+        file
       );
+
+      form.append(
+        'upload_preset',
+        uploadPreset
+      );
+
+      const response =
+        await fetch(
+          `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`,
+          {
+            method: 'POST',
+            body: form,
+          }
+        );
+
+      const result =
+        (await response.json()) as CloudinaryUploadResponse;
+
+      if (
+        !response.ok ||
+        !result.secure_url
+      ) {
+        throw new Error(
+          result.error?.message ||
+            'MP3のアップロードに失敗しました。'
+        );
+      }
+
+      return result.secure_url;
+    };
+
+
+  const deleteCloudinaryAudio =
+    async (
+      audioUrl: string
+    ): Promise<void> => {
+      const normalized =
+        audioUrl.trim();
+
+      if (!normalized) return;
+
+      const be =
+        backend();
+
+      const token =
+        await be
+          ?.getIdToken
+          ?.();
+
+      if (!token) {
+        throw new Error(
+          '音源削除用のログイン認証を取得できませんでした。いったんログインし直してください。'
+        );
+      }
+
+      const response =
+        await fetch(
+          '/api/cloudinary/delete-audio',
+          {
+            method:
+              'POST',
+
+            headers: {
+              'Content-Type':
+                'application/json',
+
+              Authorization:
+                `Bearer ${token}`,
+            },
+
+            body:
+              JSON.stringify({
+                audioUrl:
+                  normalized,
+              }),
+          }
+        );
+
+      const result =
+        (await response.json()) as {
+          error?: string;
+        };
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            'Cloudinary音源の削除に失敗しました。'
+        );
+      }
     };
 
   const handleDeletePost = async () => {
@@ -766,7 +862,7 @@ export default function EditIllustrationPage() {
     }
 
     const confirmed = window.confirm(
-      'この作品を完全に削除しますか？\n\n投稿画像・専用サムネイル・登録済み音源も削除され、元に戻せません。'
+      'この作品を完全に削除しますか？\n\n投稿画像・専用サムネイル・Cloudinary音源も削除され、元に戻せません。'
     );
 
     if (!confirmed) return;
@@ -799,14 +895,9 @@ export default function EditIllustrationPage() {
       );
 
       if (oldAudio) {
-        const be = backend();
-        if (!be) {
-          throw new Error(
-            'Firebase Storageへ接続できません。'
-          );
-        }
-
-        await be.deleteFile(oldAudio);
+        await deleteCloudinaryAudio(
+          oldAudio
+        );
       }
 
       const nextPosts = originalPosts.filter(
@@ -1022,7 +1113,7 @@ export default function EditIllustrationPage() {
           );
 
           newlyUploadedAudio =
-            await uploadAudioToFirebase(
+            await uploadAudioToCloudinary(
               newAudioFile
             );
 
@@ -1166,14 +1257,9 @@ export default function EditIllustrationPage() {
           shouldDeleteOldAudio
         ) {
           try {
-            const be =
-              backend();
-
-            if (be) {
-              await be.deleteFile(
-                oldAudio
-              );
-            }
+            await deleteCloudinaryAudio(
+              oldAudio
+            );
           } catch {
             // 保存自体は成功しているため、
             // 古い音声の削除失敗だけで編集を失敗扱いにしない。
@@ -1203,12 +1289,9 @@ export default function EditIllustrationPage() {
 
           if (newlyUploadedAudio) {
             try {
-              const be = backend();
-              if (be) {
-                await be.deleteFile(
-                  newlyUploadedAudio
-                );
-              }
+              await deleteCloudinaryAudio(
+                newlyUploadedAudio
+              );
             } catch {
               // 同上。
             }
@@ -1258,9 +1341,9 @@ export default function EditIllustrationPage() {
           </span>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '7px' }}>
             {([
+              ['none', 'NONE'],
               ['white', 'WHITE'],
               ['black', 'BLACK'],
-              ['none', 'NONE'],
             ] as const).map(([value, text]) => {
               const active = watermark.color === value;
               return (
