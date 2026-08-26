@@ -271,6 +271,7 @@ export default function GalleryDetailPage() {
 
   return (
     <main
+      className="gallery-detail-page"
       style={{
         maxWidth: '1220px',
         margin: '0 auto',
@@ -279,6 +280,7 @@ export default function GalleryDetailPage() {
       }}
     >
       <div
+        className="gallery-detail-topline"
         style={{
           display: 'flex',
           justifyContent:
@@ -363,6 +365,7 @@ export default function GalleryDetailPage() {
         }}
       >
         <div
+          className="gallery-detail-layout"
           style={{
             display: 'grid',
             gridTemplateColumns:
@@ -373,6 +376,7 @@ export default function GalleryDetailPage() {
             className="gallery-detail-viewer"
             style={{
               position: 'relative',
+              minWidth: 0,
               height:
                 'clamp(420px, calc(100dvh - 220px), 820px)',
               background: '#0c0f12',
@@ -484,7 +488,9 @@ export default function GalleryDetailPage() {
           </section>
 
           <aside
+            className="gallery-detail-info"
             style={{
+              minWidth: 0,
               padding: '24px',
               borderLeft:
                 '1px solid rgba(255,255,255,.1)',
@@ -795,16 +801,82 @@ export default function GalleryDetailPage() {
 
       <style jsx global>{`
         @media (max-width: 760px) {
+          .gallery-detail-page {
+            padding:
+              28px 16px
+              calc(
+                96px +
+                env(safe-area-inset-bottom)
+              ) !important;
+          }
+
+          .gallery-detail-topline {
+            gap: 12px !important;
+            margin-bottom:
+              16px !important;
+          }
+
+          .gallery-detail-layout {
+            grid-template-columns:
+              minmax(0, 1fr) !important;
+          }
+
+          .gallery-detail-viewer {
+            width: 100% !important;
+            min-width: 0 !important;
+            height:
+              clamp(
+                320px,
+                62dvh,
+                620px
+              ) !important;
+          }
+
+          .gallery-detail-info {
+            min-width: 0 !important;
+            padding:
+              22px 18px
+              24px !important;
+            border-left:
+              0 !important;
+            border-top:
+              1px solid
+              rgba(
+                255,
+                255,
+                255,
+                .1
+              ) !important;
+          }
+
+          .gallery-detail-info audio {
+            display: block;
+            width: 100% !important;
+            max-width: 100% !important;
+          }
+        }
+
+        @media (max-width: 430px) {
+          .gallery-detail-page {
+            padding-left:
+              12px !important;
+            padding-right:
+              12px !important;
+          }
+
           .gallery-detail-viewer {
             height:
               clamp(
-                360px,
-                calc(
-                  100dvh -
-                  250px
-                ),
-                720px
+                300px,
+                58dvh,
+                560px
               ) !important;
+          }
+
+          .gallery-detail-info {
+            padding:
+              20px 16px
+              22px !important;
           }
         }
       `}</style>
