@@ -1056,6 +1056,7 @@ export default function GalleryPage() {
       ====================== */}
 
       <section
+        className="gallery-category-row"
         style={{
           display:
             'flex',
@@ -1740,10 +1741,10 @@ export default function GalleryPage() {
           right: 0;
           width: min(62%, 680px);
           aspect-ratio: 16 / 9;
-          opacity: 0.9;
+          opacity: 1;
           pointer-events: none;
           overflow: hidden;
-          background: #1f232a;
+          background: transparent;
         }
 
         .gallery-random-hero::after {
@@ -1756,21 +1757,31 @@ export default function GalleryPage() {
             linear-gradient(
               90deg,
               #1f232a 0,
-              rgba(31,35,42,.8) 8px,
-              transparent 24px,
-              transparent calc(100% - 24px),
-              rgba(31,35,42,.8) calc(100% - 8px),
-              #1f232a 100%
-            ),
+              transparent 18px
+            )
+            left center / 18px 100%
+            no-repeat,
+            linear-gradient(
+              270deg,
+              #1f232a 0,
+              transparent 18px
+            )
+            right center / 18px 100%
+            no-repeat,
             linear-gradient(
               180deg,
               #1f232a 0,
-              rgba(31,35,42,.8) 8px,
-              transparent 24px,
-              transparent calc(100% - 24px),
-              rgba(31,35,42,.8) calc(100% - 8px),
-              #1f232a 100%
-            );
+              transparent 18px
+            )
+            center top / 100% 18px
+            no-repeat,
+            linear-gradient(
+              0deg,
+              #1f232a 0,
+              transparent 18px
+            )
+            center bottom / 100% 18px
+            no-repeat;
         }
 
         .gallery-random-hero > * {
@@ -1914,7 +1925,9 @@ export default function GalleryPage() {
 
           .gallery-heading {
             min-height:
-              250px !important;
+              175px !important;
+            margin-bottom:
+              10px !important;
             overflow:
               visible !important;
           }
@@ -1924,7 +1937,33 @@ export default function GalleryPage() {
             right: -8%;
             width: 76%;
             aspect-ratio: 16 / 9;
-            opacity: 0.88;
+            opacity: 1;
+          }
+
+          .gallery-category-row {
+            display:
+              grid !important;
+            grid-template-columns:
+              minmax(0, 1fr)
+              minmax(0, 1fr);
+            gap:
+              10px !important;
+            margin-bottom:
+              18px !important;
+          }
+
+          .gallery-category-row
+            button {
+            width:
+              100% !important;
+            min-width:
+              0 !important;
+            min-height:
+              52px !important;
+            padding:
+              13px 12px !important;
+            font-size:
+              13px !important;
           }
 
           .gallery-heading-copy {
@@ -1934,6 +1973,11 @@ export default function GalleryPage() {
           .gallery-heading h1 {
             font-size:
               30px !important;
+          }
+
+          .gallery-page > div:nth-of-type(2) {
+            margin-bottom:
+              10px !important;
           }
 
           .gallery-admin-actions {
