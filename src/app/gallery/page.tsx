@@ -3,6 +3,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
@@ -492,15 +493,30 @@ export default function GalleryPage() {
   useEffect(() => {
     const candidates =
       illustrations.filter(
-        (item) =>
-          item.category ===
-            'original' &&
-          item.heroEnabled ===
-            true &&
-          item.heroCrop != null &&
-          getGalleryThumbnailImage(
-            item
-          ) !== null
+        (item) => {
+          if (
+            item.category !== 'original' ||
+            item.heroEnabled !== true ||
+            item.heroCrop == null
+          ) {
+            return false;
+          }
+
+          if (
+            item.heroMode === 'custom'
+          ) {
+            return !!item.customHeroImage?.url;
+          }
+
+          const images =
+            getGalleryImages(item);
+          const index =
+            typeof item.heroImageIndex === 'number'
+              ? item.heroImageIndex
+              : 0;
+
+          return !!images[index];
+        }
       );
 
     if (
@@ -574,14 +590,15 @@ export default function GalleryPage() {
    * フィルター条件を変更したら
    * 必ず1ページ目へ戻る。
    */
-  const [
-    filtersReady,
-    setFiltersReady,
-  ] = useState(false);
+  const didMountFilters =
+    useRef(false);
 
   useEffect(() => {
-    if (!filtersReady) {
-      setFiltersReady(true);
+    if (
+      !didMountFilters.current
+    ) {
+      didMountFilters.current =
+        true;
       return;
     }
 
@@ -591,7 +608,6 @@ export default function GalleryPage() {
     character,
     tag,
     sortOrder,
-    filtersReady,
   ]);
 
   const filtered =
@@ -805,10 +821,18 @@ export default function GalleryPage() {
         ) ?? null
       : null;
 
-  const heroThumbnail =
+  const heroImage =
     heroPost
-      ? getGalleryThumbnailImage(
-          heroPost
+      ? (
+          heroPost.heroMode === 'custom'
+            ? heroPost.customHeroImage ?? null
+            : (
+                getGalleryImages(heroPost)[
+                  typeof heroPost.heroImageIndex === 'number'
+                    ? heroPost.heroImageIndex
+                    : 0
+                ] ?? null
+              )
         )
       : null;
 
@@ -836,8 +860,8 @@ export default function GalleryPage() {
           position:
             'relative',
           minHeight:
-            heroThumbnail
-              ? '180px'
+            heroImage
+              ? '390px'
               : undefined,
           display:
             'flex',
@@ -849,17 +873,17 @@ export default function GalleryPage() {
           marginBottom:
             '34px',
           overflow:
-            'hidden',
+            'visible',
         }}
       >
-        {heroThumbnail && (
+        {heroImage && (
           <div
             className="gallery-random-hero"
             aria-hidden="true"
           >
             <CropImg
               src={optimizeCloudinaryUrl(
-                heroThumbnail.url
+                heroImage.url
               )}
               crop={
                 heroPost
@@ -1712,50 +1736,41 @@ export default function GalleryPage() {
       <style jsx global>{`
         .gallery-random-hero {
           position: absolute;
-          top: -12px;
+          top: 0;
           right: 0;
           width: min(62%, 680px);
           aspect-ratio: 16 / 9;
-          opacity: 0.84;
+          opacity: 0.9;
           pointer-events: none;
           overflow: hidden;
-          filter:
-            saturate(.94)
-            contrast(.97);
-          -webkit-mask-image:
+          background: #1f232a;
+        }
+
+        .gallery-random-hero::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          z-index: 5;
+          pointer-events: none;
+          background:
             linear-gradient(
               90deg,
-              transparent 0,
-              #000 12px,
-              #000 calc(100% - 12px),
-              transparent 100%
+              #1f232a 0,
+              rgba(31,35,42,.8) 8px,
+              transparent 24px,
+              transparent calc(100% - 24px),
+              rgba(31,35,42,.8) calc(100% - 8px),
+              #1f232a 100%
             ),
             linear-gradient(
               180deg,
-              transparent 0,
-              #000 10px,
-              #000 calc(100% - 10px),
-              transparent 100%
+              #1f232a 0,
+              rgba(31,35,42,.8) 8px,
+              transparent 24px,
+              transparent calc(100% - 24px),
+              rgba(31,35,42,.8) calc(100% - 8px),
+              #1f232a 100%
             );
-          -webkit-mask-composite:
-            source-in;
-          mask-image:
-            linear-gradient(
-              90deg,
-              transparent 0,
-              #000 12px,
-              #000 calc(100% - 12px),
-              transparent 100%
-            ),
-            linear-gradient(
-              180deg,
-              transparent 0,
-              #000 10px,
-              #000 calc(100% - 10px),
-              transparent 100%
-            );
-          mask-composite:
-            intersect;
         }
 
         .gallery-random-hero > * {
@@ -1899,15 +1914,17 @@ export default function GalleryPage() {
 
           .gallery-heading {
             min-height:
-              150px !important;
+              250px !important;
+            overflow:
+              visible !important;
           }
 
           .gallery-random-hero {
             top: 0;
-            right: -12%;
-            width: 78%;
+            right: -8%;
+            width: 76%;
             aspect-ratio: 16 / 9;
-            opacity: 0.76;
+            opacity: 0.88;
           }
 
           .gallery-heading-copy {
