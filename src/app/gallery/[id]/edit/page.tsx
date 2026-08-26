@@ -83,7 +83,7 @@ function defaultWatermarkFor(
       : ORIGINAL_WATERMARK_ID;
 
   return {
-    ...createGalleryWatermark('white', text),
+    ...createGalleryWatermark('none', text),
     gridSize: DEFAULT_GRID_SIZE,
   };
 }
@@ -133,6 +133,9 @@ export default function EditIllustrationPage() {
     useState<File | null>(null);
   const [removeAudio, setRemoveAudio] =
     useState(false);
+
+  const [newAudioPreviewUrl, setNewAudioPreviewUrl] =
+    useState<string | null>(null);
 
   const [existingImages, setExistingImages] =
     useState<GalleryImage[]>([]);
@@ -236,6 +239,8 @@ export default function EditIllustrationPage() {
         setSongAudioUrl(
           song?.audioUrl ?? ''
         );
+        setRemoveAudio(false);
+        setNewAudioFile(null);
 
         const imgs =
           getGalleryImages(found);
@@ -333,6 +338,23 @@ export default function EditIllustrationPage() {
     return () =>
       URL.revokeObjectURL(url);
   }, [newCustomThumbnail]);
+
+  useEffect(() => {
+    if (!newAudioFile) {
+      setNewAudioPreviewUrl(null);
+      return;
+    }
+
+    const url =
+      URL.createObjectURL(
+        newAudioFile
+      );
+
+    setNewAudioPreviewUrl(url);
+
+    return () =>
+      URL.revokeObjectURL(url);
+  }, [newAudioFile]);
 
   useEffect(() => {
     if (!isSongParody) {
@@ -729,29 +751,125 @@ export default function EditIllustrationPage() {
       };
     };
 
-  const uploadAudioToFirebase =
+  const uploadAudioToCloudinary =
     async (
       file: File
     ): Promise<string> => {
-      const be = backend();
+      const cloudName =
+        process.env
+          .NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+          ?.trim();
 
-      if (!be) {
+      const uploadPreset =
+        process.env
+          .NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET
+          ?.trim();
+
+      if (
+        !cloudName ||
+        !uploadPreset
+      ) {
         throw new Error(
-          'Firebase Storageへ接続できません。'
+          'Cloudinaryの設定が見つかりません。'
         );
       }
 
-      const ext =
-        file.name
-          .split('.')
-          .pop()
-          ?.toLowerCase() ||
-        'mp3';
+      const form =
+        new FormData();
 
-      return await be.uploadFile(
-        file,
-        ext
+      form.append(
+        'file',
+        file
       );
+
+      form.append(
+        'upload_preset',
+        uploadPreset
+      );
+
+      const response =
+        await fetch(
+          `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`,
+          {
+            method: 'POST',
+            body: form,
+          }
+        );
+
+      const result =
+        (await response.json()) as CloudinaryUploadResponse;
+
+      if (
+        !response.ok ||
+        !result.secure_url
+      ) {
+        throw new Error(
+          result.error?.message ||
+            'MP3のアップロードに失敗しました。'
+        );
+      }
+
+      return result.secure_url;
+    };
+
+
+  const deleteCloudinaryAudio =
+    async (
+      audioUrl: string
+    ): Promise<void> => {
+      const normalized =
+        audioUrl.trim();
+
+      if (!normalized) return;
+
+      const be =
+        backend();
+
+      const token =
+        await be
+          ?.getIdToken
+          ?.();
+
+      if (!token) {
+        throw new Error(
+          '音源削除用のログイン認証を取得できませんでした。いったんログインし直してください。'
+        );
+      }
+
+      const response =
+        await fetch(
+          '/api/cloudinary/delete-audio',
+          {
+            method:
+              'POST',
+
+            headers: {
+              'Content-Type':
+                'application/json',
+
+              Authorization:
+                `Bearer ${token}`,
+            },
+
+            body:
+              JSON.stringify({
+                audioUrl:
+                  normalized,
+              }),
+          }
+        );
+
+      const result =
+        (await response.json()) as {
+          error?: string;
+        };
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            'Cloudinary音源の削除に失敗しました。'
+        );
+      }
     };
 
   const handleDeletePost = async () => {
@@ -766,7 +884,7 @@ export default function EditIllustrationPage() {
     }
 
     const confirmed = window.confirm(
-      'この作品を完全に削除しますか？\n\n投稿画像・専用サムネイル・登録済み音源も削除され、元に戻せません。'
+      'この作品を完全に削除しますか？\n\n投稿画像・専用サムネイル・Cloudinary音源も削除され、元に戻せません。'
     );
 
     if (!confirmed) return;
@@ -799,14 +917,9 @@ export default function EditIllustrationPage() {
       );
 
       if (oldAudio) {
-        const be = backend();
-        if (!be) {
-          throw new Error(
-            'Firebase Storageへ接続できません。'
-          );
-        }
-
-        await be.deleteFile(oldAudio);
+        await deleteCloudinaryAudio(
+          oldAudio
+        );
       }
 
       const nextPosts = originalPosts.filter(
@@ -1022,7 +1135,7 @@ export default function EditIllustrationPage() {
           );
 
           newlyUploadedAudio =
-            await uploadAudioToFirebase(
+            await uploadAudioToCloudinary(
               newAudioFile
             );
 
@@ -1166,14 +1279,9 @@ export default function EditIllustrationPage() {
           shouldDeleteOldAudio
         ) {
           try {
-            const be =
-              backend();
-
-            if (be) {
-              await be.deleteFile(
-                oldAudio
-              );
-            }
+            await deleteCloudinaryAudio(
+              oldAudio
+            );
           } catch {
             // 保存自体は成功しているため、
             // 古い音声の削除失敗だけで編集を失敗扱いにしない。
@@ -1203,12 +1311,9 @@ export default function EditIllustrationPage() {
 
           if (newlyUploadedAudio) {
             try {
-              const be = backend();
-              if (be) {
-                await be.deleteFile(
-                  newlyUploadedAudio
-                );
-              }
+              await deleteCloudinaryAudio(
+                newlyUploadedAudio
+              );
             } catch {
               // 同上。
             }
@@ -1233,163 +1338,789 @@ export default function EditIllustrationPage() {
     label: string,
     watermark: GalleryWatermark
   ) => {
-    const disabled = watermark.color === 'none';
-    const gridDisabled = disabled || !watermark.grid;
+    const disabled =
+      watermark.color ===
+      'none';
+
+    const gridDisabled =
+      disabled ||
+      !watermark.grid;
 
     return (
       <div
         key={`${kind}-${index}-watermark`}
         style={{
-          padding: '16px',
-          border: '1px solid rgba(255,255,255,.14)',
-          borderRadius: '10px',
-          background: 'rgba(255,255,255,.025)',
-          display: 'grid',
-          gap: '18px',
+          padding:
+            '16px',
+
+          border:
+            '1px solid rgba(255,255,255,.14)',
+
+          borderRadius:
+            '10px',
+
+          background:
+            'rgba(255,255,255,.025)',
+
+          display:
+            'grid',
+
+          gap:
+            '18px',
         }}
       >
-        <strong style={{ fontSize: '12px', letterSpacing: '.08em' }}>
-          {label}
-        </strong>
+        <div
+          style={{
+            display:
+              'flex',
 
-        <div style={{ display: 'grid', gap: '8px' }}>
-          <span style={{ color: 'rgba(255,255,255,.5)', fontSize: '10px', letterSpacing: '.12em' }}>
-            COLOR
+            justifyContent:
+              'space-between',
+
+            alignItems:
+              'center',
+
+            gap:
+              '12px',
+          }}
+        >
+          <strong
+            style={{
+              fontSize:
+                '12px',
+
+              letterSpacing:
+                '.08em',
+            }}
+          >
+            {label}
+          </strong>
+
+          <span
+            style={{
+              color:
+                'rgba(255,255,255,.38)',
+
+              fontSize:
+                '9px',
+            }}
+          >
+            {kind ===
+            'existing'
+              ? 'SAVED'
+              : 'NEW'}
           </span>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '7px' }}>
-            {([
-              ['white', 'WHITE'],
-              ['black', 'BLACK'],
-              ['none', 'NONE'],
-            ] as const).map(([value, text]) => {
-              const active = watermark.color === value;
-              return (
-                <button
-                  type="button"
-                  key={value}
-                  onClick={() => changeWatermarkColor(kind, index, value)}
-                  style={{
-                    minHeight: '38px',
-                    borderRadius: '8px',
-                    border: active
-                      ? '1px solid rgba(255,255,255,.9)'
-                      : '1px solid rgba(255,255,255,.2)',
-                    background: active
-                      ? 'rgba(255,255,255,.14)'
-                      : 'rgba(255,255,255,.035)',
-                    color: '#f5f5f5',
-                    cursor: 'pointer',
-                    fontSize: '11px',
-                    fontWeight: active ? 700 : 500,
-                  }}
-                >
-                  {text}
-                </button>
-              );
-            })}
-          </div>
         </div>
 
-        <div style={{ display: 'grid', gap: '9px', opacity: disabled ? 0.35 : 1 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ color: 'rgba(255,255,255,.5)', fontSize: '10px', letterSpacing: '.12em' }}>
+
+        {/* ===================================
+            COLOR
+        =================================== */}
+
+        <div
+          style={{
+            display:
+              'grid',
+
+            gap:
+              '8px',
+          }}
+        >
+          <span
+            style={{
+              color:
+                'rgba(255,255,255,.5)',
+
+              fontSize:
+                '10px',
+
+              letterSpacing:
+                '.12em',
+            }}
+          >
+            COLOR
+          </span>
+
+          <div
+            style={{
+              display:
+                'grid',
+
+              gridTemplateColumns:
+                'repeat(3, 1fr)',
+
+              gap:
+                '7px',
+            }}
+          >
+            {(
+              [
+                [
+                  'none',
+                  'NONE',
+                ],
+
+                [
+                  'white',
+                  'WHITE',
+                ],
+
+                [
+                  'black',
+                  'BLACK',
+                ],
+              ] as const
+            ).map(
+              ([
+                value,
+                text,
+              ]) => {
+                const active =
+                  watermark.color ===
+                  value;
+
+                return (
+                  <button
+                    type="button"
+                    key={
+                      value
+                    }
+                    onClick={() =>
+                      changeWatermarkColor(
+                        kind,
+                        index,
+                        value
+                      )
+                    }
+                    style={{
+                      minHeight:
+                        '38px',
+
+                      borderRadius:
+                        '8px',
+
+                      border:
+                        active
+                          ? '1px solid rgba(255,255,255,.9)'
+                          : '1px solid rgba(255,255,255,.2)',
+
+                      background:
+                        active
+                          ? 'rgba(255,255,255,.14)'
+                          : 'rgba(255,255,255,.035)',
+
+                      color:
+                        '#f5f5f5',
+
+                      cursor:
+                        'pointer',
+
+                      fontSize:
+                        '11px',
+
+                      fontWeight:
+                        active
+                          ? 700
+                          : 500,
+
+                      letterSpacing:
+                        '.06em',
+                    }}
+                  >
+                    {text}
+                  </button>
+                );
+              }
+            )}
+          </div>
+
+          <span
+            style={{
+              color:
+                'rgba(255,255,255,.34)',
+
+              fontSize:
+                '9px',
+
+              lineHeight:
+                1.5,
+            }}
+          >
+            NONEが初期値です。WHITEは25%、BLACKは5%で開始します。
+          </span>
+        </div>
+
+
+        {/* ===================================
+            OPACITY
+        =================================== */}
+
+        <div
+          style={{
+            display:
+              'grid',
+
+            gap:
+              '9px',
+
+            opacity:
+              disabled
+                ? 0.35
+                : 1,
+          }}
+        >
+          <div
+            style={{
+              display:
+                'flex',
+
+              justifyContent:
+                'space-between',
+
+              alignItems:
+                'center',
+            }}
+          >
+            <span
+              style={{
+                color:
+                  'rgba(255,255,255,.5)',
+
+                fontSize:
+                  '10px',
+
+                letterSpacing:
+                  '.12em',
+              }}
+            >
               OPACITY
             </span>
-            <strong style={{ fontSize: '12px' }}>{watermark.opacity}%</strong>
+
+            <strong
+              style={{
+                fontSize:
+                  '12px',
+              }}
+            >
+              {watermark.opacity}%
+            </strong>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '38px 1fr 38px', gap: '8px', alignItems: 'center' }}>
+
+          <div
+            style={{
+              display:
+                'grid',
+
+              gridTemplateColumns:
+                '38px 1fr 38px',
+
+              gap:
+                '8px',
+
+              alignItems:
+                'center',
+            }}
+          >
             <button
               type="button"
-              disabled={disabled}
-              onClick={() => updateWatermark(kind, index, { opacity: clampOpacity(watermark.opacity - 1) })}
-              style={{ height: '36px' }}
-            >−</button>
+              disabled={
+                disabled
+              }
+              onClick={() =>
+                updateWatermark(
+                  kind,
+                  index,
+                  {
+                    opacity:
+                      clampOpacity(
+                        watermark.opacity -
+                          1
+                      ),
+                  }
+                )
+              }
+              style={{
+                height:
+                  '36px',
+
+                borderRadius:
+                  '8px',
+
+                border:
+                  '1px solid rgba(255,255,255,.2)',
+
+                background:
+                  'rgba(255,255,255,.05)',
+
+                color:
+                  '#fff',
+
+                cursor:
+                  disabled
+                    ? 'default'
+                    : 'pointer',
+              }}
+            >
+              −
+            </button>
+
             <input
               type="range"
               min="0"
               max="100"
               step="1"
-              disabled={disabled}
-              value={watermark.opacity}
-              onChange={(e) => updateWatermark(kind, index, { opacity: clampOpacity(Number(e.target.value)) })}
-              style={{ width: '100%' }}
+              disabled={
+                disabled
+              }
+              value={
+                watermark.opacity
+              }
+              onChange={(
+                e
+              ) =>
+                updateWatermark(
+                  kind,
+                  index,
+                  {
+                    opacity:
+                      clampOpacity(
+                        Number(
+                          e.target
+                            .value
+                        )
+                      ),
+                  }
+                )
+              }
+              style={{
+                width:
+                  '100%',
+              }}
             />
+
             <button
               type="button"
-              disabled={disabled}
-              onClick={() => updateWatermark(kind, index, { opacity: clampOpacity(watermark.opacity + 1) })}
-              style={{ height: '36px' }}
-            >＋</button>
+              disabled={
+                disabled
+              }
+              onClick={() =>
+                updateWatermark(
+                  kind,
+                  index,
+                  {
+                    opacity:
+                      clampOpacity(
+                        watermark.opacity +
+                          1
+                      ),
+                  }
+                )
+              }
+              style={{
+                height:
+                  '36px',
+
+                borderRadius:
+                  '8px',
+
+                border:
+                  '1px solid rgba(255,255,255,.2)',
+
+                background:
+                  'rgba(255,255,255,.05)',
+
+                color:
+                  '#fff',
+
+                cursor:
+                  disabled
+                    ? 'default'
+                    : 'pointer',
+              }}
+            >
+              ＋
+            </button>
           </div>
         </div>
 
-        <div style={{ display: 'grid', gap: '9px', opacity: gridDisabled ? 0.35 : 1 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ color: 'rgba(255,255,255,.5)', fontSize: '10px', letterSpacing: '.12em' }}>
+
+        {/* ===================================
+            GRID SIZE
+        =================================== */}
+
+        <div
+          style={{
+            display:
+              'grid',
+
+            gap:
+              '9px',
+
+            opacity:
+              gridDisabled
+                ? 0.35
+                : 1,
+          }}
+        >
+          <div
+            style={{
+              display:
+                'flex',
+
+              justifyContent:
+                'space-between',
+
+              alignItems:
+                'center',
+            }}
+          >
+            <span
+              style={{
+                color:
+                  'rgba(255,255,255,.5)',
+
+                fontSize:
+                  '10px',
+
+                letterSpacing:
+                  '.12em',
+              }}
+            >
               GRID SIZE
             </span>
-            <strong style={{ fontSize: '12px' }}>{watermark.gridSize}</strong>
+
+            <strong
+              style={{
+                fontSize:
+                  '12px',
+              }}
+            >
+              {watermark.gridSize ??
+                DEFAULT_GRID_SIZE}
+            </strong>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '38px 1fr 38px', gap: '8px', alignItems: 'center' }}>
+
+          <div
+            style={{
+              display:
+                'grid',
+
+              gridTemplateColumns:
+                '38px 1fr 38px',
+
+              gap:
+                '8px',
+
+              alignItems:
+                'center',
+            }}
+          >
             <button
               type="button"
-              disabled={gridDisabled}
-              onClick={() => updateWatermark(kind, index, { gridSize: clampGridSize(watermark.gridSize - 10) })}
-              style={{ height: '36px' }}
-            >−</button>
+              disabled={
+                gridDisabled
+              }
+              onClick={() =>
+                updateWatermark(
+                  kind,
+                  index,
+                  {
+                    gridSize:
+                      clampGridSize(
+                        (
+                          watermark.gridSize ??
+                          DEFAULT_GRID_SIZE
+                        ) - 10
+                      ),
+                  }
+                )
+              }
+              style={{
+                height:
+                  '36px',
+
+                borderRadius:
+                  '8px',
+
+                border:
+                  '1px solid rgba(255,255,255,.2)',
+
+                background:
+                  'rgba(255,255,255,.05)',
+
+                color:
+                  '#fff',
+
+                cursor:
+                  gridDisabled
+                    ? 'default'
+                    : 'pointer',
+              }}
+            >
+              −
+            </button>
+
             <input
               type="range"
               min="60"
               max="500"
               step="10"
-              disabled={gridDisabled}
-              value={watermark.gridSize}
-              onChange={(e) => updateWatermark(kind, index, { gridSize: clampGridSize(Number(e.target.value)) })}
-              style={{ width: '100%' }}
+              disabled={
+                gridDisabled
+              }
+              value={
+                watermark.gridSize ??
+                DEFAULT_GRID_SIZE
+              }
+              onChange={(
+                e
+              ) =>
+                updateWatermark(
+                  kind,
+                  index,
+                  {
+                    gridSize:
+                      clampGridSize(
+                        Number(
+                          e.target
+                            .value
+                        )
+                      ),
+                  }
+                )
+              }
+              style={{
+                width:
+                  '100%',
+              }}
             />
+
             <button
               type="button"
-              disabled={gridDisabled}
-              onClick={() => updateWatermark(kind, index, { gridSize: clampGridSize(watermark.gridSize + 10) })}
-              style={{ height: '36px' }}
-            >＋</button>
+              disabled={
+                gridDisabled
+              }
+              onClick={() =>
+                updateWatermark(
+                  kind,
+                  index,
+                  {
+                    gridSize:
+                      clampGridSize(
+                        (
+                          watermark.gridSize ??
+                          DEFAULT_GRID_SIZE
+                        ) + 10
+                      ),
+                  }
+                )
+              }
+              style={{
+                height:
+                  '36px',
+
+                borderRadius:
+                  '8px',
+
+                border:
+                  '1px solid rgba(255,255,255,.2)',
+
+                background:
+                  'rgba(255,255,255,.05)',
+
+                color:
+                  '#fff',
+
+                cursor:
+                  gridDisabled
+                    ? 'default'
+                    : 'pointer',
+              }}
+            >
+              ＋
+            </button>
           </div>
+
+          <span
+            style={{
+              color:
+                'rgba(255,255,255,.36)',
+
+              fontSize:
+                '9px',
+
+              lineHeight:
+                1.5,
+            }}
+          >
+            小さいほど格子が細かく、大きいほど格子が大きくなります。
+          </span>
         </div>
 
-        <label style={{ display: 'grid', gap: '8px', opacity: disabled ? 0.35 : 1 }}>
-          <span style={{ color: 'rgba(255,255,255,.5)', fontSize: '10px', letterSpacing: '.12em' }}>
+
+        {/* ===================================
+            ID
+        =================================== */}
+
+        <label
+          style={{
+            display:
+              'grid',
+
+            gap:
+              '8px',
+
+            opacity:
+              disabled
+                ? 0.35
+                : 1,
+          }}
+        >
+          <span
+            style={{
+              color:
+                'rgba(255,255,255,.5)',
+
+              fontSize:
+                '10px',
+
+              letterSpacing:
+                '.12em',
+            }}
+          >
             ID
           </span>
+
           <input
             type="text"
-            disabled={disabled}
-            value={watermark.text}
-            onChange={(e) => updateWatermark(kind, index, { text: e.target.value })}
-            onBlur={() => updateWatermark(kind, index, { text: normalizeWatermarkText(watermark.text) })}
-            placeholder={category === 'commission' ? '@artist' : ORIGINAL_WATERMARK_ID}
-            style={inputStyle}
+            disabled={
+              disabled
+            }
+            value={
+              watermark.text
+            }
+            onChange={(
+              e
+            ) =>
+              updateWatermark(
+                kind,
+                index,
+                {
+                  text:
+                    e.target.value,
+                }
+              )
+            }
+            onBlur={() =>
+              updateWatermark(
+                kind,
+                index,
+                {
+                  text:
+                    normalizeWatermarkText(
+                      watermark.text
+                    ),
+                }
+              )
+            }
+            placeholder={
+              category ===
+              'commission'
+                ? '@artist'
+                : ORIGINAL_WATERMARK_ID
+            }
+            style={
+              inputStyle
+            }
           />
         </label>
 
-        <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', opacity: disabled ? 0.35 : 1 }}>
-          <span style={{ display: 'grid', gap: '3px' }}>
-            <strong style={{ fontSize: '11px', letterSpacing: '.08em' }}>
+
+        {/* ===================================
+            DIAGONAL GRID
+        =================================== */}
+
+        <label
+          style={{
+            display:
+              'flex',
+
+            alignItems:
+              'center',
+
+            justifyContent:
+              'space-between',
+
+            gap:
+              '12px',
+
+            opacity:
+              disabled
+                ? 0.35
+                : 1,
+          }}
+        >
+          <span
+            style={{
+              display:
+                'grid',
+
+              gap:
+                '3px',
+            }}
+          >
+            <strong
+              style={{
+                fontSize:
+                  '11px',
+
+                letterSpacing:
+                  '.08em',
+              }}
+            >
               DIAGONAL GRID
             </strong>
-            <span style={{ color: 'rgba(255,255,255,.4)', fontSize: '10px' }}>
+
+            <span
+              style={{
+                color:
+                  'rgba(255,255,255,.4)',
+
+                fontSize:
+                  '10px',
+              }}
+            >
               大きな斜め格子を画像全体に表示
             </span>
           </span>
+
           <input
             type="checkbox"
-            disabled={disabled}
-            checked={watermark.grid}
-            onChange={(e) => updateWatermark(kind, index, { grid: e.target.checked })}
+            disabled={
+              disabled
+            }
+            checked={
+              watermark.grid
+            }
+            onChange={(
+              e
+            ) =>
+              updateWatermark(
+                kind,
+                index,
+                {
+                  grid:
+                    e.target
+                      .checked,
+                }
+              )
+            }
           />
         </label>
       </div>
     );
   };
+
 
   const fieldStyle = {
     display: 'grid',
@@ -1834,7 +2565,7 @@ export default function EditIllustrationPage() {
               </legend>
 
               <p style={{ margin: 0, color: 'rgba(255,255,255,.48)', fontSize: '11px', lineHeight: 1.7 }}>
-                画像ごとに透かしを編集できます。WHITEは25%、BLACKは5%が初期値です。
+                画像ごとに透かしを編集できます。NONEが初期値で、WHITEは25%、BLACKは5%から開始します。
               </p>
 
               {existingImages.map((image, index) =>
@@ -2480,37 +3211,116 @@ export default function EditIllustrationPage() {
                       />
                     </label>
 
-                    <label
-                      style={
-                        fieldStyle
-                      }
-                    >
-                      <span>
-                        MP3 / AUDIO
-                      </span>
-
-                      <input
-                        type="file"
-                        accept="audio/*,.mp3"
-                        onChange={(e) => {
-                          setNewAudioFile(
-                            e.target
-                              .files?.[0] ??
-                              null
-                          );
-                          setRemoveAudio(
-                            false
-                          );
-                        }}
+                    {songAudioUrl &&
+                      !removeAudio && (
+                      <div
                         style={{
-                          color:
-                            '#f5f5f5',
+                          display:
+                            'grid',
+                          gap:
+                            '10px',
+                          padding:
+                            '12px',
+                          borderRadius:
+                            '9px',
+                          border:
+                            '1px solid rgba(255,255,255,.14)',
+                          background:
+                            'rgba(255,255,255,.04)',
                         }}
-                      />
-                    </label>
+                      >
+                        <div
+                          style={{
+                            display:
+                              'flex',
+                            justifyContent:
+                              'space-between',
+                            alignItems:
+                              'center',
+                            gap:
+                              '12px',
+                          }}
+                        >
+                          <div
+                            style={{
+                              display:
+                                'grid',
+                              gap:
+                                '3px',
+                            }}
+                          >
+                            <strong
+                              style={{
+                                fontSize:
+                                  '11px',
+                                letterSpacing:
+                                  '.08em',
+                              }}
+                            >
+                              CURRENT AUDIO
+                            </strong>
+
+                            <span
+                              style={{
+                                fontSize:
+                                  '10px',
+                                color:
+                                  'rgba(255,255,255,.48)',
+                              }}
+                            >
+                              登録済み音源
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRemoveAudio(
+                                true
+                              );
+                              setNewAudioFile(
+                                null
+                              );
+                            }}
+                            style={{
+                              border:
+                                '1px solid rgba(255,255,255,.2)',
+                              borderRadius:
+                                '7px',
+                              background:
+                                'transparent',
+                              color:
+                                '#fff',
+                              padding:
+                                '6px 9px',
+                              cursor:
+                                'pointer',
+                              fontSize:
+                                '10px',
+                            }}
+                          >
+                            音源を削除
+                          </button>
+                        </div>
+
+                        <audio
+                          controls
+                          preload="metadata"
+                          src={
+                            songAudioUrl
+                          }
+                          style={{
+                            width:
+                              '100%',
+                          }}
+                        >
+                          お使いのブラウザは音声再生に対応していません。
+                        </audio>
+                      </div>
+                    )}
 
                     {songAudioUrl &&
-                      !removeAudio &&
+                      removeAudio &&
                       !newAudioFile && (
                       <div
                         style={{
@@ -2526,8 +3336,10 @@ export default function EditIllustrationPage() {
                             '10px 12px',
                           borderRadius:
                             '8px',
+                          border:
+                            '1px solid rgba(255,120,120,.28)',
                           background:
-                            'rgba(255,255,255,.06)',
+                            'rgba(255,80,80,.06)',
                         }}
                       >
                         <span
@@ -2535,22 +3347,19 @@ export default function EditIllustrationPage() {
                             fontSize:
                               '11px',
                             color:
-                              'rgba(255,255,255,.62)',
+                              'rgba(255,180,180,.9)',
                           }}
                         >
-                          登録済み音源あり
+                          保存すると登録済み音源を削除します
                         </span>
 
                         <button
                           type="button"
-                          onClick={() => {
+                          onClick={() =>
                             setRemoveAudio(
-                              true
-                            );
-                            setNewAudioFile(
-                              null
-                            );
-                          }}
+                              false
+                            )
+                          }
                           style={{
                             border:
                               '1px solid rgba(255,255,255,.2)',
@@ -2564,25 +3373,162 @@ export default function EditIllustrationPage() {
                               '6px 9px',
                             cursor:
                               'pointer',
+                            fontSize:
+                              '10px',
                           }}
                         >
-                          音源を削除
+                          元に戻す
                         </button>
                       </div>
                     )}
 
-                    {newAudioFile && (
-                      <p
+                    <label
+                      style={
+                        fieldStyle
+                      }
+                    >
+                      <span>
+                        {songAudioUrl
+                          ? 'REPLACE AUDIO'
+                          : 'MP3 / AUDIO'}
+                      </span>
+
+                      <input
+                        type="file"
+                        accept="audio/*,.mp3"
+                        onChange={(e) => {
+                          const file =
+                            e.target
+                              .files?.[0] ??
+                            null;
+
+                          setNewAudioFile(
+                            file
+                          );
+
+                          if (
+                            file
+                          ) {
+                            setRemoveAudio(
+                              false
+                            );
+                          }
+                        }}
                         style={{
-                          margin: 0,
-                          fontSize:
-                            '11px',
                           color:
-                            'rgba(255,255,255,.58)',
+                            '#f5f5f5',
+                        }}
+                      />
+                    </label>
+
+                    {newAudioFile && (
+                      <div
+                        style={{
+                          display:
+                            'grid',
+                          gap:
+                            '9px',
+                          padding:
+                            '12px',
+                          borderRadius:
+                            '9px',
+                          border:
+                            '1px solid rgba(255,255,255,.14)',
+                          background:
+                            'rgba(255,255,255,.04)',
                         }}
                       >
-                        新しい音源: {newAudioFile.name}
-                      </p>
+                        <div
+                          style={{
+                            display:
+                              'flex',
+                            justifyContent:
+                              'space-between',
+                            alignItems:
+                              'center',
+                            gap:
+                              '12px',
+                          }}
+                        >
+                          <div
+                            style={{
+                              display:
+                                'grid',
+                              gap:
+                                '3px',
+                            }}
+                          >
+                            <strong
+                              style={{
+                                fontSize:
+                                  '11px',
+                                letterSpacing:
+                                  '.08em',
+                              }}
+                            >
+                              NEW AUDIO
+                            </strong>
+
+                            <span
+                              style={{
+                                fontSize:
+                                  '10px',
+                                color:
+                                  'rgba(255,255,255,.48)',
+                                wordBreak:
+                                  'break-all',
+                              }}
+                            >
+                              差し替え予定: {
+                                newAudioFile.name
+                              }
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setNewAudioFile(
+                                null
+                              )
+                            }
+                            style={{
+                              border:
+                                '1px solid rgba(255,255,255,.2)',
+                              borderRadius:
+                                '7px',
+                              background:
+                                'transparent',
+                              color:
+                                '#fff',
+                              padding:
+                                '6px 9px',
+                              cursor:
+                                'pointer',
+                              fontSize:
+                                '10px',
+                            }}
+                          >
+                            選択解除
+                          </button>
+                        </div>
+
+                        {newAudioPreviewUrl && (
+                          <audio
+                            controls
+                            preload="metadata"
+                            src={
+                              newAudioPreviewUrl
+                            }
+                            style={{
+                              width:
+                                '100%',
+                            }}
+                          >
+                            お使いのブラウザは音声再生に対応していません。
+                          </audio>
+                        )}
+                      </div>
                     )}
                   </fieldset>
                 )}

@@ -678,6 +678,30 @@ export default function GalleryDetailPage() {
                     曲のリンクを開く
                   </a>
                 )}
+
+                {song.audioUrl && (
+                  <div
+                    style={{
+                      marginTop:
+                        song.title ||
+                        song.url
+                          ? '12px'
+                          : 0,
+                    }}
+                  >
+                    <audio
+                      controls
+                      preload="metadata"
+                      src={song.audioUrl}
+                      style={{
+                        width: '100%',
+                        maxWidth: '100%',
+                      }}
+                    >
+                      お使いのブラウザは音声再生に対応していません。
+                    </audio>
+                  </div>
+                )}
               </div>
             )}
 
