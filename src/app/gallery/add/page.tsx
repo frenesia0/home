@@ -435,16 +435,18 @@ export default function AddIllustrationPage() {
       null
     );
 
-    const [
+  const [
     cropOpen,
     setCropOpen,
   ] =
     useState(false);
 
-  /*
-   * ギャラリー右上ランダム表示専用。
-   * 通常の1:1サムネイルとは別の構図を保存する。
-   */
+  const [
+    heroEnabled,
+    setHeroEnabled,
+  ] =
+    useState(true);
+
   const [
     heroCrop,
     setHeroCrop,
@@ -458,6 +460,7 @@ export default function AddIllustrationPage() {
     setHeroCropOpen,
   ] =
     useState(false);
+
 
   /* =======================================================
      STATUS
@@ -1426,9 +1429,14 @@ export default function AddIllustrationPage() {
               ? thumbnailIndex
               : undefined,
 
-                    thumbnailCrop,
+          thumbnailCrop,
 
-          heroCrop,
+          heroEnabled,
+
+          heroCrop:
+            heroEnabled
+              ? heroCrop
+              : undefined,
 
           customThumbnail:
             thumbnailMode ===
@@ -3021,56 +3029,24 @@ export default function AddIllustrationPage() {
 
               {/* THUMBNAIL CROP PREVIEW */}
 
-                            {thumbnailSrc && (
-                <div
-                  style={{
-                    marginTop:
-                      '16px',
-
-                    display:
-                      'grid',
-
-                    gap:
-                      '24px',
-                  }}
-                >
-                  {/* 1:1 THUMBNAIL */}
-
+              {thumbnailSrc && (
+                <div style={{ marginTop: '16px', display: 'grid', gap: '24px' }}>
                   <div>
                     <div
                       style={{
-                        position:
-                          'relative',
-
-                        width:
-                          'min(220px, 100%)',
-
-                        aspectRatio:
-                          '1 / 1',
-
-                        overflow:
-                          'hidden',
-
-                        borderRadius:
-                          '10px',
-
-                        background:
-                          'rgba(255,255,255,.08)',
-
-                        border:
-                          '1px solid rgba(255,255,255,.2)',
-
-                        marginBottom:
-                          '10px',
+                        position: 'relative',
+                        width: 'min(220px, 100%)',
+                        aspectRatio: '1 / 1',
+                        overflow: 'hidden',
+                        borderRadius: '10px',
+                        background: 'rgba(255,255,255,.08)',
+                        border: '1px solid rgba(255,255,255,.2)',
+                        marginBottom: '10px',
                       }}
                     >
                       <CropImg
-                        src={
-                          thumbnailSrc
-                        }
-                        crop={
-                          thumbnailCrop
-                        }
+                        src={thumbnailSrc}
+                        crop={thumbnailCrop}
                         alt="thumbnail preview"
                       />
                     </div>
@@ -3078,113 +3054,105 @@ export default function AddIllustrationPage() {
                     <button
                       type="button"
                       className="btn btn-ghost"
-                      onClick={() =>
-                        setCropOpen(
-                          true
-                        )
-                      }
+                      onClick={() => setCropOpen(true)}
                     >
                       1:1サムネイルを調整
                     </button>
                   </div>
 
-
-                  {/* GALLERY HERO */}
-
                   <div
                     style={{
-                      paddingTop:
-                        '20px',
-
-                      borderTop:
-                        '1px solid rgba(255,255,255,.12)',
+                      paddingTop: '20px',
+                      borderTop: '1px solid rgba(255,255,255,.12)',
                     }}
                   >
                     <div
                       style={{
-                        marginBottom:
-                          '10px',
-
-                        fontSize:
-                          '11px',
-
-                        letterSpacing:
-                          '.1em',
-
-                        color:
-                          'rgba(255,255,255,.58)',
+                        marginBottom: '12px',
+                        fontSize: '11px',
+                        letterSpacing: '.1em',
+                        color: 'rgba(255,255,255,.58)',
                       }}
                     >
                       GALLERY HERO
                     </div>
 
-                    <div
+                    <label
                       style={{
-                        position:
-                          'relative',
-
-                        width:
-                          'min(360px, 100%)',
-
-                        aspectRatio:
-                          '16 / 9',
-
-                        overflow:
-                          'hidden',
-
-                        borderRadius:
-                          '10px',
-
-                        background:
-                          'rgba(255,255,255,.08)',
-
-                        border:
-                          '1px solid rgba(255,255,255,.2)',
-
-                        marginBottom:
-                          '10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '9px',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        color: 'rgba(255,255,255,.76)',
                       }}
                     >
-                      <CropImg
-                        src={
-                          thumbnailSrc
-                        }
-                        crop={
-                          heroCrop
-                        }
-                        alt="gallery hero preview"
+                      <input
+                        type="checkbox"
+                        checked={heroEnabled}
+                        onChange={(event) => {
+                          const checked = event.target.checked;
+                          setHeroEnabled(checked);
+                          if (!checked) {
+                            setHeroCropOpen(false);
+                          }
+                        }}
                       />
-                    </div>
-
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      onClick={() =>
-                        setHeroCropOpen(
-                          true
-                        )
-                      }
-                    >
-                      横長表示を調整
-                    </button>
+                      ギャラリー右上のランダム表示候補に含める
+                    </label>
 
                     <p
                       style={{
-                        margin:
-                          '9px 0 0',
-
-                        color:
-                          'rgba(255,255,255,.4)',
-
-                        fontSize:
-                          '10px',
-
-                        lineHeight:
-                          1.6,
+                        margin: '8px 0 0',
+                        color: 'rgba(255,255,255,.4)',
+                        fontSize: '10px',
+                        lineHeight: 1.6,
                       }}
                     >
-                      ギャラリー右上にランダム表示される際の構図です。
+                      OFFにした作品は右上のランダム表示には使われません。
                     </p>
+
+                    {heroEnabled && (
+                      <div style={{ marginTop: '16px' }}>
+                        <div
+                          style={{
+                            position: 'relative',
+                            width: 'min(360px, 100%)',
+                            aspectRatio: '16 / 9',
+                            overflow: 'hidden',
+                            borderRadius: '10px',
+                            background: 'rgba(255,255,255,.08)',
+                            border: '1px solid rgba(255,255,255,.2)',
+                            marginBottom: '10px',
+                          }}
+                        >
+                          <CropImg
+                            src={thumbnailSrc}
+                            crop={heroCrop}
+                            alt="gallery hero preview"
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => setHeroCropOpen(true)}
+                        >
+                          横長表示を調整
+                        </button>
+
+                        <p
+                          style={{
+                            margin: '9px 0 0',
+                            color: 'rgba(255,255,255,.4)',
+                            fontSize: '10px',
+                            lineHeight: 1.6,
+                          }}
+                        >
+                          ギャラリー右上にランダム表示される際の構図です。
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -3950,38 +3918,24 @@ export default function AddIllustrationPage() {
         />
       )}
 
-
-            {thumbnailSrc && (
+      {thumbnailSrc &&
+        heroEnabled && (
         <CropEditor
-          open={
-            heroCropOpen
-          }
-          src={
-            thumbnailSrc
-          }
+          open={heroCropOpen}
+          src={thumbnailSrc}
           aspect="16:9"
-          initial={
-            heroCrop
-          }
+          initial={heroCrop}
           onClose={() =>
-            setHeroCropOpen(
-              false
-            )
+            setHeroCropOpen(false)
           }
-          onApply={(
-            crop
-          ) => {
-            setHeroCrop(
-              crop
-            );
-
-            setHeroCropOpen(
-              false
-            );
+          onApply={(crop) => {
+            setHeroCrop(crop);
+            setHeroCropOpen(false);
           }}
         />
       )}
-      
+
+
       {/* =====================================================
           RESPONSIVE
       ===================================================== */}
