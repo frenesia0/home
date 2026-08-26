@@ -13,6 +13,7 @@ import { useAuth } from '@/lib/auth';
 import { backend } from '@/lib/backend';
 import {
   fetchGalleryPosts,
+  getCachedGalleryPosts,
   getGalleryCharacters,
   createGalleryWatermark,
   getDefaultWatermarkOpacity,
@@ -179,128 +180,149 @@ export default function EditIllustrationPage() {
   useEffect(() => {
     let alive = true;
 
-    const load = async () => {
-      try {
-        const posts =
-          await fetchGalleryPosts();
+    const applyPosts = (
+      posts: GalleryPost[]
+    ) => {
+      const found =
+        posts.find(
+          (item) =>
+            item.id === id
+        ) ?? null;
 
-        const found =
-          posts.find(
-            (item) => item.id === id
-          ) ?? null;
+      if (!alive) return;
 
-        if (!alive) return;
+      setOriginalPosts(posts);
+      setPost(found);
 
-        setOriginalPosts(posts);
-        setPost(found);
-
-        if (!found) {
-          setLoading(false);
-          return;
-        }
-
-        setDate(found.date);
-        setCategory(found.category);
-        setCharacters(
-          getGalleryCharacters(found)
-        );
-        setTags(
-          found.category === 'original'
-            ? (
-                Array.isArray(found.tags)
-                  ? found.tags
-                  : []
-              )
-            : []
-        );
-
-        setArtistName(
-          found.commission?.artistName ?? ''
-        );
-        setSnsId(
-          found.commission?.snsId ?? ''
-        );
-        setSnsUrl(
-          found.commission?.snsUrl ?? ''
-        );
-
-        const song =
-          (
-            found.song ??
-            getGallerySong(found)
-          ) as SongWithAudio | null;
-
-        setSongTitle(
-          song?.title ?? ''
-        );
-        setSongUrl(
-          song?.url ?? ''
-        );
-        setSongAudioUrl(
-          song?.audioUrl ?? ''
-        );
-        setRemoveAudio(false);
-        setNewAudioFile(null);
-
-        const imgs =
-          getGalleryImages(found);
-
-        setExistingImages(
-          imgs.map((image) => ({
-            ...image,
-            watermark: watermarkForExisting(
-              image,
-              found.category,
-              found.commission?.snsId ?? ''
-            ),
-          }))
-        );
-
-        setThumbnailMode(
-          found.thumbnailMode ??
-            'post'
-        );
-
-        setThumbnailCrop(
-          found.thumbnailCrop ??
-            DEFAULT_CROP
-        );
-
-        const thumbIndex =
-          typeof found.thumbnailIndex ===
-          'number'
-            ? found.thumbnailIndex
-            : 0;
-
-        setThumbChoice({
-          kind: 'existing',
-          index:
-            thumbIndex >= 0 &&
-            thumbIndex < imgs.length
-              ? thumbIndex
-              : 0,
-        });
-
-        setExistingCustomThumbnail(
-          found.customThumbnail ??
-            null
-        );
-      } catch (err) {
-        if (alive) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : '作品を読み込めませんでした。'
-          );
-        }
-      } finally {
-        if (alive) {
-          setLoading(false);
-        }
+      if (!found) {
+        setLoading(false);
+        return;
       }
+
+      setDate(found.date);
+      setCategory(found.category);
+      setCharacters(
+        getGalleryCharacters(found)
+      );
+      setTags(
+        found.category === 'original'
+          ? (
+              Array.isArray(found.tags)
+                ? found.tags
+                : []
+            )
+          : []
+      );
+
+      setArtistName(
+        found.commission?.artistName ?? ''
+      );
+      setSnsId(
+        found.commission?.snsId ?? ''
+      );
+      setSnsUrl(
+        found.commission?.snsUrl ?? ''
+      );
+
+      const song =
+        (
+          found.song ??
+          getGallerySong(found)
+        ) as SongWithAudio | null;
+
+      setSongTitle(
+        song?.title ?? ''
+      );
+      setSongUrl(
+        song?.url ?? ''
+      );
+      setSongAudioUrl(
+        song?.audioUrl ?? ''
+      );
+      setRemoveAudio(false);
+      setNewAudioFile(null);
+
+      const imgs =
+        getGalleryImages(found);
+
+      setExistingImages(
+        imgs.map((image) => ({
+          ...image,
+          watermark: watermarkForExisting(
+            image,
+            found.category,
+            found.commission?.snsId ?? ''
+          ),
+        }))
+      );
+
+      setThumbnailMode(
+        found.thumbnailMode ??
+          'post'
+      );
+
+      setThumbnailCrop(
+        found.thumbnailCrop ??
+          DEFAULT_CROP
+      );
+
+      const thumbIndex =
+        typeof found.thumbnailIndex ===
+        'number'
+          ? found.thumbnailIndex
+          : 0;
+
+      setThumbChoice({
+        kind: 'existing',
+        index:
+          thumbIndex >= 0 &&
+          thumbIndex < imgs.length
+            ? thumbIndex
+            : 0,
+      });
+
+      setExistingCustomThumbnail(
+        found.customThumbnail ??
+          null
+      );
+
+      setLoading(false);
     };
 
-    void load();
+    const cachedPosts =
+      getCachedGalleryPosts();
+
+    if (
+      cachedPosts &&
+      cachedPosts.length > 0
+    ) {
+      applyPosts(
+        cachedPosts
+      );
+    } else {
+      const load =
+        async () => {
+          try {
+            const posts =
+              await fetchGalleryPosts();
+
+            applyPosts(
+              posts
+            );
+          } catch (err) {
+            if (alive) {
+              setError(
+                err instanceof Error
+                  ? err.message
+                  : '作品を読み込めませんでした。'
+              );
+              setLoading(false);
+            }
+          }
+        };
+
+      void load();
+    }
 
     return () => {
       alive = false;
@@ -3088,18 +3110,6 @@ export default function EditIllustrationPage() {
                         'REFERENCE',
                       ],
                       [
-                        'song-parody',
-                        'SONG PARODY',
-                      ],
-                      [
-                        'manga',
-                        'MANGA',
-                      ],
-                      [
-                        'rakugaki',
-                        'RAKUGAKI',
-                      ],
-                      [
                         'tachie',
                         'TACHIE',
                       ],
@@ -3110,6 +3120,18 @@ export default function EditIllustrationPage() {
                       [
                         'deformed',
                         'DEFORMED',
+                      ],
+                      [
+                        'rakugaki',
+                        'RAKUGAKI',
+                      ],
+                      [
+                        'manga',
+                        'MANGA',
+                      ],
+                      [
+                        'song-parody',
+                        'SONG PARODY',
                       ],
                     ].map(
                       ([
