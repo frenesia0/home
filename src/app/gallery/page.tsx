@@ -313,18 +313,83 @@ export default function GalleryPage() {
     );
 
   useEffect(() => {
+    /*
+     * Next.jsが前ページのスクロール位置を引き継いだ場合でも、
+     * GALLERYを開いた直後はページ最上部から始める。
+     */
+    window.requestAnimationFrame(
+      () => {
+        window.scrollTo({
+          top: 0,
+          left: 0,
+          behavior: 'auto',
+        });
+      }
+    );
+  }, []);
+
+  useEffect(() => {
     let alive = true;
     let firstSnapshot = true;
 
     const cachedPosts =
       getCachedGalleryPosts();
 
+    let browserCachedPosts:
+      GalleryPost[] | null =
+        null;
+
     if (
-      cachedPosts &&
-      cachedPosts.length > 0
+      !cachedPosts &&
+      typeof window !==
+        'undefined'
+    ) {
+      try {
+        const raw =
+          window.localStorage.getItem(
+            'frenesia.gallery.cache.v1'
+          );
+
+        if (raw) {
+          const parsed =
+            JSON.parse(raw) as {
+              savedAt?: number;
+              posts?: GalleryPost[];
+            };
+
+          const freshEnough =
+            typeof parsed.savedAt ===
+              'number' &&
+            Date.now() -
+              parsed.savedAt <
+              30 * 60 * 1000;
+
+          if (
+            freshEnough &&
+            Array.isArray(
+              parsed.posts
+            )
+          ) {
+            browserCachedPosts =
+              parsed.posts;
+          }
+        }
+      } catch {
+        browserCachedPosts =
+          null;
+      }
+    }
+
+    const immediatePosts =
+      cachedPosts ??
+      browserCachedPosts;
+
+    if (
+      immediatePosts &&
+      immediatePosts.length > 0
     ) {
       setIllustrations(
-        cachedPosts
+        immediatePosts
       );
       setLoading(false);
     }
@@ -341,11 +406,24 @@ export default function GalleryPage() {
             );
 
             setError('');
+
+            try {
+              window.localStorage.setItem(
+                'frenesia.gallery.cache.v1',
+                JSON.stringify({
+                  savedAt:
+                    Date.now(),
+                  posts,
+                })
+              );
+            } catch {
+              // キャッシュ保存に失敗しても表示自体は続行する。
+            }
           }
         } catch (err) {
           if (
             alive &&
-            !cachedPosts
+            !immediatePosts
           ) {
             setError(
               err instanceof
@@ -390,6 +468,8 @@ export default function GalleryPage() {
         (item) =>
           item.category ===
             'original' &&
+          item.heroEnabled !==
+            false &&
           getGalleryThumbnailImage(
             item
           ) !== null
@@ -661,15 +741,17 @@ export default function GalleryPage() {
     (active: boolean) => ({
       ...pillStyle(active),
       padding:
-        '11px 22px',
+        '14px 30px',
       minWidth:
-        '118px',
+        '150px',
+      minHeight:
+        '48px',
       fontSize:
-        '13px',
+        '14px',
       fontWeight:
-        700,
+        800,
       letterSpacing:
-        '.03em',
+        '.045em',
     });
 
   const heroPost =
@@ -738,6 +820,8 @@ export default function GalleryPage() {
               )}
               crop={
                 heroPost
+                  ?.heroCrop ??
+                heroPost
                   ?.thumbnailCrop
               }
               alt=""
@@ -800,35 +884,6 @@ export default function GalleryPage() {
                 'flex-end',
             }}
           >
-            <button
-              type="button"
-              onClick={() =>
-                router.push(
-                  '/admin/orphans'
-                )
-              }
-              style={{
-                padding:
-                  '10px 16px',
-                borderRadius:
-                  '8px',
-                border:
-                  '1px solid rgba(255,255,255,.3)',
-                background:
-                  'rgba(255,255,255,.05)',
-                color:
-                  '#f5f5f5',
-                fontWeight:
-                  700,
-                cursor:
-                  'pointer',
-                letterSpacing:
-                  '.02em',
-              }}
-            >
-              UNUSED IMAGES
-            </button>
-
             <button
               type="button"
               onClick={() =>
@@ -1616,45 +1671,69 @@ export default function GalleryPage() {
       <style jsx global>{`
         .gallery-random-hero {
           position: absolute;
-          top: -18px;
-          right: 0;
-          width: min(58%, 650px);
-          height: 220px;
-          opacity: 0.72;
+          top: -20px;
+          right: -10px;
+          width: min(62%, 680px);
+          height: 225px;
+          opacity: 0.82;
           pointer-events: none;
           overflow: hidden;
-          filter: saturate(.9) contrast(.96);
+          filter:
+            saturate(.92)
+            contrast(.95);
           -webkit-mask-image:
             radial-gradient(
-              ellipse at 58% 45%,
+              ellipse 76% 72%
+              at 57% 48%,
               #000 0%,
-              #000 40%,
-              rgba(0,0,0,.88) 54%,
-              rgba(0,0,0,.42) 72%,
-              transparent 90%
+              #000 28%,
+              rgba(0,0,0,.95) 38%,
+              rgba(0,0,0,.72) 52%,
+              rgba(0,0,0,.34) 68%,
+              rgba(0,0,0,.08) 80%,
+              transparent 91%
             );
           mask-image:
             radial-gradient(
-              ellipse at 58% 45%,
+              ellipse 76% 72%
+              at 57% 48%,
               #000 0%,
-              #000 40%,
-              rgba(0,0,0,.88) 54%,
-              rgba(0,0,0,.42) 72%,
-              transparent 90%
+              #000 28%,
+              rgba(0,0,0,.95) 38%,
+              rgba(0,0,0,.72) 52%,
+              rgba(0,0,0,.34) 68%,
+              rgba(0,0,0,.08) 80%,
+              transparent 91%
             );
+        }
+
+        .gallery-random-hero::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          z-index: 2;
+          box-shadow:
+            inset 54px 0 48px rgba(20,23,28,.74),
+            inset -38px 0 42px rgba(20,23,28,.44),
+            inset 0 34px 34px rgba(20,23,28,.34),
+            inset 0 -38px 40px rgba(20,23,28,.58);
+          pointer-events: none;
         }
 
         .gallery-random-hero::after {
           content: '';
           position: absolute;
           inset: 0;
+          z-index: 3;
           background:
             linear-gradient(
               90deg,
-              rgba(20,23,28,1) 0%,
-              rgba(20,23,28,.76) 18%,
-              transparent 50%
+              rgba(20,23,28,.98) 0%,
+              rgba(20,23,28,.72) 10%,
+              rgba(20,23,28,.22) 30%,
+              transparent 52%
             );
+          pointer-events: none;
         }
 
         .gallery-random-hero > * {
@@ -1802,11 +1881,23 @@ export default function GalleryPage() {
           }
 
           .gallery-random-hero {
-            top: 0;
-            right: -12%;
-            width: 78%;
-            height: 160px;
-            opacity: 0.56;
+            top: -4px;
+            right: -18%;
+            width: 86%;
+            height: 165px;
+            opacity: 0.68;
+          }
+
+          .gallery-category-row
+            button {
+            min-width:
+              138px !important;
+            min-height:
+              48px !important;
+            padding:
+              13px 22px !important;
+            font-size:
+              13px !important;
           }
 
           .gallery-heading-copy {
