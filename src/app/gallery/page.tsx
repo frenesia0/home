@@ -80,13 +80,13 @@ function tagLabel(
   if (
     tag === 'single-illustration'
   ) {
-    return '一枚絵';
+    return 'SINGLE ILLUSTRATION';
   }
 
   if (
     tag === 'deformed'
   ) {
-    return 'デフォルメ';
+    return 'DEFORMED';
   }
 
   return tag.toUpperCase();
