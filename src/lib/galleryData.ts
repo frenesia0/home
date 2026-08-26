@@ -399,6 +399,10 @@ export type GalleryThumbnailMode =
   | 'post'
   | 'custom';
 
+export type GalleryHeroMode =
+  | 'post'
+  | 'custom';
+
 
 /* =========================================================
    POST
@@ -438,23 +442,28 @@ export interface GalleryPost {
     number;
 
 
-    thumbnailCrop?:
+  thumbnailCrop?:
     CropValue;
 
+  heroEnabled?:
+    boolean;
 
-  /**
-   * ギャラリー右上のランダムイラスト用・横長トリミング。
-   *
-   * 通常の1:1サムネイルとは別管理。
-   * 未設定の既存投稿は、表示側で通常サムネイルを
-   * 自動的に横長表示するフォールバックを使用する。
-   */
+  heroMode?:
+    GalleryHeroMode;
+
+  heroImageIndex?:
+    number;
+
   heroCrop?:
     CropValue;
+
+  customHeroImage?:
+    GalleryImage;
 
 
   customThumbnail?:
     GalleryImage;
+
 
   commission?:
     GalleryCommission;
