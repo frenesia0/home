@@ -15,6 +15,7 @@ import { useAuth } from '@/lib/auth';
 
 import {
   fetchGalleryPosts,
+  getCachedGalleryPosts,
   getGalleryCharacters,
   getGalleryCommission,
   getGalleryImages,
@@ -291,6 +292,20 @@ export default function GalleryPage() {
 
   useEffect(() => {
     let alive = true;
+    let firstSnapshot = true;
+
+    const cachedPosts =
+      getCachedGalleryPosts();
+
+    if (
+      cachedPosts &&
+      cachedPosts.length > 0
+    ) {
+      setIllustrations(
+        cachedPosts
+      );
+      setLoading(false);
+    }
 
     const load =
       async () => {
@@ -306,7 +321,10 @@ export default function GalleryPage() {
             setError('');
           }
         } catch (err) {
-          if (alive) {
+          if (
+            alive &&
+            !cachedPosts
+          ) {
             setError(
               err instanceof
                 Error
@@ -326,6 +344,14 @@ export default function GalleryPage() {
     const off =
       subscribeGallery(
         () => {
+          if (
+            firstSnapshot
+          ) {
+            firstSnapshot =
+              false;
+            return;
+          }
+
           void load();
         }
       );
