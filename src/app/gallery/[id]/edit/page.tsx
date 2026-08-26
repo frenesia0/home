@@ -2307,13 +2307,12 @@ export default function EditIllustrationPage() {
         </div>
 
         <form
+          className="gallery-edit-form"
           onSubmit={
             handleSave
           }
           style={{
             display: 'grid',
-            gridTemplateColumns:
-              'minmax(320px, 460px) 1fr',
             gap: '42px',
             alignItems:
               'start',
@@ -3106,11 +3105,11 @@ export default function EditIllustrationPage() {
                       ],
                       [
                         'single-illustration',
-                        '一枚絵',
+                        'SINGLE ILLUSTRATION',
                       ],
                       [
                         'deformed',
-                        'デフォルメ',
+                        'DEFORMED',
                       ],
                     ].map(
                       ([
@@ -3738,6 +3737,19 @@ export default function EditIllustrationPage() {
           </section>
         </form>
       </main>
+
+      <style jsx>{`
+        .gallery-edit-form {
+          grid-template-columns: minmax(320px, 460px) minmax(0, 1fr);
+        }
+
+        @media (max-width: 760px) {
+          .gallery-edit-form {
+            grid-template-columns: minmax(0, 1fr);
+            gap: 28px;
+          }
+        }
+      `}</style>
 
       {thumbnailSrc && (
         <CropEditor
