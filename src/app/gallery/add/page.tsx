@@ -3329,6 +3329,16 @@ export default function AddIllustrationPage() {
                           'tachie',
                           'TACHIE',
                         ],
+
+                        [
+                          'single-illustration',
+                          '一枚絵',
+                        ],
+
+                        [
+                          'deformed',
+                          'デフォルメ',
+                        ],
                       ] as const
                     ).map(
                       ([
