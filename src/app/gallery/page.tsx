@@ -340,6 +340,12 @@ export default function GalleryPage() {
       null
     );
 
+  const [
+    mobileTagOpen,
+    setMobileTagOpen,
+  ] =
+    useState(false);
+
   useEffect(() => {
     /*
      * Next.jsが前ページのスクロール位置を引き継いだ場合でも、
@@ -1048,148 +1054,243 @@ export default function GalleryPage() {
 
       {category ===
         'original' && (
-        <section
-          style={{
-            marginBottom:
-              '18px',
-          }}
-        >
-          <p
+        <>
+          <section
+            className="gallery-tag-desktop"
             style={{
-              margin:
-                '0 0 9px',
-              fontSize:
-                '10px',
-              letterSpacing:
-                '.14em',
-              color:
-                'rgba(255,255,255,.45)',
+              marginBottom:
+                '18px',
             }}
           >
-            TAG
-          </p>
+            <p
+              style={{
+                margin:
+                  '0 0 9px',
+                fontSize:
+                  '10px',
+                letterSpacing:
+                  '.14em',
+                color:
+                  'rgba(255,255,255,.45)',
+              }}
+            >
+              TAG
+            </p>
 
-          <div
-            style={{
-              display:
-                'flex',
-              flexWrap:
-                'wrap',
-              gap: '8px',
-            }}
+            <div
+              style={{
+                display:
+                  'flex',
+                flexWrap:
+                  'wrap',
+                gap:
+                  '8px',
+              }}
+            >
+              <button
+                onClick={() =>
+                  setTag(
+                    'all'
+                  )
+                }
+                style={pillStyle(
+                  tag === 'all'
+                )}
+              >
+                ALL TAG
+              </button>
+
+              <button
+                onClick={() =>
+                  setTag(
+                    'reference'
+                  )
+                }
+                style={pillStyle(
+                  tag ===
+                    'reference'
+                )}
+              >
+                REFERENCE
+              </button>
+
+              <button
+                onClick={() =>
+                  setTag(
+                    'tachie'
+                  )
+                }
+                style={pillStyle(
+                  tag ===
+                    'tachie'
+                )}
+              >
+                TACHIE
+              </button>
+
+              <button
+                onClick={() =>
+                  setTag(
+                    'single-illustration'
+                  )
+                }
+                style={pillStyle(
+                  tag ===
+                    'single-illustration'
+                )}
+              >
+                SINGLE ILLUSTRATION
+              </button>
+
+              <button
+                onClick={() =>
+                  setTag(
+                    'deformed'
+                  )
+                }
+                style={pillStyle(
+                  tag ===
+                    'deformed'
+                )}
+              >
+                DEFORMED
+              </button>
+
+              <button
+                onClick={() =>
+                  setTag(
+                    'rakugaki'
+                  )
+                }
+                style={pillStyle(
+                  tag ===
+                    'rakugaki'
+                )}
+              >
+                RAKUGAKI
+              </button>
+
+              <button
+                onClick={() =>
+                  setTag(
+                    'manga'
+                  )
+                }
+                style={pillStyle(
+                  tag ===
+                    'manga'
+                )}
+              >
+                MANGA
+              </button>
+
+              <button
+                onClick={() =>
+                  setTag(
+                    'song-parody'
+                  )
+                }
+                style={pillStyle(
+                  tag ===
+                    'song-parody'
+                )}
+              >
+                SONG PARODY
+              </button>
+            </div>
+          </section>
+
+          <section
+            className="gallery-tag-mobile"
           >
             <button
+              type="button"
+              className="gallery-tag-toggle"
+              aria-expanded={
+                mobileTagOpen
+              }
               onClick={() =>
-                setTag(
-                  'all'
+                setMobileTagOpen(
+                  current =>
+                    !current
                 )
               }
-              style={pillStyle(
-                tag === 'all'
-              )}
             >
-              ALL TAG
+              <span
+                className="gallery-tag-toggle-label"
+              >
+                TAG
+              </span>
+
+              <span
+                className="gallery-tag-current"
+              >
+                {tag === 'all'
+                  ? 'ALL TAG'
+                  : tagLabel(
+                      tag
+                    )}
+              </span>
+
+              <span
+                aria-hidden="true"
+                className="gallery-tag-chevron"
+              >
+                {mobileTagOpen
+                  ? '⌃'
+                  : '⌄'}
+              </span>
             </button>
 
-            <button
-              onClick={() =>
-                setTag(
-                  'reference'
-                )
-              }
-              style={pillStyle(
-                tag ===
-                  'reference'
-              )}
-            >
-              REFERENCE
-            </button>
-
-            <button
-              onClick={() =>
-                setTag(
-                  'tachie'
-                )
-              }
-              style={pillStyle(
-                tag ===
-                  'tachie'
-              )}
-            >
-              TACHIE
-            </button>
-
-            <button
-              onClick={() =>
-                setTag(
-                  'single-illustration'
-                )
-              }
-              style={pillStyle(
-                tag ===
-                  'single-illustration'
-              )}
-            >
-              SINGLE ILLUSTRATION
-            </button>
-
-            <button
-              onClick={() =>
-                setTag(
-                  'deformed'
-                )
-              }
-              style={pillStyle(
-                tag ===
-                  'deformed'
-              )}
-            >
-              DEFORMED
-            </button>
-
-            <button
-              onClick={() =>
-                setTag(
-                  'rakugaki'
-                )
-              }
-              style={pillStyle(
-                tag ===
-                  'rakugaki'
-              )}
-            >
-              RAKUGAKI
-            </button>
-
-            <button
-              onClick={() =>
-                setTag(
-                  'manga'
-                )
-              }
-              style={pillStyle(
-                tag ===
-                  'manga'
-              )}
-            >
-              MANGA
-            </button>
-
-            <button
-              onClick={() =>
-                setTag(
-                  'song-parody'
-                )
-              }
-              style={pillStyle(
-                tag ===
-                  'song-parody'
-              )}
-            >
-              SONG PARODY
-            </button>
-          </div>
-        </section>
+            {mobileTagOpen && (
+              <div
+                className="gallery-tag-panel"
+              >
+                {(
+                  [
+                    ['all', 'ALL TAG'],
+                    ['reference', 'REFERENCE'],
+                    ['tachie', 'TACHIE'],
+                    [
+                      'single-illustration',
+                      'SINGLE ILLUSTRATION',
+                    ],
+                    ['deformed', 'DEFORMED'],
+                    ['rakugaki', 'RAKUGAKI'],
+                    ['manga', 'MANGA'],
+                    [
+                      'song-parody',
+                      'SONG PARODY',
+                    ],
+                  ] as const
+                ).map(
+                  ([
+                    value,
+                    label,
+                  ]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => {
+                        setTag(
+                          value
+                        );
+                        setMobileTagOpen(
+                          false
+                        );
+                      }}
+                      style={pillStyle(
+                        tag === value
+                      )}
+                    >
+                      {label}
+                    </button>
+                  )
+                )}
+              </div>
+            )}
+          </section>
+        </>
       )}
 
       {category ===
@@ -1824,6 +1925,80 @@ export default function GalleryPage() {
           line-height: 1;
         }
 
+        .gallery-tag-mobile {
+          display: none;
+        }
+
+        .gallery-tag-toggle {
+          width: 100%;
+          display: grid;
+          grid-template-columns:
+            auto minmax(0, 1fr) auto;
+          align-items: center;
+          gap: 10px;
+          padding: 12px 14px;
+          border-radius: 12px;
+          border:
+            1px solid
+            rgba(
+              255,
+              255,
+              255,
+              0.18
+            );
+          background:
+            rgba(
+              255,
+              255,
+              255,
+              0.045
+            );
+          color: #f5f5f5;
+          cursor: pointer;
+          text-align: left;
+        }
+
+        .gallery-tag-toggle-label {
+          font-size: 10px;
+          letter-spacing: .14em;
+          color:
+            rgba(
+              255,
+              255,
+              255,
+              0.46
+            );
+        }
+
+        .gallery-tag-current {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: .04em;
+        }
+
+        .gallery-tag-chevron {
+          font-size: 14px;
+          line-height: 1;
+          color:
+            rgba(
+              255,
+              255,
+              255,
+              0.72
+            );
+        }
+
+        .gallery-tag-panel {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          padding-top: 10px;
+        }
+
         .gallery-grid {
           display: grid;
           grid-template-columns:
@@ -2029,6 +2204,24 @@ export default function GalleryPage() {
               9px !important;
           }
 
+          .gallery-tag-desktop {
+            display:
+              none !important;
+          }
+
+          .gallery-tag-mobile {
+            display:
+              block;
+            margin-bottom:
+              18px;
+          }
+
+          .gallery-tag-panel
+            button {
+            font-size:
+              11px !important;
+          }
+
           .gallery-category-row {
             display:
               grid !important;
@@ -2057,7 +2250,7 @@ export default function GalleryPage() {
 
           .gallery-sort-row {
             margin:
-              -20px 0 20px;
+              -8px 0 20px;
           }
 
           .gallery-sort-row button {
