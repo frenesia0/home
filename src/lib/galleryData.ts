@@ -108,13 +108,24 @@ export interface GalleryWatermark {
 /**
  * ORIGINAL用の標準ウォーターマーク
  */
-export const DEFAULT_ORIGINAL_WATERMARK: GalleryWatermark = {
-  color: 'none',
-  opacity: 0,
-  text: '@frenesia0',
-  grid: false,
-  gridSize: 180,
-};
+export const DEFAULT_ORIGINAL_WATERMARK:
+  GalleryWatermark = {
+    color:
+      'none',
+
+    opacity:
+      0,
+
+    text:
+      '@frenesia0',
+
+    grid:
+      false,
+
+    gridSize:
+      180,
+  };
+
 
 /**
  * 色ごとの初期不透明度
@@ -124,13 +135,15 @@ export function getDefaultWatermarkOpacity(
     GalleryWatermarkColor
 ): number {
   if (
-    color === 'black'
+    color ===
+    'black'
   ) {
     return 5;
   }
 
   if (
-    color === 'white'
+    color ===
+    'white'
   ) {
     return 25;
   }
@@ -180,8 +193,12 @@ export function normalizeWatermarkText(
  * 新しいウォーターマーク設定を作る
  */
 export function createGalleryWatermark(
-  color: GalleryWatermarkColor = 'none',
-  text = '@frenesia0'
+  color:
+    GalleryWatermarkColor =
+      'none',
+
+  text =
+    '@frenesia0'
 ): GalleryWatermark {
   return {
     color,
@@ -210,9 +227,9 @@ export function createGalleryWatermark(
  * 保存済みのウォーターマーク設定を
  * 安全な値に整える
  *
- * 古い投稿に watermark がない場合も
- * WHITE / 25% / @frenesia0 / GRID ON / 180
- * として扱える
+ * watermark がない古い投稿は
+ * NONE / 0% / @frenesia0 / GRID OFF / 180
+ * として扱う
  */
 export function normalizeGalleryWatermark(
   watermark:
@@ -355,7 +372,19 @@ export interface GallerySong {
   title?:
     string;
 
+  /**
+   * YouTubeなど、元曲への外部リンク
+   */
   url?:
+    string;
+
+  /**
+   * Cloudinaryへ保存したMP3 / 音声ファイルのURL
+   *
+   * optional にしてあるため
+   * 音声がない既存投稿も壊れない
+   */
+  audioUrl?:
     string;
 }
 
@@ -913,9 +942,18 @@ export function getGallerySong(
       : undefined;
 
 
+  const audioUrl =
+    typeof song.audioUrl ===
+      'string' &&
+    song.audioUrl.trim()
+      ? song.audioUrl.trim()
+      : undefined;
+
+
   if (
     !title &&
-    !url
+    !url &&
+    !audioUrl
   ) {
     return null;
   }
@@ -924,6 +962,7 @@ export function getGallerySong(
   return {
     title,
     url,
+    audioUrl,
   };
 }
 
