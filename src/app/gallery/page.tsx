@@ -851,34 +851,28 @@ export default function GalleryPage() {
       }}
     >
       {/* =====================
-          HEADER
+          GALLERY BANNER
       ====================== */}
 
-      <div
-        className="gallery-heading"
-        style={{
-          position:
-            'relative',
-          minHeight:
-            heroImage
-              ? '390px'
-              : undefined,
-          display:
-            'flex',
-          justifyContent:
-            'space-between',
-          alignItems:
-            'flex-start',
-          gap: '24px',
-          marginBottom:
-            '34px',
-          overflow:
-            'visible',
-        }}
+      <section
+        className="gallery-banner"
       >
-        {heroImage && (
+        <div
+          className="gallery-banner-copy"
+        >
+          <h1>
+            GALLERY
+          </h1>
+
+          <p>
+            shiki &amp; solas
+            illustration archive
+          </p>
+        </div>
+
+        {heroImage ? (
           <div
-            className="gallery-random-hero"
+            className="gallery-banner-hero"
             aria-hidden="true"
           >
             <CropImg
@@ -892,62 +886,16 @@ export default function GalleryPage() {
               alt=""
             />
           </div>
+        ) : (
+          <div
+            className="gallery-banner-hero gallery-banner-hero-empty"
+            aria-hidden="true"
+          />
         )}
-
-        <div
-          className="gallery-heading-copy"
-          style={{
-            position:
-              'relative',
-            zIndex: 2,
-          }}
-        >
-          <h1
-            style={{
-              margin:
-                '0 0 8px',
-              fontSize:
-                '32px',
-              letterSpacing:
-                '.08em',
-            }}
-          >
-            GALLERY
-          </h1>
-
-          <p
-            style={{
-              margin: 0,
-              color:
-                'rgba(255,255,255,.55)',
-              fontSize:
-                '13px',
-              letterSpacing:
-                '.04em',
-            }}
-          >
-            shiki & solas
-            visual archive
-          </p>
-        </div>
 
         {isAdmin && (
           <div
             className="gallery-admin-actions"
-            style={{
-              position:
-                'relative',
-              zIndex: 2,
-              display:
-                'flex',
-              gap: '10px',
-              alignItems:
-                'center',
-              flexWrap:
-                'wrap',
-              justifyContent:
-                'flex-end',
-            }}
           >
             <button
               type="button"
@@ -956,100 +904,12 @@ export default function GalleryPage() {
                   '/gallery/add'
                 )
               }
-              style={{
-                padding:
-                  '10px 16px',
-                borderRadius:
-                  '8px',
-                border:
-                  '1px solid rgba(255,255,255,.3)',
-                background:
-                  '#f1f1f1',
-                color:
-                  '#17191d',
-                fontWeight:
-                  700,
-                cursor:
-                  'pointer',
-                letterSpacing:
-                  '.02em',
-              }}
             >
               ＋ ADD WORK
             </button>
           </div>
         )}
-      </div>
-
-      {/* =====================
-          SORT
-      ====================== */}
-
-      <div
-        style={{
-          display:
-            'flex',
-          justifyContent:
-            'flex-end',
-          marginBottom:
-            '22px',
-        }}
-      >
-        <button
-          type="button"
-          aria-label={
-            sortOrder ===
-            'newest'
-              ? '新しい順。押すと古い順に切り替えます'
-              : '古い順。押すと新しい順に切り替えます'
-          }
-          title={
-            sortOrder ===
-            'newest'
-              ? '新しい順'
-              : '古い順'
-          }
-          onClick={() =>
-            setSortOrder(
-              current =>
-                current ===
-                'newest'
-                  ? 'oldest'
-                  : 'newest'
-            )
-          }
-          style={{
-            padding:
-              '10px 14px',
-            borderRadius:
-              '9px',
-            border:
-              '1px solid rgba(255,255,255,.2)',
-            background:
-              'rgba(255,255,255,.06)',
-            color:
-              '#f5f5f5',
-            cursor:
-              'pointer',
-            fontSize:
-              '11px',
-          }}
-        >
-          <span
-            aria-hidden="true"
-            style={{
-              fontSize:
-                '16px',
-              lineHeight: 1,
-            }}
-          >
-            {sortOrder ===
-            'newest'
-              ? '↓'
-              : '↑'}
-          </span>
-        </button>
-      </div>
+      </section>
 
       {/* =====================
           CATEGORY
@@ -1191,7 +1051,7 @@ export default function GalleryPage() {
         <section
           style={{
             marginBottom:
-              '36px',
+              '18px',
           }}
         >
           <p
@@ -1337,10 +1197,52 @@ export default function GalleryPage() {
         <div
           style={{
             marginBottom:
-              '36px',
+              '18px',
           }}
         />
       )}
+
+      {/* =====================
+          SORT
+      ====================== */}
+
+      <div
+        className="gallery-sort-row"
+      >
+        <button
+          type="button"
+          aria-label={
+            sortOrder ===
+            'newest'
+              ? '新しい順。押すと古い順に切り替えます'
+              : '古い順。押すと新しい順に切り替えます'
+          }
+          title={
+            sortOrder ===
+            'newest'
+              ? '新しい順'
+              : '古い順'
+          }
+          onClick={() =>
+            setSortOrder(
+              current =>
+                current ===
+                'newest'
+                  ? 'oldest'
+                  : 'newest'
+            )
+          }
+        >
+          <span
+            aria-hidden="true"
+          >
+            {sortOrder ===
+            'newest'
+              ? '↓'
+              : '↑'}
+          </span>
+        </button>
+      </div>
 
       {/* =====================
           LOADING
@@ -1735,19 +1637,94 @@ export default function GalleryPage() {
       ====================== */}
 
       <style jsx global>{`
-        .gallery-random-hero {
-          position: absolute;
-          top: 0;
-          right: 0;
-          width: min(62%, 680px);
-          aspect-ratio: 16 / 9;
-          opacity: 1;
-          pointer-events: none;
+        .gallery-banner {
+          position: relative;
+          display: grid;
+          grid-template-columns:
+            minmax(260px, 0.78fr)
+            minmax(0, 1.22fr);
+          align-items: stretch;
+          min-height: 188px;
+          margin-bottom: 24px;
+          border:
+            1px solid
+            rgba(
+              255,
+              255,
+              255,
+              0.1
+            );
+          background:
+            rgba(
+              255,
+              255,
+              255,
+              0.025
+            );
           overflow: hidden;
-          background: transparent;
         }
 
-        .gallery-random-hero::after {
+        .gallery-banner-copy {
+          position: relative;
+          z-index: 3;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          min-width: 0;
+          padding:
+            30px 30px 28px;
+          background:
+            linear-gradient(
+              90deg,
+              rgba(31,35,42,1) 0%,
+              rgba(31,35,42,.98) 72%,
+              rgba(31,35,42,.86) 100%
+            );
+        }
+
+        .gallery-banner-copy h1 {
+          margin: 0 0 8px;
+          font-size: 34px;
+          line-height: 1;
+          letter-spacing: .08em;
+        }
+
+        .gallery-banner-copy p {
+          margin: 0;
+          max-width: 290px;
+          color:
+            rgba(
+              255,
+              255,
+              255,
+              0.56
+            );
+          font-size: 13px;
+          line-height: 1.6;
+          letter-spacing: .04em;
+        }
+
+        .gallery-banner-hero {
+          position: relative;
+          min-width: 0;
+          overflow: hidden;
+          background: #1f232a;
+        }
+
+        .gallery-banner-hero::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          z-index: 4;
+          pointer-events: none;
+          box-shadow:
+            inset 16px 0 18px rgba(31,35,42,.95),
+            inset -12px 0 16px rgba(31,35,42,.55),
+            inset 0 10px 14px rgba(31,35,42,.5),
+            inset 0 -10px 14px rgba(31,35,42,.5);
+        }
+
+        .gallery-banner-hero::after {
           content: '';
           position: absolute;
           inset: 0;
@@ -1757,36 +1734,94 @@ export default function GalleryPage() {
             linear-gradient(
               90deg,
               #1f232a 0,
-              transparent 18px
-            )
-            left center / 18px 100%
-            no-repeat,
-            linear-gradient(
-              270deg,
-              #1f232a 0,
-              transparent 18px
-            )
-            right center / 18px 100%
-            no-repeat,
+              rgba(31,35,42,.72) 10px,
+              transparent 26px,
+              transparent calc(100% - 18px),
+              rgba(31,35,42,.34) calc(100% - 8px),
+              #1f232a 100%
+            ),
             linear-gradient(
               180deg,
               #1f232a 0,
-              transparent 18px
-            )
-            center top / 100% 18px
-            no-repeat,
-            linear-gradient(
-              0deg,
-              #1f232a 0,
-              transparent 18px
-            )
-            center bottom / 100% 18px
-            no-repeat;
+              transparent 18px,
+              transparent calc(100% - 18px),
+              #1f232a 100%
+            );
         }
 
-        .gallery-random-hero > * {
+        .gallery-banner-hero > * {
           width: 100% !important;
           height: 100% !important;
+        }
+
+        .gallery-banner-hero-empty {
+          min-height: 188px;
+        }
+
+        .gallery-admin-actions {
+          position: absolute;
+          right: 12px;
+          top: 12px;
+          z-index: 10;
+          display: flex;
+          gap: 8px;
+        }
+
+        .gallery-admin-actions button {
+          padding: 9px 13px;
+          border-radius: 8px;
+          border:
+            1px solid
+            rgba(
+              255,
+              255,
+              255,
+              0.3
+            );
+          background: #f1f1f1;
+          color: #17191d;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: .02em;
+          cursor: pointer;
+        }
+
+        .gallery-sort-row {
+          display: flex;
+          justify-content: flex-end;
+          margin:
+            -10px 0 22px;
+        }
+
+        .gallery-sort-row button {
+          width: 44px;
+          height: 40px;
+          display: grid;
+          place-items: center;
+          padding: 0;
+          border-radius: 9px;
+          border:
+            1px solid
+            rgba(
+              255,
+              255,
+              255,
+              0.2
+            );
+          background:
+            rgba(
+              255,
+              255,
+              255,
+              0.06
+            );
+          color: #f5f5f5;
+          cursor: pointer;
+        }
+
+        .gallery-sort-row span {
+          font-size: 17px;
+          line-height: 1;
         }
 
         .gallery-grid {
@@ -1912,32 +1947,80 @@ export default function GalleryPage() {
           max-width: 620px
         ) {
           .gallery-page {
-  padding:
-    40px 18px
-    calc(160px + env(safe-area-inset-bottom))
-    !important;
-}
-
-          .gallery-heading {
-            gap:
-              18px !important;
+            padding:
+              34px 18px
+              calc(160px + env(safe-area-inset-bottom))
+              !important;
           }
 
-          .gallery-heading {
-            min-height:
-              175px !important;
-            margin-bottom:
-              10px !important;
-            overflow:
-              visible !important;
+          .gallery-banner {
+            grid-template-columns:
+              minmax(150px, 0.92fr)
+              minmax(0, 1.08fr);
+            min-height: 132px;
+            margin-bottom: 18px;
           }
 
-          .gallery-random-hero {
-            top: 0;
-            right: -8%;
-            width: 76%;
-            aspect-ratio: 16 / 9;
-            opacity: 1;
+          .gallery-banner-copy {
+            padding:
+              20px 16px 18px;
+          }
+
+          .gallery-banner-copy h1 {
+            font-size:
+              28px !important;
+            margin-bottom: 7px;
+          }
+
+          .gallery-banner-copy p {
+            max-width: 160px;
+            font-size: 10px;
+            line-height: 1.45;
+            letter-spacing: .025em;
+          }
+
+          .gallery-banner-hero {
+            min-height: 132px;
+          }
+
+          .gallery-banner-hero::before {
+            box-shadow:
+              inset 10px 0 14px rgba(31,35,42,.9),
+              inset -8px 0 12px rgba(31,35,42,.42),
+              inset 0 8px 10px rgba(31,35,42,.48),
+              inset 0 -8px 10px rgba(31,35,42,.48);
+          }
+
+          .gallery-banner-hero::after {
+            background:
+              linear-gradient(
+                90deg,
+                #1f232a 0,
+                rgba(31,35,42,.72) 8px,
+                transparent 20px,
+                transparent calc(100% - 14px),
+                rgba(31,35,42,.28) calc(100% - 6px),
+                #1f232a 100%
+              ),
+              linear-gradient(
+                180deg,
+                #1f232a 0,
+                transparent 14px,
+                transparent calc(100% - 14px),
+                #1f232a 100%
+              );
+          }
+
+          .gallery-admin-actions {
+            right: 8px;
+            top: 8px;
+          }
+
+          .gallery-admin-actions button {
+            padding:
+              7px 9px !important;
+            font-size:
+              9px !important;
           }
 
           .gallery-category-row {
@@ -1966,31 +2049,14 @@ export default function GalleryPage() {
               13px !important;
           }
 
-          .gallery-heading-copy {
-            max-width: 58%;
+          .gallery-sort-row {
+            margin:
+              -20px 0 20px;
           }
 
-          .gallery-heading h1 {
-            font-size:
-              30px !important;
-          }
-
-          .gallery-page > div:nth-of-type(2) {
-            margin-bottom:
-              10px !important;
-          }
-
-          .gallery-admin-actions {
-            gap:
-              8px !important;
-          }
-
-          .gallery-admin-actions
-            button {
-            padding:
-              9px 12px !important;
-            font-size:
-              10px !important;
+          .gallery-sort-row button {
+            width: 42px;
+            height: 40px;
           }
 
           .gallery-grid {
