@@ -28,7 +28,9 @@ export type GalleryTag =
   | 'song-parody'
   | 'manga'
   | 'rakugaki'
-  | 'tachie';
+  | 'tachie'
+  | 'single-illustration'
+  | 'deformed';
 
 
 /* =========================================================
@@ -827,6 +829,26 @@ export function getGalleryTags(
     ) {
       converted.push(
         'tachie'
+      );
+    }
+
+
+    if (
+      item ===
+      'single-illustration'
+    ) {
+      converted.push(
+        'single-illustration'
+      );
+    }
+
+
+    if (
+      item ===
+      'deformed'
+    ) {
+      converted.push(
+        'deformed'
       );
     }
   }
