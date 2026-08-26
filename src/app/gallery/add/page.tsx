@@ -3362,7 +3362,7 @@ export default function AddIllustrationPage() {
                               style={{
                                 position: 'relative',
                                 width: 'min(420px, 100%)',
-                                aspectRatio: '16 / 9',
+                                aspectRatio: '5 / 2',
                                 overflow: 'hidden',
                                 borderRadius: '10px',
                                 background:
@@ -3386,7 +3386,7 @@ export default function AddIllustrationPage() {
                                 setHeroCropOpen(true)
                               }
                             >
-                              16:9表示を調整
+                              バナー表示を調整
                             </button>
                           </div>
                         )}
@@ -4162,7 +4162,7 @@ export default function AddIllustrationPage() {
         <CropEditor
           open={heroCropOpen}
           src={heroSrc}
-          aspect="16:9"
+          aspect={5 / 2}
           initial={heroCrop}
           onClose={() =>
             setHeroCropOpen(false)
