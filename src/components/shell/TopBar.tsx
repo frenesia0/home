@@ -340,7 +340,7 @@ export function TopBar() {
                 'pointer',
             }}
           >
-            frenesia
+            frenesia0
           </div>
 
           <nav
@@ -474,7 +474,7 @@ export function TopBar() {
                 }
               }
             >
-              frenesia
+              frenesia0
             </div>
 
             {renderUserArea(
