@@ -24,8 +24,8 @@ function characterLabel(character: GalleryCharacter) {
 
 function tagLabel(tag: GalleryTag) {
   if (tag === 'song-parody') return 'SONG PARODY';
-  if (tag === 'single-illustration') return '一枚絵';
-  if (tag === 'deformed') return 'デフォルメ';
+  if (tag === 'single-illustration') return 'SINGLE ILLUSTRATION';
+  if (tag === 'deformed') return 'DEFORMED';
   return tag.toUpperCase();
 }
 
