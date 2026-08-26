@@ -968,15 +968,52 @@ export function getGallerySong(
 
 
 /* =========================================================
+   MEMORY CACHE
+========================================================= */
+
+/**
+ * 一覧画面で取得済みのギャラリーデータを、
+ * ページ遷移後の詳細画面でもすぐ使えるように保持する。
+ *
+ * Firestoreのサーバー取得自体は従来どおり行うため、
+ * このキャッシュだけを正として扱うことはしない。
+ */
+let galleryMemoryCache:
+  GalleryPost[] | null =
+    null;
+
+export function getCachedGalleryPosts():
+  GalleryPost[] | null {
+  return galleryMemoryCache
+    ? [...galleryMemoryCache]
+    : null;
+}
+
+export function setCachedGalleryPosts(
+  posts: GalleryPost[]
+): void {
+  galleryMemoryCache =
+    [...posts];
+}
+
+
+/* =========================================================
    FETCH
 ========================================================= */
 
 export async function fetchGalleryPosts(): Promise<
   GalleryPost[]
 > {
-  return fetchList<GalleryPost>(
-    GALLERY_COLLECTION
+  const posts =
+    await fetchList<GalleryPost>(
+      GALLERY_COLLECTION
+    );
+
+  setCachedGalleryPosts(
+    posts
   );
+
+  return posts;
 }
 
 
