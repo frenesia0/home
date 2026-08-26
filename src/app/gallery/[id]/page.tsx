@@ -1,7 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import {
+  useParams,
+  useRouter,
+  useSearchParams,
+} from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import {
   fetchGalleryPosts,
@@ -40,6 +44,8 @@ function optimizeThumbUrl(url: string) {
 
 export default function GalleryDetailPage() {
   const router = useRouter();
+  const searchParams =
+    useSearchParams();
   const params = useParams<{ id: string }>();
   const { isAdmin } = useAuth();
 
@@ -47,6 +53,27 @@ export default function GalleryDetailPage() {
     typeof params?.id === 'string'
       ? decodeURIComponent(params.id)
       : '';
+
+  const galleryQuery =
+    searchParams.toString();
+
+  const galleryHref =
+    galleryQuery
+      ? `/gallery?${galleryQuery}`
+      : '/gallery';
+
+  const detailHref = (
+    targetId: string
+  ) => {
+    const base =
+      `/gallery/${encodeURIComponent(
+        targetId
+      )}`;
+
+    return galleryQuery
+      ? `${base}?${galleryQuery}`
+      : base;
+  };
 
   const [post, setPost] =
     useState<GalleryPost | null>(null);
@@ -312,7 +339,7 @@ export default function GalleryDetailPage() {
         <button
           type="button"
           onClick={() =>
-            router.push('/gallery')
+            router.push(galleryHref)
           }
           style={{
             marginTop: '20px',
@@ -413,9 +440,9 @@ export default function GalleryDetailPage() {
     setError('');
 
     router.push(
-      `/gallery/${encodeURIComponent(
+      detailHref(
         target.id
-      )}`
+      )
     );
   };
 
@@ -443,7 +470,7 @@ export default function GalleryDetailPage() {
         <button
           type="button"
           onClick={() =>
-            router.push('/gallery')
+            router.push(galleryHref)
           }
           style={{
             padding: 0,
