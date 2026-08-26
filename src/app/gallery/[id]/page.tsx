@@ -24,6 +24,8 @@ function characterLabel(character: GalleryCharacter) {
 
 function tagLabel(tag: GalleryTag) {
   if (tag === 'song-parody') return 'SONG PARODY';
+  if (tag === 'single-illustration') return '一枚絵';
+  if (tag === 'deformed') return 'デフォルメ';
   return tag.toUpperCase();
 }
 
@@ -349,7 +351,13 @@ export default function GalleryDetailPage() {
     images[imageIndex] ?? null;
 
   const sortedPosts =
-    [...allPosts].sort(
+    allPosts
+      .filter(
+        (item) =>
+          item.category ===
+          post.category
+      )
+      .sort(
       (a, b) => {
         const dateCompare =
           b.date.localeCompare(
@@ -394,6 +402,15 @@ export default function GalleryDetailPage() {
     target: GalleryPost | null
   ) => {
     if (!target) return;
+
+    /*
+     * 先に手元のデータへ表示を切り替える。
+     * その後URLを更新するため、PREV / NEXTで
+     * LOADING表示を挟みにくくする。
+     */
+    setPost(target);
+    setImageIndex(0);
+    setError('');
 
     router.push(
       `/gallery/${encodeURIComponent(
