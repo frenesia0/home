@@ -77,6 +77,18 @@ function tagLabel(
     return 'SONG PARODY';
   }
 
+  if (
+    tag === 'single-illustration'
+  ) {
+    return '一枚絵';
+  }
+
+  if (
+    tag === 'deformed'
+  ) {
+    return 'デフォルメ';
+  }
+
   return tag.toUpperCase();
 }
 
@@ -108,7 +120,9 @@ function isTagFilter(
     value === 'song-parody' ||
     value === 'manga' ||
     value === 'rakugaki' ||
-    value === 'tachie'
+    value === 'tachie' ||
+    value === 'single-illustration' ||
+    value === 'deformed'
   );
 }
 
@@ -1039,6 +1053,34 @@ export default function GalleryPage() {
               )}
             >
               TACHIE
+            </button>
+
+            <button
+              onClick={() =>
+                setTag(
+                  'single-illustration'
+                )
+              }
+              style={pillStyle(
+                tag ===
+                  'single-illustration'
+              )}
+            >
+              一枚絵
+            </button>
+
+            <button
+              onClick={() =>
+                setTag(
+                  'deformed'
+                )
+              }
+              style={pillStyle(
+                tag ===
+                  'deformed'
+              )}
+            >
+              デフォルメ
             </button>
           </div>
         </section>
