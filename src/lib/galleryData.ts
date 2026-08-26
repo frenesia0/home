@@ -438,13 +438,23 @@ export interface GalleryPost {
     number;
 
 
-  thumbnailCrop?:
+    thumbnailCrop?:
+    CropValue;
+
+
+  /**
+   * ギャラリー右上のランダムイラスト用・横長トリミング。
+   *
+   * 通常の1:1サムネイルとは別管理。
+   * 未設定の既存投稿は、表示側で通常サムネイルを
+   * 自動的に横長表示するフォールバックを使用する。
+   */
+  heroCrop?:
     CropValue;
 
 
   customThumbnail?:
     GalleryImage;
-
 
   commission?:
     GalleryCommission;
