@@ -324,6 +324,321 @@ function optimizeMusicCoverUrl(url?: string): string | undefined {
   );
 }
 
+
+type MusicTheme = {
+  background: string;
+  foreground: '#FFFFFF' | '#111318';
+};
+
+const MUSIC_FALLBACK_THEME: MusicTheme = {
+  background: '#8083D6',
+  foreground: '#FFFFFF',
+};
+
+function clampByte(value: number) {
+  return Math.max(0, Math.min(255, Math.round(value)));
+}
+
+function rgbHex(r: number, g: number, b: number) {
+  return `#${[r, g, b]
+    .map(value => clampByte(value).toString(16).padStart(2, '0'))
+    .join('')
+    .toUpperCase()}`;
+}
+
+function rgbStats(r: number, g: number, b: number) {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const chroma = max - min;
+  const light = (max + min) / (2 * 255);
+  const saturation =
+    chroma === 0
+      ? 0
+      : chroma / (255 * (1 - Math.abs(2 * light - 1)));
+
+  let hue = 0;
+  if (chroma > 0) {
+    if (max === r) hue = ((g - b) / chroma) % 6;
+    else if (max === g) hue = (b - r) / chroma + 2;
+    else hue = (r - g) / chroma + 4;
+
+    hue *= 60;
+    if (hue < 0) hue += 360;
+  }
+
+  // sRGB relative luminance, used only to pick black/white UI.
+  const linear = (value: number) => {
+    const c = value / 255;
+    return c <= 0.04045
+      ? c / 12.92
+      : ((c + 0.055) / 1.055) ** 2.4;
+  };
+
+  const luminance =
+    0.2126 * linear(r) +
+    0.7152 * linear(g) +
+    0.0722 * linear(b);
+
+  return {
+    hue,
+    saturation: Number.isFinite(saturation) ? saturation : 0,
+    light,
+    luminance,
+  };
+}
+
+function foregroundForBackground(r: number, g: number, b: number):
+  '#FFFFFF' | '#111318' {
+  return rgbStats(r, g, b).luminance > 0.53
+    ? '#111318'
+    : '#FFFFFF';
+}
+
+async function extractMusicTheme(
+  url?: string
+): Promise<MusicTheme> {
+  if (!url || typeof document === 'undefined') {
+    return MUSIC_FALLBACK_THEME;
+  }
+
+  try {
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.decoding = 'async';
+
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error('cover load failed'));
+      image.src = url;
+    });
+
+    const size = 72;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+
+    const context = canvas.getContext('2d', {
+      willReadFrequently: true,
+    });
+
+    if (!context) return MUSIC_FALLBACK_THEME;
+
+    context.drawImage(image, 0, 0, size, size);
+
+    const { data } =
+      context.getImageData(0, 0, size, size);
+
+    type Pixel = {
+      r: number;
+      g: number;
+      b: number;
+      hue: number;
+      saturation: number;
+      light: number;
+      luminance: number;
+      edge: boolean;
+    };
+
+    const pixels: Pixel[] = [];
+    const colorful: Pixel[] = [];
+    const edgeColorful: Pixel[] = [];
+
+    let whiteCount = 0;
+    let blackCount = 0;
+    let grayLightSum = 0;
+
+    for (let y = 0; y < size; y += 1) {
+      for (let x = 0; x < size; x += 1) {
+        const index = (y * size + x) * 4;
+        const alpha = data[index + 3];
+
+        if (alpha < 160) continue;
+
+        const r = data[index];
+        const g = data[index + 1];
+        const b = data[index + 2];
+        const stats = rgbStats(r, g, b);
+        const edge =
+          x < 8 ||
+          y < 8 ||
+          x >= size - 8 ||
+          y >= size - 8;
+
+        const pixel: Pixel = {
+          r,
+          g,
+          b,
+          ...stats,
+          edge,
+        };
+
+        pixels.push(pixel);
+        grayLightSum += stats.light;
+
+        if (stats.saturation < 0.12 && stats.light > 0.90) {
+          whiteCount += 1;
+        }
+        if (stats.saturation < 0.12 && stats.light < 0.14) {
+          blackCount += 1;
+        }
+
+        // Ignore near-white / near-black pixels when searching for the
+        // illustration's "main color". This is what lets purple hair beat
+        // a large white background.
+        if (
+          stats.saturation >= 0.18 &&
+          stats.light >= 0.12 &&
+          stats.light <= 0.90
+        ) {
+          colorful.push(pixel);
+          if (edge) edgeColorful.push(pixel);
+        }
+      }
+    }
+
+    if (!pixels.length) return MUSIC_FALLBACK_THEME;
+
+    const colorfulRatio = colorful.length / pixels.length;
+
+    const dominantHueColor = (
+      source: Pixel[],
+      bins = 24
+    ): { r: number; g: number; b: number; share: number } | null => {
+      if (!source.length) return null;
+
+      const bucketWeight = new Array<number>(bins).fill(0);
+      const bucketCount = new Array<number>(bins).fill(0);
+
+      for (const pixel of source) {
+        const bin =
+          Math.floor((pixel.hue / 360) * bins) % bins;
+
+        // Area still matters most; saturation only gives a modest boost.
+        const weight = 0.7 + pixel.saturation * 0.6;
+        bucketWeight[bin] += weight;
+        bucketCount[bin] += 1;
+      }
+
+      let best = 0;
+      for (let i = 1; i < bins; i += 1) {
+        if (bucketWeight[i] > bucketWeight[best]) best = i;
+      }
+
+      const neighbours = new Set([
+        (best - 1 + bins) % bins,
+        best,
+        (best + 1) % bins,
+      ]);
+
+      let totalWeight = 0;
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      let count = 0;
+
+      for (const pixel of source) {
+        const bin =
+          Math.floor((pixel.hue / 360) * bins) % bins;
+
+        if (!neighbours.has(bin)) continue;
+
+        const weight = 0.7 + pixel.saturation * 0.6;
+        totalWeight += weight;
+        r += pixel.r * weight;
+        g += pixel.g * weight;
+        b += pixel.b * weight;
+        count += 1;
+      }
+
+      if (!totalWeight || !count) return null;
+
+      return {
+        r: r / totalWeight,
+        g: g / totalWeight,
+        b: b / totalWeight,
+        share: count / source.length,
+      };
+    };
+
+    // 1) If a real chromatic background dominates the outer edge,
+    // preserve it. This makes flat-color covers visually merge with
+    // the player instead of returning a merely "similar" color.
+    if (edgeColorful.length >= 24) {
+      const edgeDominant = dominantHueColor(edgeColorful);
+
+      if (
+        edgeDominant &&
+        edgeDominant.share >= 0.48 &&
+        edgeColorful.length / Math.max(1, pixels.filter(p => p.edge).length) >= 0.22
+      ) {
+        const r = clampByte(edgeDominant.r);
+        const g = clampByte(edgeDominant.g);
+        const b = clampByte(edgeDominant.b);
+
+        return {
+          background: rgbHex(r, g, b),
+          foreground: foregroundForBackground(r, g, b),
+        };
+      }
+    }
+
+    // 2) If the image has a meaningful amount of color, ignore a large
+    // white/black canvas and use the dominant chromatic family instead.
+    if (colorfulRatio >= 0.055) {
+      const dominant = dominantHueColor(colorful);
+
+      if (dominant) {
+        const r = clampByte(dominant.r);
+        const g = clampByte(dominant.g);
+        const b = clampByte(dominant.b);
+
+        return {
+          background: rgbHex(r, g, b),
+          foreground: foregroundForBackground(r, g, b),
+        };
+      }
+    }
+
+    // 3) Truly monochrome / nearly monochrome covers:
+    // white-heavy -> pure white, black-heavy -> deep gray/black,
+    // otherwise use a neutral gray based on the overall lightness.
+    const whiteRatio = whiteCount / pixels.length;
+    const blackRatio = blackCount / pixels.length;
+
+    if (whiteRatio >= 0.50) {
+      return {
+        background: '#FFFFFF',
+        foreground: '#111318',
+      };
+    }
+
+    if (blackRatio >= 0.42) {
+      return {
+        background: '#17191D',
+        foreground: '#FFFFFF',
+      };
+    }
+
+    const averageLight = grayLightSum / pixels.length;
+    const gray = clampByte(
+      Math.max(34, Math.min(224, averageLight * 255))
+    );
+
+    return {
+      background: rgbHex(gray, gray, gray),
+      foreground:
+        foregroundForBackground(gray, gray, gray),
+    };
+  } catch (error) {
+    console.warn(
+      'HOME MUSIC: cover color analysis failed',
+      error
+    );
+
+    return MUSIC_FALLBACK_THEME;
+  }
+}
+
 function galleryPostToMusicTrack(post: GalleryPost): MusicTrack | null {
   if (!getGalleryTags(post).includes('song-parody')) return null;
 
@@ -365,6 +680,7 @@ export function MusicWidget({
   const [volumeOpen, setVolumeOpen] = useState(false);
   const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null);
   const forcedAppliedRef = useRef<string | null>(null);
+  const [musicTheme, setMusicTheme] = useState<MusicTheme>(MUSIC_FALLBACK_THEME);
 
   useEffect(() => {
     // HOME本体がすでにGallery投稿を読み込んでいる場合は、
@@ -416,6 +732,26 @@ export function MusicWidget({
   const current =
     tracks.find(track => track.id === currentId) ??
     (currentId === null ? undefined : tracks[0]);
+
+
+  useEffect(() => {
+    let alive = true;
+
+    if (!current?.coverUrl) {
+      setMusicTheme(MUSIC_FALLBACK_THEME);
+      return () => {
+        alive = false;
+      };
+    }
+
+    void extractMusicTheme(current.coverUrl).then(theme => {
+      if (alive) setMusicTheme(theme);
+    });
+
+    return () => {
+      alive = false;
+    };
+  }, [current?.coverUrl]);
 
   const chooseRandom = (excludeId?: string) => {
     if (!tracks.length) return;
@@ -524,8 +860,9 @@ export function MusicWidget({
         minHeight: 116,
         padding: '12px 14px',
         overflow: 'hidden',
-        background: '#8083D6',
-        color: '#FFFFFF',
+        background: musicTheme.background,
+        color: musicTheme.foreground,
+        transition: 'background-color .38s ease, color .38s ease',
       }}
     >
       {current && (
@@ -540,7 +877,7 @@ export function MusicWidget({
             zIndex: 4,
             border: 0,
             background: 'transparent',
-            color: '#FFFFFF',
+            color: musicTheme.foreground,
             cursor: 'pointer',
             padding: 0,
           }}
@@ -612,7 +949,7 @@ export function MusicWidget({
               title={current.title}
               style={{
                 paddingRight: 52,
-                color: '#FFFFFF',
+                color: musicTheme.foreground,
                 fontSize: 13,
                 fontWeight: 650,
                 whiteSpace: 'nowrap',
@@ -627,7 +964,7 @@ export function MusicWidget({
               title={current.creator}
               style={{
                 marginTop: 3,
-                color: '#FFFFFF',
+                color: musicTheme.foreground,
                 fontSize: 10.5,
                 opacity: .72,
                 whiteSpace: 'nowrap',
@@ -662,7 +999,7 @@ export function MusicWidget({
               style={{
                 display: 'flex',
                 justifyContent: 'space-between',
-                color: '#FFFFFF',
+                color: musicTheme.foreground,
                 fontSize: 9.5,
                 opacity: .68,
                 fontVariantNumeric: 'tabular-nums',
@@ -696,7 +1033,7 @@ export function MusicWidget({
                   aria-label="別の曲をランダム再生"
                   onClick={skip}
                   className="music-skip"
-                  style={{ color: '#FFFFFF' }}
+                  style={{ color: musicTheme.foreground }}
                 >
                   ‹
                 </button>
@@ -706,7 +1043,7 @@ export function MusicWidget({
                   aria-label={playing ? '一時停止' : '再生'}
                   onClick={() => setPlaying(value => !value)}
                   className="music-play"
-                  style={{ color: '#FFFFFF' }}
+                  style={{ color: musicTheme.foreground }}
                 >
                   {playing ? (
                     <svg
@@ -737,7 +1074,7 @@ export function MusicWidget({
                   aria-label="別の曲をランダム再生"
                   onClick={skip}
                   className="music-skip"
-                  style={{ color: '#FFFFFF' }}
+                  style={{ color: musicTheme.foreground }}
                 >
                   ›
                 </button>
@@ -748,12 +1085,21 @@ export function MusicWidget({
                 style={{ position: 'absolute', right: 0, bottom: 0 }}
               >
                 {volumeOpen && (
-                  <div className="music-volume-pop" role="group" aria-label="音量調整">
+                  <div
+                    className="music-volume-pop"
+                    role="group"
+                    aria-label="音量調整"
+                    style={{
+                      background: musicTheme.background,
+                      color: musicTheme.foreground,
+                      transition: 'background-color .38s ease, color .38s ease',
+                    }}
+                  >
                     <button
                       type="button"
                       aria-label={volume === 0 ? 'ミュート解除' : 'ミュート'}
                       className="music-speaker"
-                      style={{ color: '#FFFFFF' }}
+                      style={{ color: musicTheme.foreground }}
                       onClick={toggleMute}
                     >
                       {volume === 0 ? '×' : '⌁'}
@@ -782,7 +1128,7 @@ export function MusicWidget({
                   type="button"
                   aria-label="音量調整を開く"
                   className="music-speaker"
-                  style={{ color: '#FFFFFF' }}
+                  style={{ color: musicTheme.foreground }}
                   onClick={() => setVolumeOpen(open => !open)}
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true">
