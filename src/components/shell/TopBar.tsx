@@ -650,6 +650,10 @@ export function TopBar() {
           align-items: center;
           min-width: 0;
         }
+        
+        .gnb {
+  margin-left: 16px;
+}
 
         .topbar-desktop-spacer {
           flex: 1;
