@@ -312,6 +312,18 @@ function formatMusicTime(sec: number): string {
   return `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
 }
 
+function optimizeMusicCoverUrl(url?: string): string | undefined {
+  if (!url) return undefined;
+  if (!url.includes('/upload/')) return url;
+
+  // Cloudinaryの元URL構造（cloud name / version / 拡張子）を壊さず、
+  // MUSIC用だけ高品質・高解像度・軽いシャープネスを指定する。
+  return url.replace(
+    '/upload/',
+    '/upload/f_auto,q_auto:best,c_limit,w_600,e_sharpen:80/'
+  );
+}
+
 function galleryPostToMusicTrack(post: GalleryPost): MusicTrack | null {
   if (!getGalleryTags(post).includes('song-parody')) return null;
 
@@ -326,7 +338,7 @@ function galleryPostToMusicTrack(post: GalleryPost): MusicTrack | null {
     title: song?.title?.trim() || 'UNTITLED',
     creator: song?.creator?.trim() || 'UNKNOWN CREATOR',
     audioUrl,
-    coverUrl: thumbnail?.url,
+    coverUrl: optimizeMusicCoverUrl(thumbnail?.url),
     href: `/gallery/${encodeURIComponent(post.id)}`,
   };
 }
@@ -646,7 +658,28 @@ export function MusicWidget({ conf }: { conf: WidgetConf }) {
                   onClick={() => setPlaying(value => !value)}
                   className="music-play"
                 >
-                  {playing ? 'Ⅱ' : '▶'}
+                  {playing ? (
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="11"
+                      height="11"
+                      aria-hidden="true"
+                      style={{ display: 'block' }}
+                    >
+                      <rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor" />
+                      <rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor" />
+                    </svg>
+                  ) : (
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="11"
+                      height="11"
+                      aria-hidden="true"
+                      style={{ display: 'block' }}
+                    >
+                      <path d="M8 5.5 18 12 8 18.5Z" fill="currentColor" />
+                    </svg>
+                  )}
                 </button>
 
                 <button
