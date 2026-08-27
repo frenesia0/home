@@ -339,6 +339,7 @@ export function MusicWidget({ conf }: { conf: WidgetConf }) {
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(70);
   const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -362,6 +363,397 @@ export function MusicWidget({ conf }: { conf: WidgetConf }) {
       }
     };
 
+    void load();
+
+    const off = subscribeGallery(() => {
+      void load();
+    });
+
+    return () => {
+      alive = false;
+      off();
+    };
+  }, []);
+
+  const current =
+    tracks.find(track => track.id === currentId) ??
+    (currentId === null ? undefined : tracks[0]);
+
+  const chooseRandom = (excludeId?: string) => {
+    if (!tracks.length) return;
+
+    const pool =
+      tracks.length > 1 && excludeId
+        ? tracks.filter(track => track.id !== excludeId)
+        : tracks;
+
+    const next =
+      pool[Math.floor(Math.random() * pool.length)] ??
+      tracks[0];
+
+    setCurrentId(next.id);
+    setCurrentTime(0);
+    setDuration(0);
+  };
+
+  useEffect(() => {
+    if (!tracks.length) {
+      setCurrentId(null);
+      setPlaying(false);
+      return;
+    }
+
+    if (!currentId || !tracks.some(track => track.id === currentId)) {
+      const random =
+        tracks[Math.floor(Math.random() * tracks.length)] ??
+        tracks[0];
+
+      setCurrentId(random.id);
+    }
+  }, [tracks, currentId]);
+
+  useEffect(() => {
+    if (!audioEl) return;
+
+    if (playing && current?.audioUrl) {
+      audioEl.play().catch(() => setPlaying(false));
+    } else {
+      audioEl.pause();
+    }
+  }, [playing, current?.audioUrl, audioEl]);
+
+  useEffect(() => {
+    if (!audioEl) return;
+
+    audioEl.load();
+    setCurrentTime(0);
+    setDuration(0);
+  }, [current?.audioUrl, audioEl]);
+
+  useEffect(() => {
+    if (!audioEl) return;
+    audioEl.volume = volume / 100;
+  }, [volume, audioEl]);
+
+  const skip = () => {
+    const keepPlaying = playing;
+    chooseRandom(current?.id);
+    setPlaying(keepPlaying);
+  };
+
+  const onEnded = () => {
+    chooseRandom(current?.id);
+    setPlaying(true);
+  };
+
+  return (
+    <div
+      className="panel widget music-widget"
+      style={{
+        margin: 0,
+        position: 'relative',
+        minHeight: 118,
+        padding: '12px 14px',
+        overflow: 'visible',
+      }}
+    >
+      {current && (
+        <button
+          type="button"
+          className="more"
+          style={{
+            position: 'absolute',
+            top: 10,
+            right: 12,
+            border: 0,
+            background: 'transparent',
+            cursor: 'pointer',
+            padding: 0,
+            zIndex: 2,
+          }}
+          onClick={() => router.push(current.href)}
+        >
+          VIEW ›
+        </button>
+      )}
+
+      {current ? (
+        <div
+          style={{
+            display: 'flex',
+            gap: 14,
+            alignItems: 'center',
+            minWidth: 0,
+          }}
+        >
+          <button
+            type="button"
+            aria-label="この曲パロ作品を開く"
+            onClick={() => router.push(current.href)}
+            style={{
+              width: 88,
+              height: 88,
+              flex: '0 0 88px',
+              overflow: 'hidden',
+              borderRadius: 8,
+              background: 'rgba(127,127,127,.08)',
+              border: 0,
+              padding: 0,
+              cursor: 'pointer',
+            }}
+          >
+            {current.coverUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={current.coverUrl}
+                alt=""
+                draggable={false}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  display: 'block',
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'grid',
+                  placeItems: 'center',
+                  fontSize: 9,
+                  letterSpacing: '.12em',
+                  opacity: .45,
+                }}
+              >
+                NO COVER
+              </div>
+            )}
+          </button>
+
+          <div
+            style={{
+              minWidth: 0,
+              flex: 1,
+              paddingRight: 4,
+            }}
+          >
+            <div
+              style={{
+                paddingRight: 52,
+                fontSize: 13,
+                fontWeight: 650,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+              title={current.title}
+            >
+              {current.title}
+            </div>
+
+            <div
+              style={{
+                marginTop: 3,
+                fontSize: 10.5,
+                opacity: .58,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+              title={current.creator}
+            >
+              {current.creator}
+            </div>
+
+            <input
+              aria-label="再生位置"
+              type="range"
+              min={0}
+              max={duration || 0}
+              step={0.1}
+              value={Math.min(currentTime, duration || 0)}
+              onChange={event => {
+                const value = Number(event.target.value);
+                if (audioEl) audioEl.currentTime = value;
+                setCurrentTime(value);
+              }}
+              style={{
+                width: '100%',
+                margin: '8px 0 0',
+              }}
+            />
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: 9.5,
+                opacity: .52,
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              <span>{formatMusicTime(currentTime)}</span>
+              <span>{formatMusicTime(duration)}</span>
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 10,
+                marginTop: 4,
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: 12,
+                }}
+              >
+                <button
+                  type="button"
+                  aria-label="別の曲をランダム再生"
+                  onClick={skip}
+                  style={{
+                    border: 0,
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    opacity: .72,
+                    fontSize: 16,
+                    lineHeight: 1,
+                    padding: 2,
+                  }}
+                >
+                  ‹
+                </button>
+
+                <button
+                  type="button"
+                  aria-label={playing ? '一時停止' : '再生'}
+                  onClick={() => setPlaying(value => !value)}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    flex: '0 0 28px',
+                    borderRadius: '50%',
+                    border: '1px solid currentColor',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    fontSize: 10,
+                    lineHeight: 1,
+                    display: 'grid',
+                    placeItems: 'center',
+                    padding: 0,
+                  }}
+                >
+                  {playing ? 'Ⅱ' : '▶'}
+                </button>
+
+                <button
+                  type="button"
+                  aria-label="別の曲をランダム再生"
+                  onClick={skip}
+                  style={{
+                    border: 0,
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    opacity: .72,
+                    fontSize: 16,
+                    lineHeight: 1,
+                    padding: 2,
+                  }}
+                >
+                  ›
+                </button>
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  minWidth: 82,
+                  maxWidth: 110,
+                  flex: 1,
+                  justifyContent: 'flex-end',
+                }}
+              >
+                <span
+                  aria-hidden="true"
+                  style={{
+                    fontSize: 11,
+                    opacity: .55,
+                    flex: '0 0 auto',
+                  }}
+                >
+                  {volume === 0 ? '×' : '♪'}
+                </span>
+
+                <input
+                  aria-label="音量"
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={volume}
+                  onChange={event =>
+                    setVolume(Number(event.target.value))
+                  }
+                  style={{
+                    width: '100%',
+                    minWidth: 48,
+                    margin: 0,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <audio
+            ref={setAudioEl}
+            src={current.audioUrl}
+            preload="metadata"
+            onTimeUpdate={event =>
+              setCurrentTime(event.currentTarget.currentTime)
+            }
+            onLoadedMetadata={event =>
+              setDuration(event.currentTarget.duration || 0)
+            }
+            onDurationChange={event =>
+              setDuration(event.currentTarget.duration || 0)
+            }
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onEnded={onEnded}
+          />
+        </div>
+      ) : (
+        <div
+          style={{
+            minHeight: 88,
+            display: 'grid',
+            placeItems: 'center',
+            padding: '0 12px',
+            textAlign: 'center',
+            fontSize: 10.5,
+            lineHeight: 1.6,
+            opacity: .5,
+            letterSpacing: '.05em',
+          }}
+        >
+          {loaded
+            ? 'MP3付きのSONG PARODYはまだありません'
+            : 'LOADING...'}
+        </div>
+      )}
+    </div>
+  );
+}
     void load();
 
     const off = subscribeGallery(() => {
