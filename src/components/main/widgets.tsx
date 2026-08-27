@@ -519,12 +519,13 @@ export function MusicWidget({
     <div
       className="panel widget music-widget"
       style={{
-        margin: 0,
-        position: 'relative',
-        minHeight: 116,
-        padding: '12px 14px',
-        overflow: 'hidden',
-      }}
+  margin: 0,
+  position: 'relative',
+  minHeight: 116,
+  padding: '12px 14px',
+  overflow: 'hidden',
+  background: '#837ECB',
+}}
     >
       {current && (
         <button
