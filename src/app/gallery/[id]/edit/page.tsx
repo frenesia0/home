@@ -467,14 +467,26 @@ export default function EditIllustrationPage() {
   }, [newAudioFile]);
 
   useEffect(() => {
-    if (!isSongParody) {
-      setSongTitle('');
-      setSongCreator('');
-      setSongUrl('');
-      setNewAudioFile(null);
-      setRemoveAudio(true);
+    // 初回レンダーでは投稿データがまだ未読込なので、
+    // tags=[] → isSongParody=false になる。
+    // ここで既存SONG情報を消すと、読込直後に「音源を削除予定」の状態へ
+    // すり替わってしまうため、ロード完了までは絶対に触らない。
+    if (loading || !post) {
+      return;
     }
-  }, [isSongParody]);
+
+    if (isSongParody) {
+      // 読込済みのSONG PARODYは既存MP3を保持する。
+      setRemoveAudio(false);
+      return;
+    }
+
+    setSongTitle('');
+    setSongCreator('');
+    setSongUrl('');
+    setNewAudioFile(null);
+    setRemoveAudio(true);
+  }, [isSongParody, loading, post]);
 
   const thumbnailSrc =
     useMemo(() => {
