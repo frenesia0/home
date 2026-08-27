@@ -19,6 +19,7 @@ import {
   getDefaultWatermarkOpacity,
   getGalleryImages,
   getGallerySong,
+  getGalleryTags,
   normalizeGalleryWatermark,
   normalizeWatermarkText,
   saveGalleryPosts,
@@ -240,11 +241,7 @@ export default function EditIllustrationPage() {
       );
       setTags(
         found.category === 'original'
-          ? (
-              Array.isArray(found.tags)
-                ? found.tags
-                : []
-            )
+          ? getGalleryTags(found)
           : []
       );
 
@@ -1329,10 +1326,20 @@ export default function EditIllustrationPage() {
           );
         }
 
+        const existingSong =
+          (
+            post.song ??
+            getGallerySong(post)
+          ) as SongWithAudio | null;
+
         let finalAudioUrl =
           removeAudio
             ? ''
-            : songAudioUrl;
+            : (
+                songAudioUrl ||
+                existingSong?.audioUrl ||
+                ''
+              );
 
         if (
           isSongParody &&
@@ -1355,24 +1362,39 @@ export default function EditIllustrationPage() {
           '変更を保存中...'
         );
 
+        const finalSongTitle =
+          songTitle.trim() ||
+          existingSong?.title?.trim() ||
+          '';
+
+        const finalSongCreator =
+          songCreator.trim() ||
+          existingSong?.creator?.trim() ||
+          '';
+
+        const finalSongUrl =
+          songUrl.trim() ||
+          existingSong?.url?.trim() ||
+          '';
+
         const songValue:
           SongWithAudio | undefined =
           isSongParody &&
           (
-            songTitle.trim() ||
-            songCreator.trim() ||
-            songUrl.trim() ||
+            finalSongTitle ||
+            finalSongCreator ||
+            finalSongUrl ||
             finalAudioUrl
           )
             ? {
                 title:
-                  songTitle.trim() ||
+                  finalSongTitle ||
                   undefined,
                 creator:
-                  songCreator.trim() ||
+                  finalSongCreator ||
                   undefined,
                 url:
-                  songUrl.trim() ||
+                  finalSongUrl ||
                   undefined,
                 audioUrl:
                   finalAudioUrl ||
