@@ -340,7 +340,8 @@ export function TopBar() {
                 'pointer',
             }}
           >
-            frenesia0
+            <span className="brand-word">frenesia</span>
+<span className="brand-zero">0</span>
           </div>
 
           <nav
@@ -474,7 +475,8 @@ export function TopBar() {
                 }
               }
             >
-              frenesia0
+              <span className="brand-word">frenesia</span>
+<span className="brand-zero">0</span>
             </div>
 
             {renderUserArea(
@@ -598,17 +600,49 @@ export function TopBar() {
   ======================================== */
 
   .brand {
-    font-family:
-      Georgia,
-      'Times New Roman',
-      serif !important;
+  display: inline-flex;
+  align-items: baseline;
 
-    font-weight: 400 !important;
-    font-style: normal;
+  font-family:
+    Georgia,
+    'Times New Roman',
+    serif !important;
 
-    letter-spacing:
-      0.24em;
-  }
+  font-weight: 400 !important;
+  font-style: normal;
+
+  letter-spacing: 0;
+}
+
+.brand-word {
+  letter-spacing: 0.24em;
+}
+
+.brand-zero {
+  display: inline-block;
+
+  font-family:
+    "Cascadia Mono",
+    "Cascadia Code",
+    Consolas,
+    monospace;
+
+  font-size: 1em;
+  font-weight: 400;
+  line-height: 1;
+
+  font-feature-settings: "zero" 1;
+  font-variant-numeric: slashed-zero;
+
+  /*
+    frenesia の最後の a が持っている字間に合わせる。
+    0自身の後ろには余分な字間を作らない。
+  */
+  margin-left: 0.24em;
+
+  transform: scaleX(0.88);
+  transform-origin: center;
+}
 
   /* ========================================
      PC
