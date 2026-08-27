@@ -95,7 +95,7 @@ function CharacterDetailInner() {
   const editHref = auKey ? `/character/${ch.id}/edit?au=${encodeURIComponent(auKey)}` : `/character/${ch.id}/edit`;
   const voices = Array.from({ length: 3 }, (_, i) => ({
     label: eff.voices?.[i]?.label?.trim() || `SAMPLE ${String(i + 1).padStart(2, '0')}`,
-    audioUrl: eff.voices?.[i]?.audioUrl?.trim() || '',
+    audioUrl: '',
   }));
 
   if (auKey && !auRegistered) {
