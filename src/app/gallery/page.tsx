@@ -1196,7 +1196,7 @@ export default function GalleryPage() {
       }}
     >
       {/* =====================
-          GALLERY BANNER
+          GALLERY HEADER
       ====================== */}
 
       <section
@@ -1215,30 +1215,7 @@ export default function GalleryPage() {
           </p>
         </div>
 
-        {heroImage ? (
-          <div
-            className="gallery-banner-hero"
-            aria-hidden="true"
-          >
-            <FocusSyncedHeroImg
-              src={optimizeCloudinaryUrl(
-                heroImage.url
-              )}
-              crop={
-                heroPost
-                  ?.heroCrop
-              }
-              alt=""
-            />
-          </div>
-        ) : (
-          <div
-            className="gallery-banner-hero gallery-banner-hero-empty"
-            aria-hidden="true"
-          />
-        )}
-
-              </section>
+      </section>
 
       {isAdmin && (
         <div className="gallery-admin-actions">
