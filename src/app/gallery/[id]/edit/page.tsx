@@ -13,6 +13,7 @@ import { useAuth } from '@/lib/auth';
 import { backend } from '@/lib/backend';
 import {
   fetchGalleryPosts,
+  getCachedGalleryPosts,
   getGalleryCharacters,
   createGalleryWatermark,
   getDefaultWatermarkOpacity,
@@ -23,6 +24,7 @@ import {
   saveGalleryPosts,
   type GalleryCategory,
   type GalleryCharacter,
+  type GalleryHeroMode,
   type GalleryImage,
   type GalleryPost,
   type GalleryTag,
@@ -52,6 +54,10 @@ type SongWithAudio = {
 };
 
 type ThumbChoice =
+  | { kind: 'existing'; index: number }
+  | { kind: 'new'; index: number };
+
+type HeroChoice =
   | { kind: 'existing'; index: number }
   | { kind: 'new'; index: number };
 
@@ -164,6 +170,33 @@ export default function EditIllustrationPage() {
     useState<string | null>(null);
 
   const [cropOpen, setCropOpen] = useState(false);
+
+  // ギャラリー右上ランダム表示用。
+  // false の作品は候補から除外し、トリミングUIも表示しない。
+  const [heroEnabled, setHeroEnabled] = useState(true);
+  const [heroMode, setHeroMode] =
+    useState<GalleryHeroMode>('post');
+  const [heroChoice, setHeroChoice] =
+    useState<HeroChoice>({
+      kind: 'existing',
+      index: 0,
+    });
+  const [
+    existingCustomHeroImage,
+    setExistingCustomHeroImage,
+  ] = useState<GalleryImage | null>(null);
+  const [
+    newCustomHeroImage,
+    setNewCustomHeroImage,
+  ] = useState<File | null>(null);
+  const [
+    newCustomHeroImageUrl,
+    setNewCustomHeroImageUrl,
+  ] = useState<string | null>(null);
+  const [heroCrop, setHeroCrop] =
+    useState<CropValue>(DEFAULT_CROP);
+  const [heroCropOpen, setHeroCropOpen] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState('');
@@ -179,128 +212,185 @@ export default function EditIllustrationPage() {
   useEffect(() => {
     let alive = true;
 
-    const load = async () => {
-      try {
-        const posts =
-          await fetchGalleryPosts();
+    const applyPosts = (
+      posts: GalleryPost[]
+    ) => {
+      const found =
+        posts.find(
+          (item) =>
+            item.id === id
+        ) ?? null;
 
-        const found =
-          posts.find(
-            (item) => item.id === id
-          ) ?? null;
+      if (!alive) return;
 
-        if (!alive) return;
+      setOriginalPosts(posts);
+      setPost(found);
 
-        setOriginalPosts(posts);
-        setPost(found);
-
-        if (!found) {
-          setLoading(false);
-          return;
-        }
-
-        setDate(found.date);
-        setCategory(found.category);
-        setCharacters(
-          getGalleryCharacters(found)
-        );
-        setTags(
-          found.category === 'original'
-            ? (
-                Array.isArray(found.tags)
-                  ? found.tags
-                  : []
-              )
-            : []
-        );
-
-        setArtistName(
-          found.commission?.artistName ?? ''
-        );
-        setSnsId(
-          found.commission?.snsId ?? ''
-        );
-        setSnsUrl(
-          found.commission?.snsUrl ?? ''
-        );
-
-        const song =
-          (
-            found.song ??
-            getGallerySong(found)
-          ) as SongWithAudio | null;
-
-        setSongTitle(
-          song?.title ?? ''
-        );
-        setSongUrl(
-          song?.url ?? ''
-        );
-        setSongAudioUrl(
-          song?.audioUrl ?? ''
-        );
-        setRemoveAudio(false);
-        setNewAudioFile(null);
-
-        const imgs =
-          getGalleryImages(found);
-
-        setExistingImages(
-          imgs.map((image) => ({
-            ...image,
-            watermark: watermarkForExisting(
-              image,
-              found.category,
-              found.commission?.snsId ?? ''
-            ),
-          }))
-        );
-
-        setThumbnailMode(
-          found.thumbnailMode ??
-            'post'
-        );
-
-        setThumbnailCrop(
-          found.thumbnailCrop ??
-            DEFAULT_CROP
-        );
-
-        const thumbIndex =
-          typeof found.thumbnailIndex ===
-          'number'
-            ? found.thumbnailIndex
-            : 0;
-
-        setThumbChoice({
-          kind: 'existing',
-          index:
-            thumbIndex >= 0 &&
-            thumbIndex < imgs.length
-              ? thumbIndex
-              : 0,
-        });
-
-        setExistingCustomThumbnail(
-          found.customThumbnail ??
-            null
-        );
-      } catch (err) {
-        if (alive) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : '作品を読み込めませんでした。'
-          );
-        }
-      } finally {
-        if (alive) {
-          setLoading(false);
-        }
+      if (!found) {
+        setLoading(false);
+        return;
       }
+
+      setDate(found.date);
+      setCategory(found.category);
+      setCharacters(
+        getGalleryCharacters(found)
+      );
+      setTags(
+        found.category === 'original'
+          ? (
+              Array.isArray(found.tags)
+                ? found.tags
+                : []
+            )
+          : []
+      );
+
+      setArtistName(
+        found.commission?.artistName ?? ''
+      );
+      setSnsId(
+        found.commission?.snsId ?? ''
+      );
+      setSnsUrl(
+        found.commission?.snsUrl ?? ''
+      );
+
+      const song =
+        (
+          found.song ??
+          getGallerySong(found)
+        ) as SongWithAudio | null;
+
+      setSongTitle(
+        song?.title ?? ''
+      );
+      setSongUrl(
+        song?.url ?? ''
+      );
+      setSongAudioUrl(
+        song?.audioUrl ?? ''
+      );
+      setRemoveAudio(false);
+      setNewAudioFile(null);
+
+      const imgs =
+        getGalleryImages(found);
+
+      setExistingImages(
+        imgs.map((image) => ({
+          ...image,
+          watermark: watermarkForExisting(
+            image,
+            found.category,
+            found.commission?.snsId ?? ''
+          ),
+        }))
+      );
+
+      setThumbnailMode(
+        found.thumbnailMode ??
+          'post'
+      );
+
+      setThumbnailCrop(
+        found.thumbnailCrop ??
+          DEFAULT_CROP
+      );
+
+      // 既存作品には heroEnabled が無いので、false のときだけ除外扱い。
+      setHeroEnabled(
+        found.heroEnabled !== false
+      );
+
+      setHeroMode(
+        found.heroMode ??
+          'post'
+      );
+
+      const heroIndex =
+        typeof found.heroImageIndex ===
+          'number'
+          ? found.heroImageIndex
+          : 0;
+
+      setHeroChoice({
+        kind: 'existing',
+        index:
+          heroIndex >= 0 &&
+          heroIndex < imgs.length
+            ? heroIndex
+            : 0,
+      });
+
+      setExistingCustomHeroImage(
+        found.customHeroImage ??
+          null
+      );
+      setNewCustomHeroImage(null);
+
+      setHeroCrop(
+        found.heroCrop ??
+          DEFAULT_CROP
+      );
+
+      const thumbIndex =
+        typeof found.thumbnailIndex ===
+        'number'
+          ? found.thumbnailIndex
+          : 0;
+
+      setThumbChoice({
+        kind: 'existing',
+        index:
+          thumbIndex >= 0 &&
+          thumbIndex < imgs.length
+            ? thumbIndex
+            : 0,
+      });
+
+      setExistingCustomThumbnail(
+        found.customThumbnail ??
+          null
+      );
+
+      setLoading(false);
     };
 
-    void load();
+    const cachedPosts =
+      getCachedGalleryPosts();
+
+    if (
+      cachedPosts &&
+      cachedPosts.length > 0
+    ) {
+      applyPosts(
+        cachedPosts
+      );
+    } else {
+      const load =
+        async () => {
+          try {
+            const posts =
+              await fetchGalleryPosts();
+
+            applyPosts(
+              posts
+            );
+          } catch (err) {
+            if (alive) {
+              setError(
+                err instanceof Error
+                  ? err.message
+                  : '作品を読み込めませんでした。'
+              );
+              setLoading(false);
+            }
+          }
+        };
+
+      void load();
+    }
 
     return () => {
       alive = false;
@@ -338,6 +428,23 @@ export default function EditIllustrationPage() {
     return () =>
       URL.revokeObjectURL(url);
   }, [newCustomThumbnail]);
+
+  useEffect(() => {
+    if (!newCustomHeroImage) {
+      setNewCustomHeroImageUrl(null);
+      return;
+    }
+
+    const url =
+      URL.createObjectURL(
+        newCustomHeroImage
+      );
+
+    setNewCustomHeroImageUrl(url);
+
+    return () =>
+      URL.revokeObjectURL(url);
+  }, [newCustomHeroImage]);
 
   useEffect(() => {
     if (!newAudioFile) {
@@ -399,6 +506,38 @@ export default function EditIllustrationPage() {
       newCustomThumbnailUrl,
       existingCustomThumbnail,
       thumbChoice,
+      existingImages,
+      newImageUrls,
+    ]);
+
+  const heroSrc =
+    useMemo(() => {
+      if (heroMode === 'custom') {
+        return (
+          newCustomHeroImageUrl ??
+          existingCustomHeroImage?.url ??
+          null
+        );
+      }
+
+      if (heroChoice.kind === 'existing') {
+        return (
+          existingImages[
+            heroChoice.index
+          ]?.url ?? null
+        );
+      }
+
+      return (
+        newImageUrls[
+          heroChoice.index
+        ] ?? null
+      );
+    }, [
+      heroMode,
+      newCustomHeroImageUrl,
+      existingCustomHeroImage,
+      heroChoice,
       existingImages,
       newImageUrls,
     ]);
@@ -1003,6 +1142,19 @@ export default function EditIllustrationPage() {
       }
 
       if (
+        heroEnabled &&
+        heroMode ===
+          'custom' &&
+        !newCustomHeroImage &&
+        !existingCustomHeroImage
+      ) {
+        setError(
+          'GALLERY HERO専用画像を選択してください。'
+        );
+        return;
+      }
+
+      if (
         newAudioFile &&
         newAudioFile.type &&
         !newAudioFile.type.startsWith(
@@ -1098,6 +1250,30 @@ export default function EditIllustrationPage() {
           }
         }
 
+        let finalHeroImageIndex:
+          number | undefined;
+
+        if (
+          heroEnabled &&
+          heroMode ===
+            'post'
+        ) {
+          finalHeroImageIndex =
+            heroChoice.kind ===
+              'existing'
+              ? heroChoice.index
+              : existingImages.length +
+                heroChoice.index;
+
+          if (
+            finalHeroImageIndex < 0 ||
+            finalHeroImageIndex >=
+              finalImages.length
+          ) {
+            finalHeroImageIndex = 0;
+          }
+        }
+
         let finalCustomThumbnail =
           existingCustomThumbnail ??
           undefined;
@@ -1118,6 +1294,30 @@ export default function EditIllustrationPage() {
 
           newlyUploadedCloudinaryIds.push(
             finalCustomThumbnail.publicId
+          );
+        }
+
+        let finalCustomHeroImage =
+          existingCustomHeroImage ??
+          undefined;
+
+        if (
+          heroEnabled &&
+          heroMode ===
+            'custom' &&
+          newCustomHeroImage
+        ) {
+          setProgress(
+            'GALLERY HERO画像をアップロード中...'
+          );
+
+          finalCustomHeroImage =
+            await uploadToCloudinary(
+              newCustomHeroImage
+            );
+
+          newlyUploadedCloudinaryIds.push(
+            finalCustomHeroImage.publicId
           );
         }
 
@@ -1192,6 +1392,27 @@ export default function EditIllustrationPage() {
               ? finalThumbnailIndex
               : undefined,
           thumbnailCrop,
+          heroEnabled,
+          heroMode:
+            heroEnabled
+              ? heroMode
+              : undefined,
+          heroImageIndex:
+            heroEnabled &&
+            heroMode ===
+              'post'
+              ? finalHeroImageIndex
+              : undefined,
+          heroCrop:
+            heroEnabled
+              ? heroCrop
+              : undefined,
+          customHeroImage:
+            heroEnabled &&
+            heroMode ===
+              'custom'
+              ? finalCustomHeroImage
+              : undefined,
           customThumbnail:
             thumbnailMode ===
             'custom'
@@ -1241,10 +1462,24 @@ export default function EditIllustrationPage() {
             !!newCustomThumbnail
           );
 
+        const oldCustomHeroImageId =
+          post.customHeroImage?.publicId ?? '';
+
+        const customHeroImageWasRemovedOrReplaced =
+          !!oldCustomHeroImageId &&
+          (
+            !heroEnabled ||
+            heroMode !== 'custom' ||
+            !!newCustomHeroImage
+          );
+
         const cloudinaryIdsToDelete = [
           ...removedImagePublicIds,
           ...(customThumbnailWasRemovedOrReplaced
             ? [oldCustomThumbnailId]
+            : []),
+          ...(customHeroImageWasRemovedOrReplaced
+            ? [oldCustomHeroImageId]
             : []),
         ];
 
@@ -2307,13 +2542,12 @@ export default function EditIllustrationPage() {
         </div>
 
         <form
+          className="gallery-edit-form"
           onSubmit={
             handleSave
           }
           style={{
             display: 'grid',
-            gridTemplateColumns:
-              'minmax(320px, 460px) 1fr',
             gap: '42px',
             alignItems:
               'start',
@@ -2880,6 +3114,264 @@ export default function EditIllustrationPage() {
                   </button>
                 </div>
               )}
+
+              {/* GALLERY HERO */}
+
+              <div
+                style={{
+                  marginTop: '24px',
+                  paddingTop: '20px',
+                  borderTop:
+                    '1px solid rgba(255,255,255,.12)',
+                }}
+              >
+                <div
+                  style={{
+                    marginBottom: '12px',
+                    fontSize: '11px',
+                    letterSpacing: '.1em',
+                    color:
+                      'rgba(255,255,255,.58)',
+                  }}
+                >
+                  GALLERY HERO
+                </div>
+
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '9px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    color:
+                      'rgba(255,255,255,.76)',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={heroEnabled}
+                    onChange={(event) => {
+                      const checked =
+                        event.target.checked;
+                      setHeroEnabled(checked);
+                      if (!checked) {
+                        setHeroCropOpen(false);
+                      }
+                    }}
+                  />
+                  ギャラリー右上のランダム表示候補に含める
+                </label>
+
+                {heroEnabled && (
+                  <div
+                    style={{
+                      marginTop: '18px',
+                      display: 'grid',
+                      gap: '14px',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: '18px',
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <label style={choiceStyle}>
+                        <input
+                          type="radio"
+                          name="heroMode"
+                          checked={heroMode === 'post'}
+                          onChange={() => {
+                            setHeroMode('post');
+                            setHeroCrop(DEFAULT_CROP);
+                          }}
+                        />
+                        投稿画像から選ぶ
+                      </label>
+
+                      <label style={choiceStyle}>
+                        <input
+                          type="radio"
+                          name="heroMode"
+                          checked={heroMode === 'custom'}
+                          onChange={() => {
+                            setHeroMode('custom');
+                            setHeroCrop(DEFAULT_CROP);
+                          }}
+                        />
+                        専用画像を使う
+                      </label>
+                    </div>
+
+                    {heroMode === 'post' && (
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns:
+                            'repeat(auto-fill, minmax(68px, 1fr))',
+                          gap: '8px',
+                        }}
+                      >
+                        {existingImages.map(
+                          (image, index) => (
+                            <button
+                              key={`${image.publicId}-hero`}
+                              type="button"
+                              onClick={() => {
+                                setHeroChoice({
+                                  kind: 'existing',
+                                  index,
+                                });
+                                setHeroCrop(DEFAULT_CROP);
+                              }}
+                              style={{
+                                padding: 0,
+                                aspectRatio: '1 / 1',
+                                borderRadius: '7px',
+                                overflow: 'hidden',
+                                border:
+                                  heroChoice.kind === 'existing' &&
+                                  heroChoice.index === index
+                                    ? '2px solid #fff'
+                                    : '1px solid rgba(255,255,255,.2)',
+                                background:
+                                  'rgba(255,255,255,.05)',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <img
+                                src={image.url}
+                                alt=""
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'cover',
+                                  display: 'block',
+                                }}
+                              />
+                            </button>
+                          )
+                        )}
+
+                        {newImageUrls.map(
+                          (url, index) => (
+                            <button
+                              key={`${url}-hero`}
+                              type="button"
+                              onClick={() => {
+                                setHeroChoice({
+                                  kind: 'new',
+                                  index,
+                                });
+                                setHeroCrop(DEFAULT_CROP);
+                              }}
+                              style={{
+                                padding: 0,
+                                aspectRatio: '1 / 1',
+                                borderRadius: '7px',
+                                overflow: 'hidden',
+                                border:
+                                  heroChoice.kind === 'new' &&
+                                  heroChoice.index === index
+                                    ? '2px solid #fff'
+                                    : '1px solid rgba(255,255,255,.2)',
+                                background:
+                                  'rgba(255,255,255,.05)',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <img
+                                src={url}
+                                alt=""
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'cover',
+                                  display: 'block',
+                                }}
+                              />
+                            </button>
+                          )
+                        )}
+                      </div>
+                    )}
+
+                    {heroMode === 'custom' && (
+                      <label
+                        style={{
+                          ...fieldStyle,
+                          marginTop: '8px',
+                        }}
+                      >
+                        <span>
+                          GALLERY HERO専用画像
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            setNewCustomHeroImage(
+                              e.target.files?.[0] ?? null
+                            );
+                            setHeroCrop(DEFAULT_CROP);
+                          }}
+                          style={{ color: '#f5f5f5' }}
+                        />
+                        {existingCustomHeroImage &&
+                          !newCustomHeroImage && (
+                          <span
+                            style={{
+                              fontSize: '10px',
+                              color:
+                                'rgba(255,255,255,.45)',
+                            }}
+                          >
+                            現在の専用画像を使用中
+                          </span>
+                        )}
+                      </label>
+                    )}
+
+                    {heroSrc && (
+                      <div>
+                        <div
+                          style={{
+                            position: 'relative',
+                            width:
+                              'min(420px, 100%)',
+                            aspectRatio: '5 / 2',
+                            overflow: 'hidden',
+                            borderRadius: '10px',
+                            border:
+                              '1px solid rgba(255,255,255,.2)',
+                            background:
+                              'rgba(255,255,255,.05)',
+                            marginBottom: '10px',
+                          }}
+                        >
+                          <CropImg
+                            src={heroSrc}
+                            crop={heroCrop}
+                            alt=""
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() =>
+                            setHeroCropOpen(true)
+                          }
+                        >
+                          バナー表示を調整
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
             </fieldset>
           </section>
 
@@ -3089,20 +3581,28 @@ export default function EditIllustrationPage() {
                         'REFERENCE',
                       ],
                       [
-                        'song-parody',
-                        'SONG PARODY',
+                        'tachie',
+                        'TACHIE',
                       ],
                       [
-                        'manga',
-                        'MANGA',
+                        'single-illustration',
+                        'SINGLE ILLUSTRATION',
+                      ],
+                      [
+                        'deformed',
+                        'DEFORMED',
                       ],
                       [
                         'rakugaki',
                         'RAKUGAKI',
                       ],
                       [
-                        'tachie',
-                        'TACHIE',
+                        'manga',
+                        'MANGA',
+                      ],
+                      [
+                        'song-parody',
+                        'SONG PARODY',
                       ],
                     ].map(
                       ([
@@ -3731,6 +4231,19 @@ export default function EditIllustrationPage() {
         </form>
       </main>
 
+      <style jsx>{`
+        .gallery-edit-form {
+          grid-template-columns: minmax(320px, 460px) minmax(0, 1fr);
+        }
+
+        @media (max-width: 760px) {
+          .gallery-edit-form {
+            grid-template-columns: minmax(0, 1fr);
+            gap: 28px;
+          }
+        }
+      `}</style>
+
       {thumbnailSrc && (
         <CropEditor
           open={cropOpen}
@@ -3750,6 +4263,24 @@ export default function EditIllustrationPage() {
           }}
         />
       )}
+
+      {heroSrc &&
+        heroEnabled && (
+          <CropEditor
+            open={heroCropOpen}
+            src={heroSrc}
+            aspect={5 / 2}
+            initial={heroCrop}
+            onClose={() =>
+              setHeroCropOpen(false)
+            }
+            onApply={(crop) => {
+              setHeroCrop(crop);
+              setHeroCropOpen(false);
+            }}
+          />
+        )}
+
     </>
   );
 }

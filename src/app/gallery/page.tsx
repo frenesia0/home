@@ -3,6 +3,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
@@ -15,6 +16,7 @@ import { useAuth } from '@/lib/auth';
 
 import {
   fetchGalleryPosts,
+  getCachedGalleryPosts,
   getGalleryCharacters,
   getGalleryCommission,
   getGalleryImages,
@@ -76,8 +78,359 @@ function tagLabel(
     return 'SONG PARODY';
   }
 
+  if (
+    tag === 'single-illustration'
+  ) {
+    return 'SINGLE ILLUSTRATION';
+  }
+
+  if (
+    tag === 'deformed'
+  ) {
+    return 'DEFORMED';
+  }
+
   return tag.toUpperCase();
 }
+
+
+/**
+ * GALLERY HERO専用。
+ *
+ * HEROの編集画面は 5:2 を基準にしている。
+ * PCとスマホでは実際の表示枠の横長さが違うため、
+ * heroCrop をそのまま使うと同じ画像でも注目位置がずれて見える。
+ *
+ * ここでは保存済みの5:2トリミングから「画像内のどこを
+ * フレーム中央に置いていたか」を逆算し、現在の表示比率へ
+ * x / y を変換する。
+ *
+ * そのためPCとスマホで枠の比率が違っても、
+ * できるだけ同じ箇所が見える。
+ */
+function FocusSyncedHeroImg({
+  src,
+  crop,
+  alt,
+}: {
+  src: string;
+  crop?: {
+    x: number;
+    y: number;
+    scale: number;
+  };
+  alt?: string;
+}) {
+  const wrapRef =
+    useRef<HTMLDivElement>(
+      null
+    );
+
+  const [
+    imageAspect,
+    setImageAspect,
+  ] =
+    useState<number | null>(
+      null
+    );
+
+  const [
+    frameAspect,
+    setFrameAspect,
+  ] =
+    useState(5 / 2);
+
+  const REFERENCE_ASPECT =
+    5 / 2;
+
+  useEffect(() => {
+    const image =
+      new Image();
+
+    image.onload = () => {
+      if (
+        image.naturalWidth >
+          0 &&
+        image.naturalHeight >
+          0
+      ) {
+        setImageAspect(
+          image.naturalWidth /
+            image.naturalHeight
+        );
+      }
+    };
+
+    image.src =
+      src;
+
+    return () => {
+      image.onload =
+        null;
+    };
+  }, [src]);
+
+  useEffect(() => {
+    const element =
+      wrapRef.current;
+
+    if (!element) {
+      return;
+    }
+
+    const measure = () => {
+      const rect =
+        element.getBoundingClientRect();
+
+      if (
+        rect.width > 1 &&
+        rect.height > 1
+      ) {
+        setFrameAspect(
+          rect.width /
+            rect.height
+        );
+      }
+    };
+
+    measure();
+
+    if (
+      typeof ResizeObserver ===
+      'undefined'
+    ) {
+      return;
+    }
+
+    const observer =
+      new ResizeObserver(
+        measure
+      );
+
+    observer.observe(
+      element
+    );
+
+    return () =>
+      observer.disconnect();
+  }, []);
+
+  const adjustedCrop =
+    useMemo(() => {
+      if (
+        !crop ||
+        !imageAspect ||
+        !frameAspect
+      ) {
+        return crop;
+      }
+
+      const scale =
+        Math.max(
+          1,
+          crop.scale ||
+            1
+        );
+
+      /*
+       * まず5:2基準のcropから、
+       * 画像内の注目点(focusX / focusY)を逆算する。
+       *
+       * 0.5 / 0.5 が画像の真ん中。
+       */
+      const referenceWide =
+        imageAspect >=
+        REFERENCE_ASPECT;
+
+      let focusX =
+        0.5;
+      let focusY =
+        0.5;
+
+      if (referenceWide) {
+        focusX =
+          0.5 -
+          crop.x *
+            REFERENCE_ASPECT /
+            (
+              imageAspect *
+              scale
+            );
+
+        focusY =
+          0.5 -
+          crop.y /
+            scale;
+      } else {
+        focusX =
+          0.5 -
+          crop.x /
+            scale;
+
+        focusY =
+          0.5 -
+          crop.y *
+            imageAspect /
+            (
+              REFERENCE_ASPECT *
+              scale
+            );
+      }
+
+      focusX =
+        Math.min(
+          1,
+          Math.max(
+            0,
+            focusX
+          )
+        );
+
+      focusY =
+        Math.min(
+          1,
+          Math.max(
+            0,
+            focusY
+          )
+        );
+
+      /*
+       * 次に、同じfocusX / focusYが現在の枠でも
+       * フレーム中央へ来るようにx / yへ戻す。
+       */
+      const targetWide =
+        imageAspect >=
+        frameAspect;
+
+      let x =
+        0;
+      let y =
+        0;
+
+      let maxX =
+        0;
+      let maxY =
+        0;
+
+      if (targetWide) {
+        x =
+          (0.5 - focusX) *
+          imageAspect *
+          scale /
+          frameAspect;
+
+        y =
+          (0.5 - focusY) *
+          scale;
+
+        maxX =
+          Math.max(
+            0,
+            (
+              imageAspect *
+              scale /
+              frameAspect -
+              1
+            ) / 2
+          );
+
+        maxY =
+          Math.max(
+            0,
+            (
+              scale -
+              1
+            ) / 2
+          );
+      } else {
+        x =
+          (0.5 - focusX) *
+          scale;
+
+        y =
+          (0.5 - focusY) *
+          frameAspect *
+          scale /
+          imageAspect;
+
+        maxX =
+          Math.max(
+            0,
+            (
+              scale -
+              1
+            ) / 2
+          );
+
+        maxY =
+          Math.max(
+            0,
+            (
+              frameAspect *
+              scale /
+              imageAspect -
+              1
+            ) / 2
+          );
+      }
+
+      /*
+       * 画像の外側が見えてしまわない範囲にだけ収める。
+       * 端に近い注目点では完全一致より「余白を出さない」
+       * 方を優先する。
+       */
+      x =
+        Math.min(
+          maxX,
+          Math.max(
+            -maxX,
+            x
+          )
+        );
+
+      y =
+        Math.min(
+          maxY,
+          Math.max(
+            -maxY,
+            y
+          )
+        );
+
+      return {
+        x,
+        y,
+        scale,
+      };
+    }, [
+      crop,
+      imageAspect,
+      frameAspect,
+    ]);
+
+  return (
+    <div
+      ref={wrapRef}
+      style={{
+        position:
+          'absolute',
+        inset: 0,
+        overflow:
+          'hidden',
+      }}
+    >
+      <CropImg
+        src={src}
+        crop={
+          adjustedCrop
+        }
+        alt={alt}
+      />
+    </div>
+  );
+}
+
 
 function isCategory(
   value: string | null
@@ -107,7 +460,9 @@ function isTagFilter(
     value === 'song-parody' ||
     value === 'manga' ||
     value === 'rakugaki' ||
-    value === 'tachie'
+    value === 'tachie' ||
+    value === 'single-illustration' ||
+    value === 'deformed'
   );
 }
 
@@ -124,7 +479,8 @@ function buildGalleryQuery(
   category: GalleryCategory,
   character: CharacterFilter,
   tag: TagFilter,
-  sortOrder: SortOrder
+  sortOrder: SortOrder,
+  page: number
 ) {
   const params =
     new URLSearchParams();
@@ -163,6 +519,13 @@ function buildGalleryQuery(
     params.set(
       'sort',
       sortOrder
+    );
+  }
+
+  if (page > 1) {
+    params.set(
+      'page',
+      String(page)
     );
   }
 
@@ -283,14 +646,126 @@ export default function GalleryPage() {
   ] =
     useState('');
 
+  const initialPageRaw =
+    Number(
+      searchParams.get(
+        'page'
+      ) ?? '1'
+    );
+
+  const initialPage =
+    Number.isFinite(
+      initialPageRaw
+    ) &&
+    initialPageRaw >= 1
+      ? Math.floor(
+          initialPageRaw
+        )
+      : 1;
+
   const [
     page,
     setPage,
   ] =
-    useState(1);
+    useState(
+      initialPage
+    );
+
+  const [
+    heroPostId,
+    setHeroPostId,
+  ] =
+    useState<string | null>(
+      null
+    );
+
+  const [
+    mobileTagOpen,
+    setMobileTagOpen,
+  ] =
+    useState(false);
+
+  useEffect(() => {
+    /*
+     * Next.jsが前ページのスクロール位置を引き継いだ場合でも、
+     * GALLERYを開いた直後はページ最上部から始める。
+     */
+    window.requestAnimationFrame(
+      () => {
+        window.scrollTo({
+          top: 0,
+          left: 0,
+          behavior: 'auto',
+        });
+      }
+    );
+  }, []);
 
   useEffect(() => {
     let alive = true;
+    let firstSnapshot = true;
+
+    const cachedPosts =
+      getCachedGalleryPosts();
+
+    let browserCachedPosts:
+      GalleryPost[] | null =
+        null;
+
+    if (
+      !cachedPosts &&
+      typeof window !==
+        'undefined'
+    ) {
+      try {
+        const raw =
+          window.localStorage.getItem(
+            'frenesia.gallery.cache.v1'
+          );
+
+        if (raw) {
+          const parsed =
+            JSON.parse(raw) as {
+              savedAt?: number;
+              posts?: GalleryPost[];
+            };
+
+          const freshEnough =
+            typeof parsed.savedAt ===
+              'number' &&
+            Date.now() -
+              parsed.savedAt <
+              30 * 60 * 1000;
+
+          if (
+            freshEnough &&
+            Array.isArray(
+              parsed.posts
+            )
+          ) {
+            browserCachedPosts =
+              parsed.posts;
+          }
+        }
+      } catch {
+        browserCachedPosts =
+          null;
+      }
+    }
+
+    const immediatePosts =
+      cachedPosts ??
+      browserCachedPosts;
+
+    if (
+      immediatePosts &&
+      immediatePosts.length > 0
+    ) {
+      setIllustrations(
+        immediatePosts
+      );
+      setLoading(false);
+    }
 
     const load =
       async () => {
@@ -304,9 +779,25 @@ export default function GalleryPage() {
             );
 
             setError('');
+
+            try {
+              window.localStorage.setItem(
+                'frenesia.gallery.cache.v1',
+                JSON.stringify({
+                  savedAt:
+                    Date.now(),
+                  posts,
+                })
+              );
+            } catch {
+              // キャッシュ保存に失敗しても表示自体は続行する。
+            }
           }
         } catch (err) {
-          if (alive) {
+          if (
+            alive &&
+            !immediatePosts
+          ) {
             setError(
               err instanceof
                 Error
@@ -326,6 +817,14 @@ export default function GalleryPage() {
     const off =
       subscribeGallery(
         () => {
+          if (
+            firstSnapshot
+          ) {
+            firstSnapshot =
+              false;
+            return;
+          }
+
           void load();
         }
       );
@@ -337,12 +836,82 @@ export default function GalleryPage() {
   }, []);
 
   useEffect(() => {
+    const candidates =
+      illustrations.filter(
+        (item) => {
+          if (
+            item.category !== 'original' ||
+            item.heroEnabled !== true ||
+            item.heroCrop == null
+          ) {
+            return false;
+          }
+
+          if (
+            item.heroMode === 'custom'
+          ) {
+            return !!item.customHeroImage?.url;
+          }
+
+          const images =
+            getGalleryImages(item);
+          const index =
+            typeof item.heroImageIndex === 'number'
+              ? item.heroImageIndex
+              : 0;
+
+          return !!images[index];
+        }
+      );
+
+    if (
+      candidates.length ===
+      0
+    ) {
+      setHeroPostId(
+        null
+      );
+      return;
+    }
+
+    const currentStillExists =
+      heroPostId &&
+      candidates.some(
+        (item) =>
+          item.id ===
+          heroPostId
+      );
+
+    if (
+      currentStillExists
+    ) {
+      return;
+    }
+
+    const randomIndex =
+      Math.floor(
+        Math.random() *
+          candidates.length
+      );
+
+    setHeroPostId(
+      candidates[
+        randomIndex
+      ]?.id ?? null
+    );
+  }, [
+    illustrations,
+    heroPostId,
+  ]);
+
+  useEffect(() => {
     const query =
       buildGalleryQuery(
         category,
         character,
         tag,
-        sortOrder
+        sortOrder,
+        page
       );
 
     router.replace(
@@ -358,6 +927,7 @@ export default function GalleryPage() {
     character,
     tag,
     sortOrder,
+    page,
     router,
   ]);
 
@@ -365,7 +935,18 @@ export default function GalleryPage() {
    * フィルター条件を変更したら
    * 必ず1ページ目へ戻る。
    */
+  const didMountFilters =
+    useRef(false);
+
   useEffect(() => {
+    if (
+      !didMountFilters.current
+    ) {
+      didMountFilters.current =
+        true;
+      return;
+    }
+
     setPage(1);
   }, [
     category,
@@ -491,13 +1072,15 @@ export default function GalleryPage() {
           category,
           character,
           tag,
-          sortOrder
+          sortOrder,
+          currentPage
         ),
       [
         category,
         character,
         tag,
         sortOrder,
+        currentPage,
       ]
     );
 
@@ -558,6 +1141,46 @@ export default function GalleryPage() {
         'all .18s ease',
     });
 
+  const categoryPillStyle =
+    (active: boolean) => ({
+      ...pillStyle(active),
+      padding:
+        '16px 38px',
+      minWidth:
+        '174px',
+      minHeight:
+        '54px',
+      fontSize:
+        '15px',
+      fontWeight:
+        800,
+      letterSpacing:
+        '.045em',
+    });
+
+  const heroPost =
+    heroPostId
+      ? illustrations.find(
+          (item) =>
+            item.id === heroPostId
+        ) ?? null
+      : null;
+
+  const heroImage =
+    heroPost
+      ? (
+          heroPost.heroMode === 'custom'
+            ? heroPost.customHeroImage ?? null
+            : (
+                getGalleryImages(heroPost)[
+                  typeof heroPost.heroImageIndex === 'number'
+                    ? heroPost.heroImageIndex
+                    : 0
+                ] ?? null
+              )
+        )
+      : null;
+
   return (
     <main
       className="gallery-page"
@@ -573,204 +1196,69 @@ export default function GalleryPage() {
       }}
     >
       {/* =====================
-          HEADER
+          GALLERY BANNER
       ====================== */}
 
-      <div
-        className="gallery-heading"
-        style={{
-          display:
-            'flex',
-          justifyContent:
-            'space-between',
-          alignItems:
-            'flex-start',
-          gap: '24px',
-          marginBottom:
-            '34px',
-        }}
+      <section
+        className="gallery-banner"
       >
-        <div>
-          <h1
-            style={{
-              margin:
-                '0 0 8px',
-              fontSize:
-                '32px',
-              letterSpacing:
-                '.08em',
-            }}
-          >
+        <div
+          className="gallery-banner-copy"
+        >
+          <h1>
             GALLERY
           </h1>
 
-          <p
-            style={{
-              margin: 0,
-              color:
-                'rgba(255,255,255,.55)',
-              fontSize:
-                '13px',
-              letterSpacing:
-                '.04em',
-            }}
-          >
-            shiki & solas
-            visual archive
+          <p>
+            shiki &amp; solas
+            illustration archive
           </p>
         </div>
 
-        {isAdmin && (
+        {heroImage ? (
           <div
-            className="gallery-admin-actions"
-            style={{
-              display:
-                'flex',
-              gap: '10px',
-              alignItems:
-                'center',
-              flexWrap:
-                'wrap',
-              justifyContent:
-                'flex-end',
-            }}
-          >
-            <button
-              type="button"
-              onClick={() =>
-                router.push(
-                  '/admin/orphans'
-                )
-              }
-              style={{
-                padding:
-                  '10px 16px',
-                borderRadius:
-                  '8px',
-                border:
-                  '1px solid rgba(255,255,255,.3)',
-                background:
-                  'rgba(255,255,255,.05)',
-                color:
-                  '#f5f5f5',
-                fontWeight:
-                  700,
-                cursor:
-                  'pointer',
-                letterSpacing:
-                  '.02em',
-              }}
-            >
-              UNUSED IMAGES
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                router.push(
-                  '/gallery/add'
-                )
-              }
-              style={{
-                padding:
-                  '10px 16px',
-                borderRadius:
-                  '8px',
-                border:
-                  '1px solid rgba(255,255,255,.3)',
-                background:
-                  '#f1f1f1',
-                color:
-                  '#17191d',
-                fontWeight:
-                  700,
-                cursor:
-                  'pointer',
-                letterSpacing:
-                  '.02em',
-              }}
-            >
-              ＋ ADD WORK
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* =====================
-          SORT
-      ====================== */}
-
-      <div
-        style={{
-          display:
-            'flex',
-          justifyContent:
-            'flex-end',
-          marginBottom:
-            '22px',
-        }}
-      >
-        <button
-          type="button"
-          aria-label={
-            sortOrder ===
-            'newest'
-              ? '新しい順。押すと古い順に切り替えます'
-              : '古い順。押すと新しい順に切り替えます'
-          }
-          title={
-            sortOrder ===
-            'newest'
-              ? '新しい順'
-              : '古い順'
-          }
-          onClick={() =>
-            setSortOrder(
-              current =>
-                current ===
-                'newest'
-                  ? 'oldest'
-                  : 'newest'
-            )
-          }
-          style={{
-            padding:
-              '10px 14px',
-            borderRadius:
-              '9px',
-            border:
-              '1px solid rgba(255,255,255,.2)',
-            background:
-              'rgba(255,255,255,.06)',
-            color:
-              '#f5f5f5',
-            cursor:
-              'pointer',
-            fontSize:
-              '11px',
-          }}
-        >
-          <span
+            className="gallery-banner-hero"
             aria-hidden="true"
-            style={{
-              fontSize:
-                '16px',
-              lineHeight: 1,
-            }}
           >
-            {sortOrder ===
-            'newest'
-              ? '↓'
-              : '↑'}
-          </span>
-        </button>
-      </div>
+            <FocusSyncedHeroImg
+              src={optimizeCloudinaryUrl(
+                heroImage.url
+              )}
+              crop={
+                heroPost
+                  ?.heroCrop
+              }
+              alt=""
+            />
+          </div>
+        ) : (
+          <div
+            className="gallery-banner-hero gallery-banner-hero-empty"
+            aria-hidden="true"
+          />
+        )}
+
+              </section>
+
+      {isAdmin && (
+        <div className="gallery-admin-actions">
+          <button
+            type="button"
+            onClick={() =>
+              router.push('/gallery/add')
+            }
+          >
+            ＋ ADD WORK
+          </button>
+        </div>
+      )}
 
       {/* =====================
           CATEGORY
       ====================== */}
 
       <section
+        className="gallery-category-row"
         style={{
           display:
             'flex',
@@ -791,7 +1279,7 @@ export default function GalleryPage() {
               'all'
             );
           }}
-          style={pillStyle(
+          style={categoryPillStyle(
             category ===
               'original'
           )}
@@ -809,7 +1297,7 @@ export default function GalleryPage() {
               'all'
             );
           }}
-          style={pillStyle(
+          style={categoryPillStyle(
             category ===
               'commission'
           )}
@@ -902,120 +1390,243 @@ export default function GalleryPage() {
 
       {category ===
         'original' && (
-        <section
-          style={{
-            marginBottom:
-              '36px',
-          }}
-        >
-          <p
+        <>
+          <section
+            className="gallery-tag-desktop"
             style={{
-              margin:
-                '0 0 9px',
-              fontSize:
-                '10px',
-              letterSpacing:
-                '.14em',
-              color:
-                'rgba(255,255,255,.45)',
+              marginBottom:
+                '18px',
             }}
           >
-            TAG
-          </p>
+            <p
+              style={{
+                margin:
+                  '0 0 9px',
+                fontSize:
+                  '10px',
+                letterSpacing:
+                  '.14em',
+                color:
+                  'rgba(255,255,255,.45)',
+              }}
+            >
+              TAG
+            </p>
 
-          <div
-            style={{
-              display:
-                'flex',
-              flexWrap:
-                'wrap',
-              gap: '8px',
-            }}
+            <div
+              style={{
+                display:
+                  'flex',
+                flexWrap:
+                  'wrap',
+                gap:
+                  '8px',
+              }}
+            >
+              <button
+                onClick={() =>
+                  setTag(
+                    'all'
+                  )
+                }
+                style={pillStyle(
+                  tag === 'all'
+                )}
+              >
+                ALL TAG
+              </button>
+
+              <button
+                onClick={() =>
+                  setTag(
+                    'reference'
+                  )
+                }
+                style={pillStyle(
+                  tag ===
+                    'reference'
+                )}
+              >
+                REFERENCE
+              </button>
+
+              <button
+                onClick={() =>
+                  setTag(
+                    'tachie'
+                  )
+                }
+                style={pillStyle(
+                  tag ===
+                    'tachie'
+                )}
+              >
+                TACHIE
+              </button>
+
+              <button
+                onClick={() =>
+                  setTag(
+                    'single-illustration'
+                  )
+                }
+                style={pillStyle(
+                  tag ===
+                    'single-illustration'
+                )}
+              >
+                SINGLE ILLUSTRATION
+              </button>
+
+              <button
+                onClick={() =>
+                  setTag(
+                    'deformed'
+                  )
+                }
+                style={pillStyle(
+                  tag ===
+                    'deformed'
+                )}
+              >
+                DEFORMED
+              </button>
+
+              <button
+                onClick={() =>
+                  setTag(
+                    'rakugaki'
+                  )
+                }
+                style={pillStyle(
+                  tag ===
+                    'rakugaki'
+                )}
+              >
+                RAKUGAKI
+              </button>
+
+              <button
+                onClick={() =>
+                  setTag(
+                    'manga'
+                  )
+                }
+                style={pillStyle(
+                  tag ===
+                    'manga'
+                )}
+              >
+                MANGA
+              </button>
+
+              <button
+                onClick={() =>
+                  setTag(
+                    'song-parody'
+                  )
+                }
+                style={pillStyle(
+                  tag ===
+                    'song-parody'
+                )}
+              >
+                SONG PARODY
+              </button>
+            </div>
+          </section>
+
+          <section
+            className="gallery-tag-mobile"
           >
             <button
+              type="button"
+              className="gallery-tag-toggle"
+              aria-expanded={
+                mobileTagOpen
+              }
               onClick={() =>
-                setTag(
-                  'all'
+                setMobileTagOpen(
+                  current =>
+                    !current
                 )
               }
-              style={pillStyle(
-                tag === 'all'
-              )}
             >
-              ALL TAG
+              <span
+                className="gallery-tag-toggle-label"
+              >
+                TAG
+              </span>
+
+              <span
+                className="gallery-tag-current"
+              >
+                {tag === 'all'
+                  ? 'ALL TAG'
+                  : tagLabel(
+                      tag
+                    )}
+              </span>
+
+              <span
+                aria-hidden="true"
+                className="gallery-tag-chevron"
+              >
+                {mobileTagOpen
+                  ? '⌃'
+                  : '⌄'}
+              </span>
             </button>
 
-            <button
-              onClick={() =>
-                setTag(
-                  'reference'
-                )
-              }
-              style={pillStyle(
-                tag ===
-                  'reference'
-              )}
-            >
-              REFERENCE
-            </button>
-
-            <button
-              onClick={() =>
-                setTag(
-                  'song-parody'
-                )
-              }
-              style={pillStyle(
-                tag ===
-                  'song-parody'
-              )}
-            >
-              SONG PARODY
-            </button>
-
-            <button
-              onClick={() =>
-                setTag(
-                  'manga'
-                )
-              }
-              style={pillStyle(
-                tag ===
-                  'manga'
-              )}
-            >
-              MANGA
-            </button>
-
-            <button
-              onClick={() =>
-                setTag(
-                  'rakugaki'
-                )
-              }
-              style={pillStyle(
-                tag ===
-                  'rakugaki'
-              )}
-            >
-              RAKUGAKI
-            </button>
-
-            <button
-              onClick={() =>
-                setTag(
-                  'tachie'
-                )
-              }
-              style={pillStyle(
-                tag ===
-                  'tachie'
-              )}
-            >
-              TACHIE
-            </button>
-          </div>
-        </section>
+            {mobileTagOpen && (
+              <div
+                className="gallery-tag-panel"
+              >
+                {(
+                  [
+                    ['all', 'ALL TAG'],
+                    ['reference', 'REFERENCE'],
+                    ['tachie', 'TACHIE'],
+                    [
+                      'single-illustration',
+                      'SINGLE ILLUSTRATION',
+                    ],
+                    ['deformed', 'DEFORMED'],
+                    ['rakugaki', 'RAKUGAKI'],
+                    ['manga', 'MANGA'],
+                    [
+                      'song-parody',
+                      'SONG PARODY',
+                    ],
+                  ] as const
+                ).map(
+                  ([
+                    value,
+                    label,
+                  ]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => {
+                        setTag(
+                          value
+                        );
+                        setMobileTagOpen(
+                          false
+                        );
+                      }}
+                      style={pillStyle(
+                        tag === value
+                      )}
+                    >
+                      {label}
+                    </button>
+                  )
+                )}
+              </div>
+            )}
+          </section>
+        </>
       )}
 
       {category ===
@@ -1023,10 +1634,52 @@ export default function GalleryPage() {
         <div
           style={{
             marginBottom:
-              '36px',
+              '18px',
           }}
         />
       )}
+
+      {/* =====================
+          SORT
+      ====================== */}
+
+      <div
+        className="gallery-sort-row"
+      >
+        <button
+          type="button"
+          aria-label={
+            sortOrder ===
+            'newest'
+              ? '新しい順。押すと古い順に切り替えます'
+              : '古い順。押すと新しい順に切り替えます'
+          }
+          title={
+            sortOrder ===
+            'newest'
+              ? '新しい順'
+              : '古い順'
+          }
+          onClick={() =>
+            setSortOrder(
+              current =>
+                current ===
+                'newest'
+                  ? 'oldest'
+                  : 'newest'
+            )
+          }
+        >
+          <span
+            aria-hidden="true"
+          >
+            {sortOrder ===
+            'newest'
+              ? '↓'
+              : '↑'}
+          </span>
+        </button>
+      </div>
 
       {/* =====================
           LOADING
@@ -1421,6 +2074,265 @@ export default function GalleryPage() {
       ====================== */}
 
       <style jsx global>{`
+        .gallery-banner {
+          position: relative;
+          display: grid;
+          grid-template-columns:
+            minmax(260px, 0.78fr)
+            minmax(0, 1.22fr);
+          align-items: stretch;
+          min-height: 188px;
+          margin-bottom: 24px;
+          border:
+            1px solid
+            rgba(
+              255,
+              255,
+              255,
+              0.1
+            );
+          background:
+            rgba(
+              255,
+              255,
+              255,
+              0.025
+            );
+          overflow: hidden;
+        }
+
+        .gallery-banner-copy {
+          position: relative;
+          z-index: 3;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          min-width: 0;
+          padding:
+            30px 30px 28px;
+          background:
+            linear-gradient(
+              90deg,
+              rgba(31,35,42,1) 0%,
+              rgba(31,35,42,.98) 72%,
+              rgba(31,35,42,.86) 100%
+            );
+        }
+
+        .gallery-banner-copy h1 {
+          margin: 0 0 8px;
+          font-size: 34px;
+          line-height: 1;
+          letter-spacing: .08em;
+        }
+
+        .gallery-banner-copy p {
+          margin: 0;
+          max-width: 290px;
+          color:
+            rgba(
+              255,
+              255,
+              255,
+              0.56
+            );
+          font-size: 13px;
+          line-height: 1.6;
+          letter-spacing: .04em;
+        }
+
+        .gallery-banner-hero {
+          position: relative;
+          min-width: 0;
+          overflow: hidden;
+          background: #1f232a;
+        }
+
+        .gallery-banner-hero::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          z-index: 4;
+          pointer-events: none;
+          box-shadow:
+            inset 16px 0 18px rgba(31,35,42,.95),
+            inset -12px 0 16px rgba(31,35,42,.55),
+            inset 0 10px 14px rgba(31,35,42,.5),
+            inset 0 -10px 14px rgba(31,35,42,.5);
+        }
+
+        .gallery-banner-hero::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          z-index: 5;
+          pointer-events: none;
+          background:
+            linear-gradient(
+              90deg,
+              #1f232a 0,
+              rgba(31,35,42,.72) 10px,
+              transparent 26px,
+              transparent calc(100% - 18px),
+              rgba(31,35,42,.34) calc(100% - 8px),
+              #1f232a 100%
+            ),
+            linear-gradient(
+              180deg,
+              #1f232a 0,
+              transparent 18px,
+              transparent calc(100% - 18px),
+              #1f232a 100%
+            );
+        }
+
+        .gallery-banner-hero > * {
+          width: 100% !important;
+          height: 100% !important;
+        }
+
+        .gallery-banner-hero-empty {
+          min-height: 188px;
+        }
+
+        .gallery-admin-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: -10px 0 18px;
+}
+
+        .gallery-admin-actions button {
+          padding: 9px 13px;
+          border-radius: 8px;
+          border:
+            1px solid
+            rgba(
+              255,
+              255,
+              255,
+              0.3
+            );
+          background: #f1f1f1;
+          color: #17191d;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: .02em;
+          cursor: pointer;
+        }
+
+        .gallery-sort-row {
+          display: flex;
+          justify-content: flex-end;
+          margin:
+            -10px 0 22px;
+        }
+
+        .gallery-sort-row button {
+          width: 44px;
+          height: 40px;
+          display: grid;
+          place-items: center;
+          padding: 0;
+          border-radius: 9px;
+          border:
+            1px solid
+            rgba(
+              255,
+              255,
+              255,
+              0.2
+            );
+          background:
+            rgba(
+              255,
+              255,
+              255,
+              0.06
+            );
+          color: #f5f5f5;
+          cursor: pointer;
+        }
+
+        .gallery-sort-row span {
+          font-size: 17px;
+          line-height: 1;
+        }
+
+        .gallery-tag-mobile {
+          display: none;
+        }
+
+        .gallery-tag-toggle {
+          width: 100%;
+          display: grid;
+          grid-template-columns:
+            auto minmax(0, 1fr) auto;
+          align-items: center;
+          gap: 10px;
+          padding: 12px 14px;
+          border-radius: 12px;
+          border:
+            1px solid
+            rgba(
+              255,
+              255,
+              255,
+              0.18
+            );
+          background:
+            rgba(
+              255,
+              255,
+              255,
+              0.045
+            );
+          color: #f5f5f5;
+          cursor: pointer;
+          text-align: left;
+        }
+
+        .gallery-tag-toggle-label {
+          font-size: 10px;
+          letter-spacing: .14em;
+          color:
+            rgba(
+              255,
+              255,
+              255,
+              0.46
+            );
+        }
+
+        .gallery-tag-current {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: .04em;
+        }
+
+        .gallery-tag-chevron {
+          font-size: 14px;
+          line-height: 1;
+          color:
+            rgba(
+              255,
+              255,
+              255,
+              0.72
+            );
+        }
+
+        .gallery-tag-panel {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          padding-top: 10px;
+        }
+
         .gallery-grid {
           display: grid;
           grid-template-columns:
@@ -1544,33 +2456,135 @@ export default function GalleryPage() {
           max-width: 620px
         ) {
           .gallery-page {
-  padding:
-    40px 18px
-    calc(160px + env(safe-area-inset-bottom))
-    !important;
-}
+            padding:
+              34px 18px
+              calc(160px + env(safe-area-inset-bottom))
+              !important;
+          }
 
-          .gallery-heading {
+          .gallery-banner {
+            grid-template-columns:
+              minmax(0, 0.44fr)
+              minmax(0, 0.56fr);
+            aspect-ratio: 4.45 / 1;
+            min-height: 0;
+            margin-bottom: 16px;
+          }
+
+          .gallery-banner-copy {
+            padding:
+              14px 16px 13px;
+          }
+
+          .gallery-banner-copy h1 {
+            font-size:
+              20px !important;
+            margin-bottom: 7px;
+            letter-spacing:
+              .16em !important;
+            white-space: nowrap;
+          }
+
+          .gallery-banner-copy p {
+            max-width: none;
+            font-size: 8.5px;
+            line-height: 1.25;
+            letter-spacing: .018em;
+            white-space: nowrap;
+          }
+
+          .gallery-banner-hero {
+            min-height: 0;
+            height: 100%;
+          }
+
+          .gallery-banner-hero::before {
+            box-shadow:
+              inset 10px 0 12px rgba(31,35,42,.9),
+              inset -6px 0 8px rgba(31,35,42,.3),
+              inset 0 5px 7px rgba(31,35,42,.4),
+              inset 0 -5px 7px rgba(31,35,42,.4);
+          }
+
+          .gallery-banner-hero::after {
+            background:
+              linear-gradient(
+                90deg,
+                #1f232a 0,
+                rgba(31,35,42,.66) 6px,
+                transparent 15px,
+                transparent calc(100% - 11px),
+                rgba(31,35,42,.22) calc(100% - 5px),
+                #1f232a 100%
+              ),
+              linear-gradient(
+                180deg,
+                #1f232a 0,
+                transparent 9px,
+                transparent calc(100% - 9px),
+                #1f232a 100%
+              );
+          }
+
+          .gallery-admin-actions button {
+            padding:
+              7px 9px !important;
+            font-size:
+              9px !important;
+          }
+
+          .gallery-tag-desktop {
+            display:
+              none !important;
+          }
+
+          .gallery-tag-mobile {
+            display:
+              block;
+            margin-bottom:
+              18px;
+          }
+
+          .gallery-tag-panel
+            button {
+            font-size:
+              11px !important;
+          }
+
+          .gallery-category-row {
+            display:
+              grid !important;
+            grid-template-columns:
+              minmax(0, 1fr)
+              minmax(0, 1fr);
             gap:
+              10px !important;
+            margin-bottom:
               18px !important;
           }
 
-          .gallery-heading h1 {
-            font-size:
-              30px !important;
-          }
-
-          .gallery-admin-actions {
-            gap:
-              8px !important;
-          }
-
-          .gallery-admin-actions
+          .gallery-category-row
             button {
+            width:
+              100% !important;
+            min-width:
+              0 !important;
+            min-height:
+              52px !important;
             padding:
-              9px 12px !important;
+              13px 12px !important;
             font-size:
-              10px !important;
+              13px !important;
+          }
+
+          .gallery-sort-row {
+            margin:
+              -8px 0 20px;
+          }
+
+          .gallery-sort-row button {
+            width: 42px;
+            height: 40px;
           }
 
           .gallery-grid {
@@ -1625,6 +2639,31 @@ export default function GalleryPage() {
         @media (
           max-width: 390px
         ) {
+          .gallery-banner {
+            grid-template-columns:
+              minmax(0, 0.46fr)
+              minmax(0, 0.54fr);
+            aspect-ratio:
+              4.2 / 1;
+          }
+
+          .gallery-banner-copy {
+            padding:
+              12px 10px 11px;
+          }
+
+          .gallery-banner-copy h1 {
+            font-size:
+              18px !important;
+            letter-spacing:
+              .14em !important;
+          }
+
+          .gallery-banner-copy p {
+            font-size:
+              7.2px;
+          }
+
           .gallery-page {
             padding-left:
               14px !important;
