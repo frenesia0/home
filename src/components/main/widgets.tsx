@@ -583,21 +583,62 @@ async function extractMusicTheme(
     }
 
     // 2) If the image has a meaningful amount of color, ignore a large
-    // white/black canvas and use the dominant chromatic family instead.
-    if (colorfulRatio >= 0.055) {
-      const dominant = dominantHueColor(colorful);
+// white/black canvas and use the dominant chromatic family instead.
+if (colorfulRatio >= 0.055) {
+  const dominant = dominantHueColor(colorful);
 
-      if (dominant) {
-        const r = clampByte(dominant.r);
-        const g = clampByte(dominant.g);
-        const b = clampByte(dominant.b);
+  if (dominant) {
+    const r = clampByte(dominant.r);
+    const g = clampByte(dominant.g);
+    const b = clampByte(dominant.b);
 
-        return {
-          background: rgbHex(r, g, b),
-          foreground: foregroundForBackground(r, g, b),
-        };
-      }
+    return {
+      background: rgbHex(r, g, b),
+      foreground: foregroundForBackground(r, g, b),
+    };
+  }
+}
+
+// 2.5) Accent-color rescue.
+//
+// 白黒主体のイラストでも、紫・青・赤などの「意図的な差し色」が
+// 少量存在する場合は、モノクロ判定より先にその色を拾う。
+// 肌色やアンチエイリアス由来の弱い色はできるだけ除外する。
+if (colorfulRatio >= 0.008 && colorful.length >= 12) {
+  const accentCandidates = colorful.filter(pixel => {
+    // はっきり色が付いているものだけ
+    if (pixel.saturation < 0.30) return false;
+
+    // 明るすぎ・暗すぎる色は除外
+    if (pixel.light < 0.16 || pixel.light > 0.84) return false;
+
+    // 肌色系（赤～黄付近）を差し色候補から除外
+    const looksLikeSkin =
+      pixel.hue >= 5 &&
+      pixel.hue <= 55 &&
+      pixel.saturation < 0.62 &&
+      pixel.light > 0.42;
+
+    if (looksLikeSkin) return false;
+
+    return true;
+  });
+
+  if (accentCandidates.length >= 10) {
+    const accent = dominantHueColor(accentCandidates);
+
+    if (accent && accent.share >= 0.18) {
+      const r = clampByte(accent.r);
+      const g = clampByte(accent.g);
+      const b = clampByte(accent.b);
+
+      return {
+        background: rgbHex(r, g, b),
+        foreground: foregroundForBackground(r, g, b),
+      };
     }
+  }
+}
 
     // 3) Truly monochrome / nearly monochrome covers:
     // white-heavy -> pure white, black-heavy -> deep gray/black,
