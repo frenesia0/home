@@ -375,6 +375,12 @@ export interface GallerySong {
     string;
 
   /**
+   * 曲の作者名 / アーティスト名
+   */
+  creator?:
+    string;
+
+  /**
    * YouTubeなど、元曲への外部リンク
    */
   url?:
@@ -399,6 +405,7 @@ export type GalleryThumbnailMode =
   | 'post'
   | 'custom';
 
+/** HOME VISUAL用。旧heroフィールド名は保存互換のため維持する。 */
 export type GalleryHeroMode =
   | 'post'
   | 'custom';
@@ -445,6 +452,7 @@ export interface GalleryPost {
   thumbnailCrop?:
     CropValue;
 
+  /** HOME VISUALのランダム候補に含めるか。旧フィールド名は互換のため維持。 */
   heroEnabled?:
     boolean;
 
@@ -975,6 +983,14 @@ export function getGallerySong(
       : undefined;
 
 
+  const creator =
+    typeof song.creator ===
+      'string' &&
+    song.creator.trim()
+      ? song.creator.trim()
+      : undefined;
+
+
   const url =
     typeof song.url ===
       'string' &&
@@ -993,6 +1009,7 @@ export function getGallerySong(
 
   if (
     !title &&
+    !creator &&
     !url &&
     !audioUrl
   ) {
@@ -1002,6 +1019,7 @@ export function getGallerySong(
 
   return {
     title,
+    creator,
     url,
     audioUrl,
   };

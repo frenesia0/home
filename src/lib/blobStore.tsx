@@ -13,13 +13,28 @@ const STORE = 'files';
 /** 확장자 추론 — Storage에 올릴 때 파일 이름에 쓴다 */
 function extOf(blob: Blob): string {
   const t = blob.type || '';
+
+  // images
   if (t.includes('png')) return 'png';
   if (t.includes('gif')) return 'gif';
   if (t.includes('webp')) return 'webp';
   if (t.includes('svg')) return 'svg';
   if (t.includes('jpeg') || t.includes('jpg')) return 'jpg';
+
+  // audio
+  if (t === 'audio/mpeg' || t.includes('mp3')) return 'mp3';
+  if (t === 'audio/wav' || t.includes('wav')) return 'wav';
+  if (t === 'audio/ogg' || t.includes('ogg')) return 'ogg';
+  if (
+    t === 'audio/mp4' ||
+    t === 'audio/x-m4a' ||
+    t.includes('m4a')
+  ) return 'm4a';
+
+  // fonts / text
   if (t.includes('font') || t.includes('woff')) return 'woff2';
   if (t.startsWith('text/')) return 'txt';
+
   return 'bin';
 }
 
@@ -27,7 +42,9 @@ function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, 1);
     req.onupgradeneeded = () => {
-      if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE);
+      if (!req.result.objectStoreNames.contains(STORE)) {
+        req.result.createObjectStore(STORE);
+      }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -39,6 +56,7 @@ function openDb(): Promise<IDBDatabase> {
    지금 몇 건이 올라가는 중인지 알려 화면에 표시할 수 있게 한다. */
 export const UPLOAD_EVT = 'ohome-upload';
 let uploading = 0;
+
 const bump = (n: number) => {
   uploading = Math.max(0, uploading + n);
   window.dispatchEvent(new Event(UPLOAD_EVT));
@@ -47,12 +65,15 @@ const bump = (n: number) => {
 /** 지금 올라가는 중인 파일 수 */
 export function useUploading(): number {
   const [n, setN] = useState(0);
+
   useEffect(() => {
     const h = () => setN(uploading);
     h();
+
     window.addEventListener(UPLOAD_EVT, h);
     return () => window.removeEventListener(UPLOAD_EVT, h);
   }, []);
+
   return n;
 }
 
@@ -65,9 +86,13 @@ async function hashOf(blob: Blob): Promise<string | null> {
   try {
     const buf = await blob.arrayBuffer();
     const d = await crypto.subtle.digest('SHA-256', buf);
-    return Array.from(new Uint8Array(d)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+    return Array.from(new Uint8Array(d))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
   } catch {
-    return null;   // 보안 컨텍스트가 아니면 해시를 못 구한다 — 그땐 그냥 올린다
+    return null;
+    // 보안 컨텍스트가 아니면 해시를 못 구한다 — 그땐 그냥 올린다
   }
 }
 
@@ -75,18 +100,24 @@ async function hashOf(blob: Blob): Promise<string | null> {
 export async function putBlob(blob: Blob): Promise<string> {
   const key = await hashOf(blob);
   const hit = key ? sent.get(key) : undefined;
+
   if (hit) return hit;
+
   const job = putBlobNew(blob);
+
   if (key) {
     sent.set(key, job);
+
     // 실패한 업로드는 캐시에 남기지 않는다 — 다시 시도할 수 있어야 한다
     job.catch(() => sent.delete(key));
   }
+
   return job;
 }
 
 async function putBlobNew(blob: Blob): Promise<string> {
   bump(1);
+
   try {
     return await putBlobRaw(blob);
   } finally {
@@ -96,57 +127,99 @@ async function putBlobNew(blob: Blob): Promise<string> {
 
 async function putBlobRaw(blob: Blob): Promise<string> {
   const be = isServerMode() ? backend() : null;
-  if (be) return be.uploadFile(blob, extOf(blob));   // 서버 모드 — 공개 URL 반환
+
+  if (be) {
+    return be.uploadFile(blob, extOf(blob));
+    // 서버 모드 — 공개 URL 반환
+  }
+
   const id = newId();
   const db = await openDb();
+
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, 'readwrite');
+
     tx.objectStore(STORE).put(blob, id);
+
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
+
   return id;
 }
 
 /** 전체 파일 목록 (id → Blob) — 데이터 백업 내보내기용 (5.2) */
 export async function allBlobs(): Promise<Map<string, Blob>> {
   const db = await openDb();
+
   return new Promise((resolve, reject) => {
     const out = new Map<string, Blob>();
-    const req = db.transaction(STORE, 'readonly').objectStore(STORE).openCursor();
+
+    const req = db
+      .transaction(STORE, 'readonly')
+      .objectStore(STORE)
+      .openCursor();
+
     req.onsuccess = () => {
       const cur = req.result;
-      if (!cur) { resolve(out); return; }
+
+      if (!cur) {
+        resolve(out);
+        return;
+      }
+
       out.set(String(cur.key), cur.value as Blob);
       cur.continue();
     };
+
     req.onerror = () => reject(req.error);
   });
 }
 
 /** 지정 id로 Blob 저장 — 백업 복원용 (기존 id 유지) */
-export async function putBlobAs(id: string, blob: Blob): Promise<void> {
+export async function putBlobAs(
+  id: string,
+  blob: Blob
+): Promise<void> {
   const db = await openDb();
+
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, 'readwrite');
+
     tx.objectStore(STORE).put(blob, id);
+
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
 }
 
 export async function getBlob(id: string): Promise<Blob | null> {
-  // 서버 모드에서 저장된 값은 공개 URL — 그대로 받아 온다 (백업 zip 내보내기 등에서 사용)
+  // 서버 모드에서 저장된 값은 공개 URL — 그대로 받아 온다
+  // (백업 zip 내보내기 등에서 사용)
   if (/^https?:/.test(id)) {
     try {
       const res = await fetch(id);
-      return res.ok ? await res.blob() : null;
-    } catch { return null; }
+
+      return res.ok
+        ? await res.blob()
+        : null;
+    } catch {
+      return null;
+    }
   }
+
   const db = await openDb();
+
   return new Promise((resolve, reject) => {
-    const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(id);
-    req.onsuccess = () => resolve((req.result as Blob) ?? null);
+    const req = db
+      .transaction(STORE, 'readonly')
+      .objectStore(STORE)
+      .get(id);
+
+    req.onsuccess = () => resolve(
+      (req.result as Blob) ?? null
+    );
+
     req.onerror = () => reject(req.error);
   });
 }
@@ -160,42 +233,111 @@ const urlCache = new Map<string, string>();
  * - blob: 은 새로고침 후 죽은 참조 → undefined (플레이스홀더 폴백)
  * - 그 외는 IndexedDB 파일 id로 간주해 로드
  */
-export function useBlobUrl(ref?: string): string | undefined {
+export function useBlobUrl(
+  ref?: string
+): string | undefined {
   const [url, setUrl] = useState<string | undefined>(() => {
     if (!ref) return undefined;
-    if (/^(https?:|data:)/.test(ref)) return ref;
-    if (ref.startsWith('blob:')) return undefined;
+
+    if (/^(https?:|data:)/.test(ref)) {
+      return ref;
+    }
+
+    if (ref.startsWith('blob:')) {
+      return undefined;
+    }
+
     return urlCache.get(ref);
   });
 
   useEffect(() => {
-    if (!ref) { setUrl(undefined); return; }
-    if (/^(https?:|data:)/.test(ref)) { setUrl(ref); return; }
-    if (ref.startsWith('blob:')) { setUrl(undefined); return; }
-    if (urlCache.has(ref)) { setUrl(urlCache.get(ref)); return; }
+    if (!ref) {
+      setUrl(undefined);
+      return;
+    }
+
+    if (/^(https?:|data:)/.test(ref)) {
+      setUrl(ref);
+      return;
+    }
+
+    if (ref.startsWith('blob:')) {
+      setUrl(undefined);
+      return;
+    }
+
+    if (urlCache.has(ref)) {
+      setUrl(urlCache.get(ref));
+      return;
+    }
+
     let alive = true;
-    getBlob(ref).then(b => {
-      if (b && alive) {
-        const u = URL.createObjectURL(b);
-        urlCache.set(ref, u);
-        setUrl(u);
-      }
-    }).catch(() => { /* 없으면 플레이스홀더 */ });
-    return () => { alive = false; };
+
+    getBlob(ref)
+      .then(b => {
+        if (b && alive) {
+          const u = URL.createObjectURL(b);
+
+          urlCache.set(ref, u);
+          setUrl(u);
+        }
+      })
+      .catch(() => {
+        /* 없으면 플레이스홀더 */
+      });
+
+    return () => {
+      alive = false;
+    };
   }, [ref]);
 
   return url;
 }
 
 /** 파일 참조 이미지 — 없으면 플레이스홀더(ph) 폴백 */
-export function BlobImg({ fileRef, ph, alt, style, imgStyle, label }: {
-  fileRef?: string; ph?: string; alt?: string;
-  style?: React.CSSProperties; imgStyle?: React.CSSProperties; label?: string;
+export function BlobImg({
+  fileRef,
+  ph,
+  alt,
+  style,
+  imgStyle,
+  label,
+}: {
+  fileRef?: string;
+  ph?: string;
+  alt?: string;
+  style?: React.CSSProperties;
+  imgStyle?: React.CSSProperties;
+  label?: string;
 }) {
   const url = useBlobUrl(fileRef);
+
   if (url) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={url} alt={alt ?? ''} style={{ width: '100%', height: '100%', objectFit: 'cover', ...imgStyle }} />;
+    return (
+      <img
+        src={url}
+        alt={alt ?? ''}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          ...imgStyle,
+        }}
+      />
+    );
   }
-  return <div className={`ph ${ph ?? ''}`} style={{ width: '100%', height: '100%', ...style }}>{label && <span>{label}</span>}</div>;
+
+  return (
+    <div
+      className={`ph ${ph ?? ''}`}
+      style={{
+        width: '100%',
+        height: '100%',
+        ...style,
+      }}
+    >
+      {label && <span>{label}</span>}
+    </div>
+  );
 }

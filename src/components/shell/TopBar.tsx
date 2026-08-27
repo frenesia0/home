@@ -340,7 +340,8 @@ export function TopBar() {
                 'pointer',
             }}
           >
-            frenesia0
+            <span className="brand-word">frenesia</span>
+<span className="brand-zero">0</span>
           </div>
 
           <nav
@@ -474,7 +475,8 @@ export function TopBar() {
                 }
               }
             >
-              frenesia0
+              <span className="brand-word">frenesia</span>
+<span className="brand-zero">0</span>
             </div>
 
             {renderUserArea(
@@ -593,9 +595,54 @@ export function TopBar() {
       </header>
 
       <style jsx global>{`
-        /* ========================================
-           PC
-        ======================================== */
+  /* ========================================
+     BRAND LOGO
+  ======================================== */
+
+  .brand {
+  display: inline-flex;
+  align-items: baseline;
+
+  font-family:
+    Georgia,
+    'Times New Roman',
+    serif !important;
+
+  font-weight: 400 !important;
+  font-style: normal;
+
+  letter-spacing: 0;
+}
+
+.brand-word {
+  letter-spacing: 0.24em;
+}
+
+.brand-zero {
+  display: inline-block;
+
+  font-family:
+    "Cascadia Mono",
+    "Cascadia Code",
+    Consolas,
+    monospace;
+
+  font-size: 1em;
+  font-weight: 400;
+  line-height: 1;
+
+  font-feature-settings: "zero" 1;
+  font-variant-numeric: slashed-zero;
+
+  margin-left: 0;
+
+  transform: scaleX(0.82);
+  transform-origin: center;
+}
+
+  /* ========================================
+     PC
+  ======================================== */
 
         .topbar-desktop {
           width: 100%;
@@ -603,6 +650,10 @@ export function TopBar() {
           align-items: center;
           min-width: 0;
         }
+        
+        .gnb {
+  margin-left: 16px;
+}
 
         .topbar-desktop-spacer {
           flex: 1;

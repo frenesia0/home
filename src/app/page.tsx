@@ -1,13 +1,24 @@
 'use client';
 // 메인 페이지 (4.0 위젯 시스템) — 고정 요소(배너·회원정보창) + 자유 배치 위젯 + 편집모드
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useMainStore, WidgetConf, WidgetType, WIDGET_META, MULTI_TYPES, widgetLabel } from '@/lib/mainStore';
 import { WidgetFrame } from '@/components/main/WidgetFrame';
-import { renderWidget } from '@/components/main/widgets';
+import { MusicWidget, renderWidget } from '@/components/main/widgets';
 import { MemberBox } from '@/components/main/MemberBox';
 import { Modal, ConfirmModal } from '@/components/ui/Modal';
 import { KRadio } from '@/components/ui/Kit';
 import { useToast } from '@/components/ui/Toast';
+import {
+  fetchGalleryPosts,
+  getCachedGalleryPosts,
+  getGalleryImages,
+  getGallerySong,
+  getGalleryTags,
+  subscribeGallery,
+  type GalleryPost,
+} from '@/lib/galleryData';
+import { CropImg } from '@/components/ui/CropEditor';
 
 const ADDABLE: WidgetType[] = ['memo', 'dday', 'todo', 'upcoming', 'freetext', 'deco', 'diary', 'latest'];
 /** 내용 설정 모달이 있는 위젯 — 우클릭 「설정」 노출 대상 (v1.9) */
@@ -21,12 +32,143 @@ export default function MainPage() {
   const [addType, setAddType] = useState<WidgetType>('freetext');
   const [addCol, setAddCol] = useState<'1' | '2' | '3'>('3');
   const [delAsk, setDelAsk] = useState<WidgetConf | null>(null);   // 우클릭 삭제 경고 (v1.9)
+  const router = useRouter();
+  const [homePosts, setHomePosts] = useState<GalleryPost[]>([]);
+  const [homeVisualId, setHomeVisualId] = useState<string | null>(null);
+  const [homeVisualLoaded, setHomeVisualLoaded] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+
+    const applyPosts = (posts: GalleryPost[]) => {
+      if (!alive) return;
+      setHomePosts(posts);
+      setHomeVisualLoaded(true);
+    };
+
+    const cached = getCachedGalleryPosts();
+    if (cached && cached.length > 0) {
+      applyPosts(cached);
+    }
+
+    const load = async () => {
+      try {
+        const posts = await fetchGalleryPosts();
+        applyPosts(posts);
+      } catch (error) {
+        console.error('HOME VISUAL: gallery load failed', error);
+        if (alive) setHomeVisualLoaded(true);
+      }
+    };
+
+    void load();
+
+    const off = subscribeGallery(() => {
+      void load();
+    });
+
+    return () => {
+      alive = false;
+      off();
+    };
+  }, []);
+
+  useEffect(() => {
+    const candidates = homePosts.filter(post => {
+      if (
+        post.category !== 'original' ||
+        post.heroEnabled !== true ||
+        post.heroCrop == null
+      ) {
+        return false;
+      }
+
+      if (post.heroMode === 'custom') {
+        return !!post.customHeroImage?.url;
+      }
+
+      const images = getGalleryImages(post);
+      const index =
+        typeof post.heroImageIndex === 'number'
+          ? post.heroImageIndex
+          : 0;
+
+      return !!images[index];
+    });
+
+    if (candidates.length === 0) {
+      setHomeVisualId(null);
+      return;
+    }
+
+    if (
+      homeVisualId &&
+      candidates.some(post => post.id === homeVisualId)
+    ) {
+      return;
+    }
+
+    const next =
+      candidates[Math.floor(Math.random() * candidates.length)] ??
+      candidates[0];
+
+    setHomeVisualId(next?.id ?? null);
+  }, [homePosts, homeVisualId]);
+
+  const homeVisualPost =
+    homeVisualId
+      ? homePosts.find(post => post.id === homeVisualId) ?? null
+      : null;
+
+  const homeVisualImage =
+    homeVisualPost
+      ? (
+          homeVisualPost.heroMode === 'custom'
+            ? homeVisualPost.customHeroImage ?? null
+            : (
+                getGalleryImages(homeVisualPost)[
+                  typeof homeVisualPost.heroImageIndex === 'number'
+                    ? homeVisualPost.heroImageIndex
+                    : 0
+                ] ?? null
+              )
+        )
+      : null;
+
+  const homeVisualSong =
+    homeVisualPost
+      ? getGallerySong(homeVisualPost)
+      : null;
+
+  const linkedMusicPostId =
+    homeVisualPost &&
+    getGalleryTags(homeVisualPost).includes('song-parody') &&
+    homeVisualSong?.audioUrl?.trim()
+      ? homeVisualPost.id
+      : null;
+
+  const recentPosts = [...homePosts]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 3);
 
   // 위젯 추가 — 상단바의 [＋ 위젯] 버튼(그리드 토글 왼쪽)이 이벤트로 연다 (v1.9 사용자 확정)
   useEffect(() => {
     const open = () => setAddOpen(true);
     window.addEventListener('ohome-add-widget', open);
     return () => window.removeEventListener('ohome-add-widget', open);
+  }, []);
+
+  // HOMEへ入った時は、前ページのスクロール位置を引き継がない。
+  useEffect(() => {
+    const id = window.requestAnimationFrame(() => {
+      window.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: 'auto',
+      });
+    });
+
+    return () => window.cancelAnimationFrame(id);
   }, []);
 
   // 모달을 열 때 선택돼 있던 종류가 이미 추가된 것이면 항상 가능한 자유 텍스트로 (v1.9)
@@ -114,6 +256,317 @@ export default function MainPage() {
   const canvasH = absMode
     ? Math.max(400, ...enabled.map(w => (w.ay ?? 0) + (w.h ?? 200))) + 40
     : undefined;
+
+  if (!editOn) {
+    return (
+      <section className="page home-public-page">
+        <div className="home-public-grid">
+          <div className="home-top-grid">
+            <button
+              type="button"
+              className="home-visual"
+              aria-label={
+                homeVisualPost
+                  ? 'HOME VISUALの作品を開く'
+                  : 'HOME VISUAL'
+              }
+              onClick={() => {
+                if (homeVisualPost) {
+                  router.push(
+                    `/gallery/${encodeURIComponent(homeVisualPost.id)}`
+                  );
+                }
+              }}
+            >
+              {homeVisualImage && homeVisualPost ? (
+                <CropImg
+                  src={homeVisualImage.url}
+                  crop={homeVisualPost.heroCrop}
+                  alt=""
+                />
+              ) : (
+                <div className="home-visual-empty">
+                  {homeVisualLoaded
+                    ? 'HOME VISUAL'
+                    : 'LOADING...'}
+                </div>
+              )}
+            </button>
+
+            <div className="home-music">
+              <MusicWidget
+                key={linkedMusicPostId ?? 'random-home-music'}
+                forcedPostId={linkedMusicPostId}
+                sourcePosts={homePosts}
+                sourcePostsLoaded={homeVisualLoaded}
+              />
+            </div>
+          </div>
+
+          <section className="home-news" aria-label="RECENT UPDATE">
+            <div className="home-news-head">
+              <span>RECENT UPDATE</span>
+              <button
+                type="button"
+                onClick={() => router.push('/gallery')}
+              >
+                GALLERY ›
+              </button>
+            </div>
+
+            <div className="home-news-list">
+              {recentPosts.length > 0 ? (
+                recentPosts.map(post => (
+                  <button
+                    key={post.id}
+                    type="button"
+                    className="home-news-row"
+                    onClick={() =>
+                      router.push(
+                        `/gallery/${encodeURIComponent(post.id)}`
+                      )
+                    }
+                  >
+                    <time>{post.date.replaceAll('-', '.')}</time>
+                    <span>
+                      {getGalleryTags(post).includes('song-parody')
+                        ? 'SONG PARODY UPDATE'
+                        : 'GALLERY UPDATE'}
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <div className="home-news-empty">
+                  NO UPDATE
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+
+        <style jsx>{`
+          .home-public-page {
+            padding-top: 12px;
+          }
+
+          .home-public-grid {
+            width: min(1120px, 100%);
+            margin: 0 auto;
+            display: grid;
+            gap: 18px;
+          }
+
+          .home-top-grid {
+            display: grid;
+            grid-template-columns:
+              minmax(0, 7fr)
+              minmax(280px, 3fr);
+            gap: 20px;
+            align-items: stretch;
+          }
+
+          .home-visual {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            border: 0;
+            padding: 0;
+            overflow: hidden;
+            border-radius: 0;
+            background: transparent;
+            box-shadow: none;
+            cursor: var(--cur-pointer, pointer);
+            color: inherit;
+          }
+
+          .home-visual :global(> div) {
+            position: absolute;
+            inset: 0;
+          }
+
+          .home-visual-empty {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            font-size: 11px;
+            letter-spacing: .16em;
+            color: rgba(255,255,255,.34);
+          }
+
+          .home-music {
+            min-width: 0;
+            height: 100%;
+          }
+
+          .home-music :global(.music-widget) {
+            height: 100% !important;
+            min-height: 0 !important;
+            box-sizing: border-box;
+            padding: 18px !important;
+          }
+
+          .home-music :global(.music-inner) {
+            height: 100% !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            justify-content: center !important;
+            gap: 16px !important;
+          }
+
+          .home-music :global(.music-cover) {
+            width: min(100%, 245px) !important;
+            height: auto !important;
+            aspect-ratio: 1 / 1 !important;
+            flex: 0 0 auto !important;
+            align-self: center;
+            border-radius: 10px !important;
+          }
+
+          .home-music :global(.music-info) {
+            width: 100%;
+            flex: 0 0 auto !important;
+          }
+
+          .home-news {
+            min-height: 0;
+            padding: 4px 2px 0;
+            background: transparent;
+            border: 0;
+            border-radius: 0;
+            box-shadow: none;
+          }
+
+          .home-news-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 11px;
+            border: 0;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: .13em;
+            color: rgba(255,255,255,.68);
+          }
+
+          .home-news-head button {
+            color: rgba(255,255,255,.48);
+            font-size: 10px;
+            letter-spacing: .08em;
+          }
+
+          .home-news-list {
+            display: grid;
+          }
+
+          .home-news-row {
+            display: grid;
+            grid-template-columns: 118px 1fr;
+            gap: 20px;
+            align-items: center;
+            min-height: 31px;
+            padding: 0;
+            text-align: left;
+            border: 0;
+            background: transparent;
+            color: rgba(255,255,255,.58);
+            font-size: 12px;
+            letter-spacing: .045em;
+          }
+
+          .home-news-row time {
+            color: rgba(255,255,255,.46);
+            font-variant-numeric: tabular-nums;
+          }
+
+          .home-news-empty {
+            min-height: 76px;
+            display: grid;
+            place-items: center;
+            font-size: 10px;
+            letter-spacing: .12em;
+            color: var(--faint);
+          }
+
+          @media (max-width: 760px) {
+            .home-public-page {
+              padding-top: 4px;
+              padding-left: 8px;
+              padding-right: 8px;
+            }
+
+            .home-public-grid {
+              width: 100%;
+              gap: 18px;
+            }
+
+            .home-top-grid {
+              display: flex;
+              flex-direction: column;
+              gap: 12px;
+            }
+
+            .home-visual {
+              display: block;
+              width: 100% !important;
+              max-width: none !important;
+              height: auto !important;
+              min-height: 0 !important;
+              aspect-ratio: 4 / 3 !important;
+            }
+
+            .home-music {
+              height: auto !important;
+            }
+
+            /* スマホMUSICは現在の横長UIをそのまま使用する。 */
+            .home-music :global(.music-widget) {
+              height: auto !important;
+              min-height: 116px !important;
+              padding: 12px 14px !important;
+            }
+
+            .home-music :global(.music-inner) {
+              flex-direction: row !important;
+              align-items: center !important;
+              justify-content: flex-start !important;
+              gap: 14px !important;
+            }
+
+            .home-music :global(.music-cover) {
+              width: 88px !important;
+              height: 88px !important;
+              aspect-ratio: 1 / 1 !important;
+              flex: 0 0 88px !important;
+              align-self: auto;
+              border-radius: 8px !important;
+            }
+
+            .home-music :global(.music-info) {
+              flex: 1 1 auto !important;
+              width: auto;
+            }
+
+            .home-news {
+              min-height: 0;
+              padding: 2px 2px 0;
+            }
+
+            .home-news-head {
+              font-size: 11px;
+            }
+
+            .home-news-row {
+              grid-template-columns: 94px 1fr;
+              gap: 10px;
+              min-height: 29px;
+              font-size: 11px;
+            }
+          }
+        `}</style>
+      </section>
+    );
+  }
 
   return (
     <section className="page page-main-wrap" onClick={() => setCtx(null)}>

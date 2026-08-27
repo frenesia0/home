@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 // 메인 위젯 시스템 + 편집모드 상태 (기획서 4.0)
 // 저장소: localStorage → 추후 Supabase site_settings 로 이전
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
@@ -8,8 +8,8 @@ import { useAuth } from './auth';
 import { getRawSetting, setSetting } from './settingStore';
 
 export type WidgetType =
-  | 'banner' | 'member'                 // 고정 요소 (삭제 불가)
-  | 'menu' | 'memo' | 'diary' | 'latest'
+  | 'banner' | 'member'
+  | 'menu' | 'memo' | 'diary' | 'latest' | 'music'
   | 'dday' | 'todo' | 'upcoming' | 'freetext' | 'deco' | 'memoboard';   // 'image'는 deco(장식 이미지+링크)로 일원화 (v1.9)
 
 export interface WidgetConf {
@@ -46,6 +46,7 @@ export const WIDGET_META: Record<WidgetType, { title: string; desc: string }> = 
   memo: { title: 'MEMO', desc: '관리자 메모 (클릭 시 관리 모달)' },
   diary: { title: 'DIARY', desc: '최근 일기 (무드 아이콘 · 비공개 미노출)' },
   latest: { title: 'LATEST', desc: '최신 그림 3장' },
+  music: { title: 'MUSIC', desc: 'ランダム音楽プレーヤー' },
   dday: { title: 'D-DAY', desc: '디데이 목록' },
   todo: { title: 'TO-DO', desc: '관리자 투두 (방문자는 열람만)' },
   upcoming: { title: 'UPCOMING', desc: '다가오는 일정' },
@@ -70,20 +71,14 @@ export function widgetLabel(widgets: WidgetConf[], w: WidgetConf): string {
 const DEFAULT_STATE: MainState = {
   layoutMode: 'fixed',
   widgets: [
-    // 배포 기본 — 더미 콘텐츠 없이 빈 위젯으로 시작 (v1.9)
-    // 메뉴리스트는 모바일 전용(PC 숨김)이라 좌표는 의미 없음
+    // HOME 최종構成の第一段階:
+    // PCは LATEST + MUSIC の2ブロックだけ。
+    // MENUはモバイル用なので残す。
     { id: 'menu', type: 'menu', col: 1, enabled: true, tx: 0, ty: 0, ax: 0, ay: 0, w: 230, h: 80, settings: {} },
-    { id: 'memo', type: 'memo', col: 1, enabled: true, tx: 0, ty: 0, ax: 0, ay: 0, w: 230, h: 80, settings: { text: '' } },
-    { id: 'banner', type: 'banner', col: 2, enabled: true, fixed: true, tx: 0, ty: 0, ax: 240, ay: 0, w: 610, h: 210, settings: {} },
-    { id: 'diary', type: 'diary', col: 2, enabled: true, tx: 0, ty: 0, ax: 240, ay: 220, w: 300, h: 150, settings: {} },
-    { id: 'latest', type: 'latest', col: 2, enabled: true, tx: 0, ty: 0, ax: 550, ay: 220, w: 300, h: 150, settings: {} },
-    // 회원정보창은 로그인 상태 내용(프로필+버튼)에 딱 맞는 높이 — 더 키우면 아래가 비어 보임 (v1.9 사용자 확정)
-    { id: 'member', type: 'member', col: 3, enabled: true, fixed: true, tx: 0, ty: 0, ax: 860, ay: 0, w: 260, h: 150, settings: {} },
-    { id: 'dday', type: 'dday', col: 3, enabled: true, tx: 0, ty: 0, ax: 860, ay: 160, w: 260, h: 90, settings: { items: [] } },
-    { id: 'todo', type: 'todo', col: 3, enabled: true, tx: 0, ty: 0, ax: 860, ay: 260, w: 260, h: 90, settings: { items: [] } },
-    // UPCOMING은 기본 구성에서 제외 — 필요하면 [＋ 위젯]으로 추가 (v1.9: 켬/끔 대신 추가/삭제 모델)
+    { id: 'latest', type: 'latest', col: 2, enabled: true, tx: 0, ty: 0, ax: 30, ay: 40, w: 420, h: 180, settings: {} },
+    { id: 'music', type: 'music', col: 3, enabled: true, tx: 0, ty: 0, ax: 470, ay: 40, w: 620, h: 180, settings: { tracks: [] } },
   ],
-  mobileOrder: ['menu', 'memo', 'diary', 'latest', 'dday', 'todo'],
+  mobileOrder: ['menu', 'latest', 'music'],
 };
 
 const STORAGE_KEY = 'ohome.main.v1';
@@ -136,15 +131,68 @@ export function MainStoreProvider({ children }: { children: React.ReactNode }) {
         // 구 enabled:false(전체 숨김)는 삭제로 이관 — 토글은 이제 모바일 표시만 제어 (v1.9 사용자 확정)
         const removed = new Set(parsed.removedIds ?? []);
         const kept: WidgetConf[] = [];
-        for (const w of parsed.widgets) {
-          if ((w.type as string) === 'image') continue;
-          if (!w.enabled && !w.fixed) { removed.add(w.id); continue; }
-          kept.push(w.enabled ? w : { ...w, enabled: true });
+        const seenIds = new Set<string>();
+        const homeRemovedTypes = new Set([
+          'member',
+          'memo',
+          'banner',
+          'diary',
+          'dday',
+          'todo',
+        ]);
+
+        for (const source of parsed.widgets) {
+          if ((source.type as string) === 'image') continue;
+
+          // HOME整理: 旧構成のカードは保存済みレイアウトからも除去する。
+          if (homeRemovedTypes.has(source.type as string)) {
+            removed.add(source.id);
+            continue;
+          }
+
+          if (seenIds.has(source.id)) continue;
+          seenIds.add(source.id);
+
+          if (!source.enabled && !source.fixed) {
+            removed.add(source.id);
+            continue;
+          }
+
+          // PCだけ新レイアウトへ固定。モバイルではCSSがw/h/座標を無視するため、
+          // 気に入っているスマホ版MUSICの見た目には影響しない。
+          const w: WidgetConf =
+            source.type === 'latest'
+              ? {
+                  ...source,
+                  enabled: true,
+                  ax: 30,
+                  ay: 40,
+                  w: 420,
+                  h: 180,
+                }
+              : source.type === 'music'
+                ? {
+                    ...source,
+                    enabled: true,
+                    ax: 470,
+                    ay: 40,
+                    w: 620,
+                    h: 180,
+                  }
+                : (source.enabled ? source : { ...source, enabled: true });
+
+          kept.push(w);
         }
         const ids = new Set(kept.map(w => w.id));
         // 삭제한 기본 위젯은 병합으로 되살리지 않음
         const merged = [...kept, ...DEFAULT_STATE.widgets.filter(w => !ids.has(w.id) && !removed.has(w.id))];
-        setState({ ...DEFAULT_STATE, ...parsed, widgets: merged, removedIds: [...removed] });
+        setState({
+          ...DEFAULT_STATE,
+          ...parsed,
+          widgets: merged,
+          mobileOrder: ['menu', 'latest', 'music'],
+          removedIds: [...removed],
+        });
       }
     } catch { /* 기본값 사용 */ }
   }, []);
@@ -228,6 +276,8 @@ export function MainStoreProvider({ children }: { children: React.ReactNode }) {
       const w: WidgetConf = {
         id, type, col, enabled: true, tx: 0, ty: 0,
         ax: colX[col], ay: maxY,
+        w: type === 'music' ? 300 : undefined,
+        h: type === 'music' ? 150 : undefined,
         settings: type === 'freetext' ? { text: '자유 텍스트' } : {},
       };
       return { ...s, widgets: [...s.widgets, w], mobileOrder: [...s.mobileOrder, id] };

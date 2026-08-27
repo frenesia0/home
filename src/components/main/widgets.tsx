@@ -1,6 +1,6 @@
 'use client';
 // メインウィジェットレンダラー (4.0) — DIARY/LATEST/UPCOMINGなどは該当機能（第2・第3段階）まではデモデータ
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { WidgetConf, useMainStore, WIDGET_META, decoSlides } from '@/lib/mainStore';
 import { useAuth } from '@/lib/auth';
@@ -19,6 +19,14 @@ import { useSched, eventColor } from '@/lib/schedStore';
 import { StickyMemo, MEMO_SEED, MEMO_SIZE_W, useMemoSettings } from '@/lib/memoStore';
 import { BlobImg, useBlobUrl } from '@/lib/blobStore';
 import { normalizeInternalLink } from '@/lib/link';
+import {
+  fetchGalleryPosts,
+  getGallerySong,
+  getGalleryTags,
+  getGalleryThumbnailImage,
+  subscribeGallery,
+  type GalleryPost,
+} from '@/lib/galleryData';
 
 /* 編集モードで右クリック「設定」→ 該当ウィジェットの設定モーダルを開く (v1.9 ユーザー確定 — イベントで接続) */
 function useEditEvent(id: string, onOpen: () => void) {
@@ -284,6 +292,955 @@ export function LatestWidget() {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+
+/* ---------- MUSIC — GALLERYのSONG PARODYから自動選曲 ---------- */
+interface MusicTrack {
+  id: string;
+  title: string;
+  creator: string;
+  audioUrl: string;
+  coverUrl?: string;
+  href: string;
+}
+
+function formatMusicTime(sec: number): string {
+  if (!Number.isFinite(sec) || sec < 0) return '0:00';
+  return `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+}
+
+function optimizeMusicCoverUrl(url?: string): string | undefined {
+  if (!url) return undefined;
+  if (!url.includes('/upload/')) return url;
+
+  // Cloudinaryの元URL構造（cloud name / version / 拡張子）を壊さず、
+  // MUSIC用だけ高品質・高解像度・軽いシャープネスを指定する。
+  return url.replace(
+    '/upload/',
+    '/upload/f_auto,q_auto:best,c_limit,w_600,e_sharpen:80/'
+  );
+}
+
+
+type MusicTheme = {
+  background: string;
+  foreground: '#FFFFFF' | '#111318';
+};
+
+const MUSIC_FALLBACK_THEME: MusicTheme = {
+  background: '#8083D6',
+  foreground: '#FFFFFF',
+};
+
+function clampByte(value: number) {
+  return Math.max(0, Math.min(255, Math.round(value)));
+}
+
+function rgbHex(r: number, g: number, b: number) {
+  return `#${[r, g, b]
+    .map(value => clampByte(value).toString(16).padStart(2, '0'))
+    .join('')
+    .toUpperCase()}`;
+}
+
+function rgbStats(r: number, g: number, b: number) {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const chroma = max - min;
+  const light = (max + min) / (2 * 255);
+  const saturation =
+    chroma === 0
+      ? 0
+      : chroma / (255 * (1 - Math.abs(2 * light - 1)));
+
+  let hue = 0;
+  if (chroma > 0) {
+    if (max === r) hue = ((g - b) / chroma) % 6;
+    else if (max === g) hue = (b - r) / chroma + 2;
+    else hue = (r - g) / chroma + 4;
+
+    hue *= 60;
+    if (hue < 0) hue += 360;
+  }
+
+  // sRGB relative luminance, used only to pick black/white UI.
+  const linear = (value: number) => {
+    const c = value / 255;
+    return c <= 0.04045
+      ? c / 12.92
+      : ((c + 0.055) / 1.055) ** 2.4;
+  };
+
+  const luminance =
+    0.2126 * linear(r) +
+    0.7152 * linear(g) +
+    0.0722 * linear(b);
+
+  return {
+    hue,
+    saturation: Number.isFinite(saturation) ? saturation : 0,
+    light,
+    luminance,
+  };
+}
+
+function isPurpleHue(hue: number) {
+  // 青紫〜紫〜赤紫までを「紫系」として扱う。
+  // 青や緑、赤、黄などはここに入れず、最終的にグレーへ落とす。
+  return hue >= 230 && hue <= 315;
+}
+
+function foregroundForBackground(r: number, g: number, b: number):
+  '#FFFFFF' | '#111318' {
+  return rgbStats(r, g, b).luminance > 0.53
+    ? '#111318'
+    : '#FFFFFF';
+}
+
+async function extractMusicTheme(
+  url?: string
+): Promise<MusicTheme> {
+  if (!url || typeof document === 'undefined') {
+    return MUSIC_FALLBACK_THEME;
+  }
+
+  try {
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.decoding = 'async';
+
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error('cover load failed'));
+      image.src = url;
+    });
+
+    const size = 72;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+
+    const context = canvas.getContext('2d', {
+      willReadFrequently: true,
+    });
+
+    if (!context) return MUSIC_FALLBACK_THEME;
+
+    context.drawImage(image, 0, 0, size, size);
+
+    const { data } =
+      context.getImageData(0, 0, size, size);
+
+    type Pixel = {
+      r: number;
+      g: number;
+      b: number;
+      hue: number;
+      saturation: number;
+      light: number;
+      luminance: number;
+      edge: boolean;
+    };
+
+    const pixels: Pixel[] = [];
+    const colorful: Pixel[] = [];
+    const edgeColorful: Pixel[] = [];
+
+    let whiteCount = 0;
+    let blackCount = 0;
+    let grayLightSum = 0;
+
+    for (let y = 0; y < size; y += 1) {
+      for (let x = 0; x < size; x += 1) {
+        const index = (y * size + x) * 4;
+        const alpha = data[index + 3];
+
+        if (alpha < 160) continue;
+
+        const r = data[index];
+        const g = data[index + 1];
+        const b = data[index + 2];
+        const stats = rgbStats(r, g, b);
+        const edge =
+          x < 8 ||
+          y < 8 ||
+          x >= size - 8 ||
+          y >= size - 8;
+
+        const pixel: Pixel = {
+          r,
+          g,
+          b,
+          ...stats,
+          edge,
+        };
+
+        pixels.push(pixel);
+        grayLightSum += stats.light;
+
+        if (stats.saturation < 0.12 && stats.light > 0.90) {
+          whiteCount += 1;
+        }
+        if (stats.saturation < 0.12 && stats.light < 0.14) {
+          blackCount += 1;
+        }
+
+        // Ignore near-white / near-black pixels when searching for the
+        // illustration's "main color". This is what lets purple hair beat
+        // a large white background.
+        if (
+          stats.saturation >= 0.18 &&
+          stats.light >= 0.12 &&
+          stats.light <= 0.90
+        ) {
+          colorful.push(pixel);
+          if (edge) edgeColorful.push(pixel);
+        }
+      }
+    }
+
+    if (!pixels.length) return MUSIC_FALLBACK_THEME;
+
+    const colorfulRatio = colorful.length / pixels.length;
+
+    const dominantHueColor = (
+      source: Pixel[],
+      bins = 24
+    ): { r: number; g: number; b: number; share: number } | null => {
+      if (!source.length) return null;
+
+      const bucketWeight = new Array<number>(bins).fill(0);
+      const bucketCount = new Array<number>(bins).fill(0);
+
+      for (const pixel of source) {
+        const bin =
+          Math.floor((pixel.hue / 360) * bins) % bins;
+
+        // Area still matters most; saturation only gives a modest boost.
+        const weight = 0.7 + pixel.saturation * 0.6;
+        bucketWeight[bin] += weight;
+        bucketCount[bin] += 1;
+      }
+
+      let best = 0;
+      for (let i = 1; i < bins; i += 1) {
+        if (bucketWeight[i] > bucketWeight[best]) best = i;
+      }
+
+      const neighbours = new Set([
+        (best - 1 + bins) % bins,
+        best,
+        (best + 1) % bins,
+      ]);
+
+      let totalWeight = 0;
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      let count = 0;
+
+      for (const pixel of source) {
+        const bin =
+          Math.floor((pixel.hue / 360) * bins) % bins;
+
+        if (!neighbours.has(bin)) continue;
+
+        const weight = 0.7 + pixel.saturation * 0.6;
+        totalWeight += weight;
+        r += pixel.r * weight;
+        g += pixel.g * weight;
+        b += pixel.b * weight;
+        count += 1;
+      }
+
+      if (!totalWeight || !count) return null;
+
+      return {
+        r: r / totalWeight,
+        g: g / totalWeight,
+        b: b / totalWeight,
+        share: count / source.length,
+      };
+    };
+
+    // 1) If a real chromatic background dominates the outer edge,
+    // preserve it. This makes flat-color covers visually merge with
+    // the player instead of returning a merely "similar" color.
+    if (edgeColorful.length >= 24) {
+      const edgeDominant = dominantHueColor(edgeColorful);
+
+      if (
+        edgeDominant &&
+        edgeDominant.share >= 0.48 &&
+        edgeColorful.length / Math.max(1, pixels.filter(p => p.edge).length) >= 0.22
+      ) {
+        const r = clampByte(edgeDominant.r);
+        const g = clampByte(edgeDominant.g);
+        const b = clampByte(edgeDominant.b);
+        const hue = rgbStats(r, g, b).hue;
+
+        if (isPurpleHue(hue)) {
+          return {
+            background: rgbHex(r, g, b),
+            foreground: foregroundForBackground(r, g, b),
+          };
+        }
+      }
+    }
+
+    // 2) If the image has a meaningful amount of color, ignore a large
+    // white/black canvas and use the dominant chromatic family instead.
+    if (colorfulRatio >= 0.055) {
+      const dominant = dominantHueColor(colorful);
+
+      if (dominant) {
+        const r = clampByte(dominant.r);
+        const g = clampByte(dominant.g);
+        const b = clampByte(dominant.b);
+        const hue = rgbStats(r, g, b).hue;
+
+        if (isPurpleHue(hue)) {
+          return {
+            background: rgbHex(r, g, b),
+            foreground: foregroundForBackground(r, g, b),
+          };
+        }
+      }
+    }
+
+    // 2.5) Muted accent-color rescue.
+    //
+    // 白黒主体でも、くすんだ紫・青・赤などの「意図的な差し色」が
+    // 少量存在する場合は、モノクロ判定より先にその色を拾う。
+    // colorful だけではなく pixels 全体から探すことで、
+    // saturation < 0.18 の低彩度な紫も候補にできる。
+    const accentCandidates = pixels.filter(pixel => {
+      const chroma =
+        Math.max(pixel.r, pixel.g, pixel.b) -
+        Math.min(pixel.r, pixel.g, pixel.b);
+
+      // ほんの少しの色転び・アンチエイリアスは除外
+      if (chroma < 14) return false;
+
+      // くすみ色も拾うが、ほぼ完全な無彩色は除外
+      if (pixel.saturation < 0.10) return false;
+
+      // 明るすぎ・暗すぎる色は除外
+      if (pixel.light < 0.14 || pixel.light > 0.90) return false;
+
+      // 肌色系は差し色として優先しない
+      const looksLikeSkin =
+        pixel.hue >= 5 &&
+        pixel.hue <= 55 &&
+        pixel.saturation < 0.68 &&
+        pixel.light > 0.40;
+
+      if (looksLikeSkin) return false;
+
+      return true;
+    });
+
+    if (accentCandidates.length >= 8) {
+      const accent = dominantHueColor(accentCandidates);
+
+      if (accent && accent.share >= 0.16) {
+        const r = clampByte(accent.r);
+        const g = clampByte(accent.g);
+        const b = clampByte(accent.b);
+        const hue = rgbStats(r, g, b).hue;
+
+        if (isPurpleHue(hue)) {
+          return {
+            background: rgbHex(r, g, b),
+            foreground: foregroundForBackground(r, g, b),
+          };
+        }
+      }
+    }
+
+    // 3) Truly monochrome / nearly monochrome covers:
+    // white-heavy -> pure white, black-heavy -> deep gray/black,
+    // otherwise use a neutral gray based on the overall lightness.
+    const whiteRatio = whiteCount / pixels.length;
+    const blackRatio = blackCount / pixels.length;
+
+    if (whiteRatio >= 0.50) {
+      return {
+        background: '#FFFFFF',
+        foreground: '#111318',
+      };
+    }
+
+    if (blackRatio >= 0.42) {
+      return {
+        background: '#17191D',
+        foreground: '#FFFFFF',
+      };
+    }
+
+    const averageLight = grayLightSum / pixels.length;
+    const gray = clampByte(
+      Math.max(34, Math.min(224, averageLight * 255))
+    );
+
+    return {
+      background: rgbHex(gray, gray, gray),
+      foreground:
+        foregroundForBackground(gray, gray, gray),
+    };
+  } catch (error) {
+    console.warn(
+      'HOME MUSIC: cover color analysis failed',
+      error
+    );
+
+    return MUSIC_FALLBACK_THEME;
+  }
+}
+
+function galleryPostToMusicTrack(post: GalleryPost): MusicTrack | null {
+  if (!getGalleryTags(post).includes('song-parody')) return null;
+
+  const song = getGallerySong(post);
+  const audioUrl = song?.audioUrl?.trim();
+  if (!audioUrl) return null;
+
+  const thumbnail = getGalleryThumbnailImage(post);
+
+  return {
+    id: post.id,
+    title: song?.title?.trim() || 'UNTITLED',
+    creator: song?.creator?.trim() || 'UNKNOWN CREATOR',
+    audioUrl,
+    coverUrl: optimizeMusicCoverUrl(thumbnail?.url),
+    href: `/gallery/${encodeURIComponent(post.id)}`,
+  };
+}
+
+export function MusicWidget({
+  forcedPostId,
+  sourcePosts,
+  sourcePostsLoaded,
+}: {
+  conf?: WidgetConf;
+  forcedPostId?: string | null;
+  sourcePosts?: GalleryPost[];
+  sourcePostsLoaded?: boolean;
+}) {
+  const router = useRouter();
+  const [tracks, setTracks] = useState<MusicTrack[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [currentId, setCurrentId] = useState<string | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(50);
+  const [lastVolume, setLastVolume] = useState(50);
+  const [volumeOpen, setVolumeOpen] = useState(false);
+  const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null);
+  const forcedAppliedRef = useRef<string | null>(null);
+  const [musicTheme, setMusicTheme] = useState<MusicTheme>(MUSIC_FALLBACK_THEME);
+
+  useEffect(() => {
+    // HOME本体がすでにGallery投稿を読み込んでいる場合は、
+    // MUSICだけ別通信をせず同じデータを使う。
+    // これでHOME VISUALは表示済みなのにMUSICだけLOADING...のまま、
+    // という二重取得由来のズレを防ぐ。
+    if (sourcePosts !== undefined) {
+      const nextTracks = sourcePosts
+        .map(galleryPostToMusicTrack)
+        .filter((track): track is MusicTrack => track !== null);
+
+      setTracks(nextTracks);
+      setLoaded(sourcePostsLoaded ?? true);
+      return;
+    }
+
+    let alive = true;
+
+    const load = async () => {
+      try {
+        const posts = await fetchGalleryPosts();
+        if (!alive) return;
+
+        const nextTracks = posts
+          .map(galleryPostToMusicTrack)
+          .filter((track): track is MusicTrack => track !== null);
+
+        setTracks(nextTracks);
+      } catch (error) {
+        console.error('HOME MUSIC: gallery load failed', error);
+        if (alive) setTracks([]);
+      } finally {
+        if (alive) setLoaded(true);
+      }
+    };
+
+    void load();
+
+    const off = subscribeGallery(() => {
+      void load();
+    });
+
+    return () => {
+      alive = false;
+      off();
+    };
+  }, [sourcePosts, sourcePostsLoaded]);
+
+  const current =
+    tracks.find(track => track.id === currentId) ??
+    (currentId === null ? undefined : tracks[0]);
+
+
+  useEffect(() => {
+    let alive = true;
+
+    if (!current?.coverUrl) {
+      setMusicTheme(MUSIC_FALLBACK_THEME);
+      return () => {
+        alive = false;
+      };
+    }
+
+    void extractMusicTheme(current.coverUrl).then(theme => {
+      if (alive) setMusicTheme(theme);
+    });
+
+    return () => {
+      alive = false;
+    };
+  }, [current?.coverUrl]);
+
+  const chooseRandom = (excludeId?: string) => {
+    if (!tracks.length) return;
+
+    const pool =
+      tracks.length > 1 && excludeId
+        ? tracks.filter(track => track.id !== excludeId)
+        : tracks;
+
+    const next =
+      pool[Math.floor(Math.random() * pool.length)] ??
+      tracks[0];
+
+    setCurrentId(next.id);
+    setCurrentTime(0);
+    setDuration(0);
+  };
+
+  useEffect(() => {
+    if (!tracks.length) {
+      setCurrentId(null);
+      setPlaying(false);
+      return;
+    }
+
+    const forcedTrack =
+      forcedPostId
+        ? tracks.find(track => track.id === forcedPostId)
+        : undefined;
+
+    // HOME VISUALがMP3付きSONG PARODYなら、そのページ表示時の初期曲を必ず合わせる。
+    // 一度合わせた後は、ユーザーが前後ボタンで別の曲へ移動できる。
+    if (
+      forcedTrack &&
+      forcedAppliedRef.current !== forcedPostId
+    ) {
+      forcedAppliedRef.current = forcedPostId ?? null;
+      setCurrentId(forcedTrack.id);
+      setCurrentTime(0);
+      setDuration(0);
+      return;
+    }
+
+    if (!currentId || !tracks.some(track => track.id === currentId)) {
+      const random =
+        tracks[Math.floor(Math.random() * tracks.length)] ??
+        tracks[0];
+
+      setCurrentId(random.id);
+    }
+  }, [tracks, currentId, forcedPostId]);
+
+  useEffect(() => {
+    if (!audioEl) return;
+
+    if (playing && current?.audioUrl) {
+      audioEl.play().catch(() => setPlaying(false));
+    } else {
+      audioEl.pause();
+    }
+  }, [playing, current?.audioUrl, audioEl]);
+
+  useEffect(() => {
+    if (!audioEl) return;
+
+    audioEl.load();
+    setCurrentTime(0);
+    setDuration(0);
+  }, [current?.audioUrl, audioEl]);
+
+  useEffect(() => {
+    if (!audioEl) return;
+    audioEl.volume = volume / 100;
+  }, [audioEl, volume]);
+
+  const skip = () => {
+    const keepPlaying = playing;
+    chooseRandom(current?.id);
+    setPlaying(keepPlaying);
+  };
+
+  const onEnded = () => {
+    chooseRandom(current?.id);
+    setPlaying(true);
+  };
+
+  const toggleMute = () => {
+    if (volume === 0) {
+      setVolume(lastVolume > 0 ? lastVolume : 50);
+      return;
+    }
+    setLastVolume(volume);
+    setVolume(0);
+  };
+
+  const progress = duration > 0
+    ? Math.max(0, Math.min(100, (currentTime / duration) * 100))
+    : 0;
+
+  return (
+    <div
+      className="panel widget music-widget"
+      style={{
+        margin: 0,
+        position: 'relative',
+        minHeight: 116,
+        padding: '12px 14px',
+        overflow: 'hidden',
+        background: musicTheme.background,
+        color: musicTheme.foreground,
+        transition: 'background-color .38s ease, color .38s ease',
+      }}
+    >
+      {current && (
+        <button
+          type="button"
+          className="more"
+          onClick={() => router.push(current.href)}
+          style={{
+            position: 'absolute',
+            top: 10,
+            right: 12,
+            zIndex: 4,
+            border: 0,
+            background: 'transparent',
+            color: musicTheme.foreground,
+            cursor: 'pointer',
+            padding: 0,
+          }}
+        >
+          VIEW ›
+        </button>
+      )}
+
+      {current ? (
+        <div
+          className="music-inner"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+            minWidth: 0,
+            height: '100%',
+          }}
+        >
+          <button
+            type="button"
+            aria-label="この曲パロ作品を開く"
+            onClick={() => router.push(current.href)}
+            className="music-cover"
+            style={{
+              width: 88,
+              height: 88,
+              flex: '0 0 88px',
+              overflow: 'hidden',
+              borderRadius: 8,
+              background: 'rgba(127,127,127,.08)',
+              border: 0,
+              padding: 0,
+              cursor: 'pointer',
+            }}
+          >
+            {current.coverUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={current.coverUrl}
+                alt=""
+                draggable={false}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  display: 'block',
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'grid',
+                  placeItems: 'center',
+                  fontSize: 9,
+                  letterSpacing: '.12em',
+                  opacity: .45,
+                }}
+              >
+                NO COVER
+              </div>
+            )}
+          </button>
+
+          <div className="music-info" style={{ minWidth: 0, flex: 1, position: 'relative' }}>
+            <div
+              title={current.title}
+              style={{
+                paddingRight: 52,
+                color: musicTheme.foreground,
+                fontSize: 13,
+                fontWeight: 650,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {current.title}
+            </div>
+
+            <div
+              title={current.creator}
+              style={{
+                marginTop: 3,
+                color: musicTheme.foreground,
+                fontSize: 10.5,
+                opacity: .72,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {current.creator}
+            </div>
+
+            <input
+              aria-label="再生位置"
+              className="music-range"
+              type="range"
+              min={0}
+              max={duration || 0}
+              step={0.1}
+              value={Math.min(currentTime, duration || 0)}
+              onChange={event => {
+                const value = Number(event.target.value);
+                if (audioEl) audioEl.currentTime = value;
+                setCurrentTime(value);
+              }}
+              style={{
+                '--music-fill': `${progress}%`,
+                width: '100%',
+                margin: '7px 0 0',
+              } as React.CSSProperties}
+            />
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                color: musicTheme.foreground,
+                fontSize: 9.5,
+                opacity: .68,
+                fontVariantNumeric: 'tabular-nums',
+                marginTop: -1,
+              }}
+            >
+              <span>{formatMusicTime(currentTime)}</span>
+              <span>{formatMusicTime(duration)}</span>
+            </div>
+
+            <div
+              style={{
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginTop: 2,
+                minHeight: 28,
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 12,
+                }}
+              >
+                <button
+                  type="button"
+                  aria-label="別の曲をランダム再生"
+                  onClick={skip}
+                  className="music-skip"
+                  style={{ color: musicTheme.foreground }}
+                >
+                  ‹
+                </button>
+
+                <button
+                  type="button"
+                  aria-label={playing ? '一時停止' : '再生'}
+                  onClick={() => setPlaying(value => !value)}
+                  className="music-play"
+                  style={{ color: musicTheme.foreground }}
+                >
+                  {playing ? (
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="11"
+                      height="11"
+                      aria-hidden="true"
+                      style={{ display: 'block' }}
+                    >
+                      <rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor" />
+                      <rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor" />
+                    </svg>
+                  ) : (
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="11"
+                      height="11"
+                      aria-hidden="true"
+                      style={{ display: 'block' }}
+                    >
+                      <path d="M8 5.5 18 12 8 18.5Z" fill="currentColor" />
+                    </svg>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  aria-label="別の曲をランダム再生"
+                  onClick={skip}
+                  className="music-skip"
+                  style={{ color: musicTheme.foreground }}
+                >
+                  ›
+                </button>
+              </div>
+
+              <div
+                className="music-volume-wrap"
+                style={{ position: 'absolute', right: 0, bottom: 0 }}
+              >
+                {volumeOpen && (
+                  <div
+                    className="music-volume-pop"
+                    role="group"
+                    aria-label="音量調整"
+                    style={{
+                      background: musicTheme.background,
+                      color: musicTheme.foreground,
+                      transition: 'background-color .38s ease, color .38s ease',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      aria-label={volume === 0 ? 'ミュート解除' : 'ミュート'}
+                      className="music-speaker"
+                      style={{ color: musicTheme.foreground }}
+                      onClick={toggleMute}
+                    >
+                      {volume === 0 ? '×' : '⌁'}
+                    </button>
+                    <input
+                      aria-label="音量"
+                      className="music-range music-volume-range"
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={volume}
+                      onChange={event => {
+                        const value = Number(event.target.value);
+                        if (value > 0) setLastVolume(value);
+                        setVolume(value);
+                      }}
+                      style={{
+                        '--music-fill': `${volume}%`,
+                      } as React.CSSProperties}
+                    />
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  aria-label="音量調整を開く"
+                  className="music-speaker"
+                  style={{ color: musicTheme.foreground }}
+                  onClick={() => setVolumeOpen(open => !open)}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M5 9v6h4l5 4V5L9 9H5Z" />
+                    {volume > 0 && <path d="M17 9.2c1.1 1.1 1.1 4.5 0 5.6" />}
+                    {volume > 45 && <path d="M19.3 6.8c2.4 2.4 2.4 8 0 10.4" />}
+                    {volume === 0 && <path d="m17 10 4 4m0-4-4 4" />}
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <audio
+            ref={setAudioEl}
+            src={current.audioUrl}
+            preload="metadata"
+            onTimeUpdate={event =>
+              setCurrentTime(event.currentTarget.currentTime)
+            }
+            onLoadedMetadata={event =>
+              setDuration(event.currentTarget.duration || 0)
+            }
+            onDurationChange={event =>
+              setDuration(event.currentTarget.duration || 0)
+            }
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onEnded={onEnded}
+          />
+        </div>
+      ) : (
+        <div
+          style={{
+            minHeight: 88,
+            display: 'grid',
+            placeItems: 'center',
+            padding: '0 12px',
+            textAlign: 'center',
+            fontSize: 10.5,
+            lineHeight: 1.6,
+            opacity: .5,
+            letterSpacing: '.05em',
+          }}
+        >
+          {loaded
+            ? 'MP3付きのSONG PARODYはまだありません'
+            : 'LOADING...'}
+        </div>
+      )}
     </div>
   );
 }
@@ -588,6 +1545,7 @@ export function renderWidget(conf: WidgetConf) {
     case 'memo': return <MemoWidget conf={conf} />;
     case 'diary': return <DiaryWidget />;
     case 'latest': return <LatestWidget />;
+    case 'music': return <MusicWidget conf={conf} />;
     case 'dday': return <DdayWidget conf={conf} />;
     case 'todo': return <TodoWidget conf={conf} />;
     case 'upcoming': return <UpcomingWidget />;

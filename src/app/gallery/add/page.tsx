@@ -326,6 +326,12 @@ export default function AddIllustrationPage() {
     useState('');
 
   const [
+    songCreator,
+    setSongCreator,
+  ] =
+    useState('');
+
+  const [
     songUrl,
     setSongUrl,
   ] =
@@ -655,6 +661,7 @@ export default function AddIllustrationPage() {
       !isSongParody
     ) {
       setSongTitle('');
+      setSongCreator('');
       setSongUrl('');
       setSongAudio(
         null
@@ -788,6 +795,7 @@ export default function AddIllustrationPage() {
     ) {
       setTags([]);
       setSongTitle('');
+      setSongCreator('');
       setSongUrl('');
       setSongAudio(
         null
@@ -1350,7 +1358,7 @@ export default function AddIllustrationPage() {
         !customHeroImage
       ) {
         setError(
-          'GALLERY HERO専用画像を選択してください。'
+          'HOME VISUAL専用画像を選択してください。'
         );
         return;
       }
@@ -1499,7 +1507,7 @@ export default function AddIllustrationPage() {
           customHeroImage
         ) {
           setUploadProgress(
-            'GALLERY HERO画像をアップロード中...'
+            'HOME VISUAL画像をアップロード中...'
           );
 
           uploadedCustomHeroImage =
@@ -1601,12 +1609,17 @@ export default function AddIllustrationPage() {
             isSongParody &&
             (
               songTitle.trim() ||
+              songCreator.trim() ||
               songUrl.trim() ||
               uploadedSongAudioUrl
             )
               ? ({
                   title:
                     songTitle.trim() ||
+                    undefined,
+
+                  creator:
+                    songCreator.trim() ||
                     undefined,
 
                   url:
@@ -3210,7 +3223,7 @@ export default function AddIllustrationPage() {
                         color: 'rgba(255,255,255,.58)',
                       }}
                     >
-                      GALLERY HERO
+                      HOME VISUAL
                     </div>
 
                     <label
@@ -3235,7 +3248,7 @@ export default function AddIllustrationPage() {
                           }
                         }}
                       />
-                      ギャラリー右上のランダム表示候補に含める
+                      HOMEのランダムビジュアル候補に含める
                     </label>
 
                     <p
@@ -3246,7 +3259,7 @@ export default function AddIllustrationPage() {
                         lineHeight: 1.6,
                       }}
                     >
-                      OFFにした作品は右上のランダム表示には使われません。
+                      OFFにした作品はHOMEのランダムビジュアルには使われません。
                     </p>
 
                     {heroEnabled && (
@@ -3340,7 +3353,7 @@ export default function AddIllustrationPage() {
                         {heroMode === 'custom' && (
                           <label style={fieldStyle}>
                             <span>
-                              GALLERY HERO専用画像
+                              HOME VISUAL専用画像
                             </span>
                             <input
                               type="file"
@@ -3362,7 +3375,7 @@ export default function AddIllustrationPage() {
                               style={{
                                 position: 'relative',
                                 width: 'min(420px, 100%)',
-                                aspectRatio: '5 / 2',
+                                aspectRatio: '4 / 3',
                                 overflow: 'hidden',
                                 borderRadius: '10px',
                                 background:
@@ -3375,7 +3388,7 @@ export default function AddIllustrationPage() {
                               <CropImg
                                 src={heroSrc}
                                 crop={heroCrop}
-                                alt="gallery hero preview"
+                                alt="home visual preview"
                               />
                             </div>
 
@@ -3386,7 +3399,7 @@ export default function AddIllustrationPage() {
                                 setHeroCropOpen(true)
                               }
                             >
-                              バナー表示を調整
+                              4:3表示を調整
                             </button>
                           </div>
                         )}
@@ -3748,7 +3761,7 @@ export default function AddIllustrationPage() {
                           1.6,
                       }}
                     >
-                      曲名・リンクはどちらも任意です。
+                      曲名・作者名・リンクは任意です。MP3を登録するとHOMEの音楽プレーヤー候補になります。
                     </p>
 
                     <label
@@ -3773,6 +3786,35 @@ export default function AddIllustrationPage() {
                           )
                         }
                         placeholder="曲名"
+                        style={
+                          inputStyle
+                        }
+                      />
+                    </label>
+
+
+                    <label
+                      style={
+                        fieldStyle
+                      }
+                    >
+                      <span>
+                        CREATOR
+                      </span>
+
+                      <input
+                        type="text"
+                        value={
+                          songCreator
+                        }
+                        onChange={(
+                          e
+                        ) =>
+                          setSongCreator(
+                            e.target.value
+                          )
+                        }
+                        placeholder="作者名"
                         style={
                           inputStyle
                         }
@@ -4162,7 +4204,7 @@ export default function AddIllustrationPage() {
         <CropEditor
           open={heroCropOpen}
           src={heroSrc}
-          aspect={5 / 2}
+          aspect={4 / 3}
           initial={heroCrop}
           onClose={() =>
             setHeroCropOpen(false)
