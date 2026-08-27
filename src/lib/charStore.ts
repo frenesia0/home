@@ -46,11 +46,10 @@ export interface Character {
   /** 立ち絵右下に重ねるキャラクターサイン */
   signId?: string;
 
-  /** サンプルボイス */
   voices?: {
-    label: string;
-    audioId?: string;
-  }[];
+  label: string;
+  audioId?: string;
+}[];
   fontId?: string;       // 전용 폰트 — 이름·타이틀 (5.1)
   /** 상세 페이지 큰 이름의 글씨 크기 px (v2.0) — 기본 38.
    *  이름 길이가 제각각이라 자동으로 줄이면 어중간해진다. 캐릭터마다 직접 정한다. */
