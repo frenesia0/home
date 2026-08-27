@@ -405,6 +405,7 @@ export type GalleryThumbnailMode =
   | 'post'
   | 'custom';
 
+/** HOME VISUAL用。旧heroフィールド名は保存互換のため維持する。 */
 export type GalleryHeroMode =
   | 'post'
   | 'custom';
@@ -451,6 +452,7 @@ export interface GalleryPost {
   thumbnailCrop?:
     CropValue;
 
+  /** HOME VISUALのランダム候補に含めるか。旧フィールド名は互換のため維持。 */
   heroEnabled?:
     boolean;
 
