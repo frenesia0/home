@@ -8,8 +8,8 @@ import { useAuth } from './auth';
 import { getRawSetting, setSetting } from './settingStore';
 
 export type WidgetType =
-  | 'banner' | 'member'                 // 고정 요소 (삭제 불가)
-  | 'menu' | 'memo' | 'diary' | 'latest'
+  | 'banner' | 'member'
+  | 'menu' | 'memo' | 'diary' | 'latest' | 'music'
   | 'dday' | 'todo' | 'upcoming' | 'freetext' | 'deco' | 'memoboard';   // 'image'는 deco(장식 이미지+링크)로 일원화 (v1.9)
 
 export interface WidgetConf {
@@ -46,6 +46,7 @@ export const WIDGET_META: Record<WidgetType, { title: string; desc: string }> = 
   memo: { title: 'MEMO', desc: '관리자 메모 (클릭 시 관리 모달)' },
   diary: { title: 'DIARY', desc: '최근 일기 (무드 아이콘 · 비공개 미노출)' },
   latest: { title: 'LATEST', desc: '최신 그림 3장' },
+  music: { title: 'MUSIC', desc: 'ランダム音楽プレーヤー' },
   dday: { title: 'D-DAY', desc: '디데이 목록' },
   todo: { title: 'TO-DO', desc: '관리자 투두 (방문자는 열람만)' },
   upcoming: { title: 'UPCOMING', desc: '다가오는 일정' },
