@@ -519,13 +519,14 @@ export function MusicWidget({
     <div
       className="panel widget music-widget"
       style={{
-  margin: 0,
-  position: 'relative',
-  minHeight: 116,
-  padding: '12px 14px',
-  overflow: 'hidden',
-  background: '#837ECB',
-}}
+        margin: 0,
+        position: 'relative',
+        minHeight: 116,
+        padding: '12px 14px',
+        overflow: 'hidden',
+        background: '#555DBE',
+        color: '#FFFFFF',
+      }}
     >
       {current && (
         <button
@@ -539,6 +540,7 @@ export function MusicWidget({
             zIndex: 4,
             border: 0,
             background: 'transparent',
+            color: '#FFFFFF',
             cursor: 'pointer',
             padding: 0,
           }}
@@ -610,6 +612,7 @@ export function MusicWidget({
               title={current.title}
               style={{
                 paddingRight: 52,
+                color: '#FFFFFF',
                 fontSize: 13,
                 fontWeight: 650,
                 whiteSpace: 'nowrap',
@@ -624,8 +627,9 @@ export function MusicWidget({
               title={current.creator}
               style={{
                 marginTop: 3,
+                color: '#FFFFFF',
                 fontSize: 10.5,
-                opacity: .58,
+                opacity: .72,
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -658,8 +662,9 @@ export function MusicWidget({
               style={{
                 display: 'flex',
                 justifyContent: 'space-between',
+                color: '#FFFFFF',
                 fontSize: 9.5,
-                opacity: .52,
+                opacity: .68,
                 fontVariantNumeric: 'tabular-nums',
                 marginTop: -1,
               }}
@@ -691,6 +696,7 @@ export function MusicWidget({
                   aria-label="別の曲をランダム再生"
                   onClick={skip}
                   className="music-skip"
+                  style={{ color: '#FFFFFF' }}
                 >
                   ‹
                 </button>
@@ -700,6 +706,7 @@ export function MusicWidget({
                   aria-label={playing ? '一時停止' : '再生'}
                   onClick={() => setPlaying(value => !value)}
                   className="music-play"
+                  style={{ color: '#FFFFFF' }}
                 >
                   {playing ? (
                     <svg
@@ -730,6 +737,7 @@ export function MusicWidget({
                   aria-label="別の曲をランダム再生"
                   onClick={skip}
                   className="music-skip"
+                  style={{ color: '#FFFFFF' }}
                 >
                   ›
                 </button>
@@ -745,6 +753,7 @@ export function MusicWidget({
                       type="button"
                       aria-label={volume === 0 ? 'ミュート解除' : 'ミュート'}
                       className="music-speaker"
+                      style={{ color: '#FFFFFF' }}
                       onClick={toggleMute}
                     >
                       {volume === 0 ? '×' : '⌁'}
@@ -773,6 +782,7 @@ export function MusicWidget({
                   type="button"
                   aria-label="音量調整を開く"
                   className="music-speaker"
+                  style={{ color: '#FFFFFF' }}
                   onClick={() => setVolumeOpen(open => !open)}
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true">
