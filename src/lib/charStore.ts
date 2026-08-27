@@ -209,7 +209,7 @@ export interface Relation {
 
 export const CHAR_SEED: Character[] = [
   {
-    id: 'shiki',
+    id: 'shiki-hakray',
     name: 'シキ・ハクレイ',
     sub: '',
     color: '#8083D6',
@@ -237,7 +237,7 @@ export const CHAR_SEED: Character[] = [
     own: true,
   },
   {
-    id: 'solas',
+    id: 'solas-frenesia',
     name: 'ソラス・フレネシア',
     sub: '',
     color: '#8083D6',
