@@ -71,18 +71,14 @@ export function widgetLabel(widgets: WidgetConf[], w: WidgetConf): string {
 const DEFAULT_STATE: MainState = {
   layoutMode: 'fixed',
   widgets: [
-    // 배포 기본 — 더미 콘텐츠 없이 빈 위젯으로 시작 (v1.9)
-    // 메뉴리스트는 모바일 전용(PC 숨김)이라 좌표는 의미 없음
+    // HOME 최종構成の第一段階:
+    // PCは LATEST + MUSIC の2ブロックだけ。
+    // MENUはモバイル用なので残す。
     { id: 'menu', type: 'menu', col: 1, enabled: true, tx: 0, ty: 0, ax: 0, ay: 0, w: 230, h: 80, settings: {} },
-    { id: 'memo', type: 'memo', col: 1, enabled: true, tx: 0, ty: 0, ax: 0, ay: 0, w: 230, h: 80, settings: { text: '' } },
-    { id: 'banner', type: 'banner', col: 2, enabled: true, fixed: true, tx: 0, ty: 0, ax: 240, ay: 0, w: 610, h: 210, settings: {} },
-    { id: 'diary', type: 'diary', col: 2, enabled: true, tx: 0, ty: 0, ax: 240, ay: 220, w: 300, h: 150, settings: {} },
-    { id: 'latest', type: 'latest', col: 2, enabled: true, tx: 0, ty: 0, ax: 550, ay: 220, w: 300, h: 150, settings: {} },
-    { id: 'music', type: 'music', col: 3, enabled: true, tx: 0, ty: 0, ax: 860, ay: 0, w: 300, h: 150, settings: { tracks: [] } },
-    // 회원정보창은 로그인 상태 내용(프로필+버튼)에 딱 맞는 높이 — 더 키우면 아래가 비어 보임 (v1.9 사용자 확정)
-    // UPCOMING은 기본 구성에서 제외 — 필요하면 [＋ 위젯]으로 추가 (v1.9: 켬/끔 대신 추가/삭제 모델)
+    { id: 'latest', type: 'latest', col: 2, enabled: true, tx: 0, ty: 0, ax: 70, ay: 40, w: 500, h: 180, settings: {} },
+    { id: 'music', type: 'music', col: 3, enabled: true, tx: 0, ty: 0, ax: 590, ay: 40, w: 500, h: 180, settings: { tracks: [] } },
   ],
-  mobileOrder: ['menu', 'memo', 'diary', 'latest', 'music'],
+  mobileOrder: ['menu', 'latest', 'music'],
 };
 
 const STORAGE_KEY = 'ohome.main.v1';
@@ -136,22 +132,54 @@ export function MainStoreProvider({ children }: { children: React.ReactNode }) {
         const removed = new Set(parsed.removedIds ?? []);
         const kept: WidgetConf[] = [];
         const seenIds = new Set<string>();
+        const homeRemovedTypes = new Set([
+          'member',
+          'memo',
+          'banner',
+          'diary',
+          'dday',
+          'todo',
+        ]);
+
         for (const source of parsed.widgets) {
           if ((source.type as string) === 'image') continue;
-          // 旧MEMBERウィジェットは上部LOGIN導線へ統合済み。
-          // 過去の保存レイアウトに残っていてもPCでMUSICの背後に重ならないよう除去する。
-          if ((source.type as string) === 'member' || source.id === 'member') {
+
+          // HOME整理: 旧構成のカードは保存済みレイアウトからも除去する。
+          if (homeRemovedTypes.has(source.type as string)) {
             removed.add(source.id);
             continue;
           }
-          if (seenIds.has(source.id)) continue; // 과거 DEFAULT_STATE의 MUSIC 중복을 자동 정리
+
+          if (seenIds.has(source.id)) continue;
           seenIds.add(source.id);
 
-          if (!source.enabled && !source.fixed) { removed.add(source.id); continue; }
+          if (!source.enabled && !source.fixed) {
+            removed.add(source.id);
+            continue;
+          }
 
-          const w = source.type === 'music'
-            ? { ...source, enabled: true, w: 300, h: 150 }
-            : (source.enabled ? source : { ...source, enabled: true });
+          // PCだけ新レイアウトへ固定。モバイルではCSSがw/h/座標を無視するため、
+          // 気に入っているスマホ版MUSICの見た目には影響しない。
+          const w: WidgetConf =
+            source.type === 'latest'
+              ? {
+                  ...source,
+                  enabled: true,
+                  ax: 70,
+                  ay: 40,
+                  w: 500,
+                  h: 180,
+                }
+              : source.type === 'music'
+                ? {
+                    ...source,
+                    enabled: true,
+                    ax: 590,
+                    ay: 40,
+                    w: 500,
+                    h: 180,
+                  }
+                : (source.enabled ? source : { ...source, enabled: true });
 
           kept.push(w);
         }
@@ -162,8 +190,7 @@ export function MainStoreProvider({ children }: { children: React.ReactNode }) {
           ...DEFAULT_STATE,
           ...parsed,
           widgets: merged,
-          mobileOrder: (parsed.mobileOrder ?? DEFAULT_STATE.mobileOrder)
-            .filter(id => id !== 'member'),
+          mobileOrder: ['menu', 'latest', 'music'],
           removedIds: [...removed],
         });
       }
