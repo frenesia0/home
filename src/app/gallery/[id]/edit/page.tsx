@@ -49,6 +49,7 @@ type CloudinaryUploadResponse = {
 
 type SongWithAudio = {
   title?: string;
+  creator?: string;
   url?: string;
   audioUrl?: string;
 };
@@ -133,6 +134,7 @@ export default function EditIllustrationPage() {
   const [snsUrl, setSnsUrl] = useState('');
 
   const [songTitle, setSongTitle] = useState('');
+  const [songCreator, setSongCreator] = useState('');
   const [songUrl, setSongUrl] = useState('');
   const [songAudioUrl, setSongAudioUrl] = useState('');
   const [newAudioFile, setNewAudioFile] =
@@ -264,6 +266,10 @@ export default function EditIllustrationPage() {
 
       setSongTitle(
         song?.title ?? ''
+      );
+
+      setSongCreator(
+        song?.creator ?? ''
       );
       setSongUrl(
         song?.url ?? ''
@@ -466,6 +472,7 @@ export default function EditIllustrationPage() {
   useEffect(() => {
     if (!isSongParody) {
       setSongTitle('');
+      setSongCreator('');
       setSongUrl('');
       setNewAudioFile(null);
       setRemoveAudio(true);
@@ -588,6 +595,7 @@ export default function EditIllustrationPage() {
     ) {
       setTags([]);
       setSongTitle('');
+      setSongCreator('');
       setSongUrl('');
       setNewAudioFile(null);
       setRemoveAudio(true);
@@ -1352,12 +1360,16 @@ export default function EditIllustrationPage() {
           isSongParody &&
           (
             songTitle.trim() ||
+            songCreator.trim() ||
             songUrl.trim() ||
             finalAudioUrl
           )
             ? {
                 title:
                   songTitle.trim() ||
+                  undefined,
+                creator:
+                  songCreator.trim() ||
                   undefined,
                 url:
                   songUrl.trim() ||
@@ -3684,6 +3696,35 @@ export default function EditIllustrationPage() {
                         }
                       />
                     </label>
+
+                    <label
+                      style={
+                        fieldStyle
+                      }
+                    >
+                      <span>
+                        CREATOR
+                      </span>
+
+                      <input
+                        type="text"
+                        value={
+                          songCreator
+                        }
+                        onChange={(
+                          e
+                        ) =>
+                          setSongCreator(
+                            e.target.value
+                          )
+                        }
+                        placeholder="作者名"
+                        style={
+                          inputStyle
+                        }
+                      />
+                    </label>
+
 
                     <label
                       style={
