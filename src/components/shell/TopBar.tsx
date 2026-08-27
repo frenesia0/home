@@ -634,13 +634,9 @@ export function TopBar() {
   font-feature-settings: "zero" 1;
   font-variant-numeric: slashed-zero;
 
-  /*
-    frenesia の最後の a が持っている字間に合わせる。
-    0自身の後ろには余分な字間を作らない。
-  */
-  margin-left: 0.24em;
+  margin-left: 0;
 
-  transform: scaleX(0.88);
+  transform: scaleX(0.82);
   transform-origin: center;
 }
 
