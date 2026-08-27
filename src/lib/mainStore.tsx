@@ -75,8 +75,8 @@ const DEFAULT_STATE: MainState = {
     // PCは LATEST + MUSIC の2ブロックだけ。
     // MENUはモバイル用なので残す。
     { id: 'menu', type: 'menu', col: 1, enabled: true, tx: 0, ty: 0, ax: 0, ay: 0, w: 230, h: 80, settings: {} },
-    { id: 'latest', type: 'latest', col: 2, enabled: true, tx: 0, ty: 0, ax: 70, ay: 40, w: 500, h: 180, settings: {} },
-    { id: 'music', type: 'music', col: 3, enabled: true, tx: 0, ty: 0, ax: 590, ay: 40, w: 500, h: 180, settings: { tracks: [] } },
+    { id: 'latest', type: 'latest', col: 2, enabled: true, tx: 0, ty: 0, ax: 30, ay: 40, w: 420, h: 180, settings: {} },
+    { id: 'music', type: 'music', col: 3, enabled: true, tx: 0, ty: 0, ax: 470, ay: 40, w: 620, h: 180, settings: { tracks: [] } },
   ],
   mobileOrder: ['menu', 'latest', 'music'],
 };
@@ -165,18 +165,18 @@ export function MainStoreProvider({ children }: { children: React.ReactNode }) {
               ? {
                   ...source,
                   enabled: true,
-                  ax: 70,
+                  ax: 30,
                   ay: 40,
-                  w: 500,
+                  w: 420,
                   h: 180,
                 }
               : source.type === 'music'
                 ? {
                     ...source,
                     enabled: true,
-                    ax: 590,
+                    ax: 470,
                     ay: 40,
-                    w: 500,
+                    w: 620,
                     h: 180,
                   }
                 : (source.enabled ? source : { ...source, enabled: true });
