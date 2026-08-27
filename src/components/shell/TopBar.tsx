@@ -593,9 +593,26 @@ export function TopBar() {
       </header>
 
       <style jsx global>{`
-        /* ========================================
-           PC
-        ======================================== */
+  /* ========================================
+     BRAND LOGO
+  ======================================== */
+
+  .brand {
+    font-family:
+      Georgia,
+      'Times New Roman',
+      serif !important;
+
+    font-weight: 400 !important;
+    font-style: normal;
+
+    letter-spacing:
+      0.24em;
+  }
+
+  /* ========================================
+     PC
+  ======================================== */
 
         .topbar-desktop {
           width: 100%;
