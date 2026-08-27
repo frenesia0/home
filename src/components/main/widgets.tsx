@@ -17,7 +17,7 @@ import { RoadItem, ROAD_SEED, BackupPost, BACKUP_SEED } from '@/lib/galleryStore
 import { DiaryPost, DIARY_SEED, Mood, MOOD_SEED, moodTint } from '@/lib/diaryStore';
 import { useSched, eventColor } from '@/lib/schedStore';
 import { StickyMemo, MEMO_SEED, MEMO_SIZE_W, useMemoSettings } from '@/lib/memoStore';
-import { BlobImg, useBlobUrl } from '@/lib/blobStore';
+import { BlobImg, useBlobUrl, putBlob } from '@/lib/blobStore';
 import { normalizeInternalLink } from '@/lib/link';
 
 /* 編集モードで右クリック「設定」→ 該当ウィジェットの設定モーダルを開く (v1.9 ユーザー確定 — イベントで接続) */
@@ -287,6 +287,246 @@ export function LatestWidget() {
     </div>
   );
 }
+
+
+/* ---------- MUSIC — ランダム音楽プレーヤー ---------- */
+interface MusicTrack {
+  id: string;
+  title: string;
+  creator: string;
+  audioRef: string;
+  coverRef?: string;
+}
+
+function formatMusicTime(sec: number): string {
+  if (!Number.isFinite(sec) || sec < 0) return '0:00';
+  return `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+}
+
+export function MusicWidget({ conf }: { conf: WidgetConf }) {
+  const { isAdmin } = useAuth();
+  const { editOn, updateWidget } = useMainStore();
+  const tracks = ((conf.settings.tracks as MusicTrack[] | undefined) ?? []).filter(t => !!t?.id && !!t?.audioRef);
+
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<MusicTrack[]>(tracks);
+  const [currentId, setCurrentId] = useState<string | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null);
+
+  const current = tracks.find(t => t.id === currentId) ?? tracks[0];
+  const audioUrl = useBlobUrl(current?.audioRef);
+  const coverUrl = useBlobUrl(current?.coverRef);
+
+  const chooseRandom = (excludeId?: string) => {
+    if (!tracks.length) return;
+    const pool = tracks.length > 1 && excludeId ? tracks.filter(t => t.id !== excludeId) : tracks;
+    const next = pool[Math.floor(Math.random() * pool.length)] ?? tracks[0];
+    setCurrentId(next.id);
+    setCurrentTime(0);
+    setDuration(0);
+  };
+
+  useEffect(() => {
+    if (!tracks.length) {
+      setCurrentId(null);
+      setPlaying(false);
+      return;
+    }
+    if (!currentId || !tracks.some(t => t.id === currentId)) {
+      setCurrentId(tracks[Math.floor(Math.random() * tracks.length)].id);
+    }
+  }, [tracks.length, currentId]);
+
+  useEffect(() => {
+    if (!audioEl) return;
+    if (playing && audioUrl) audioEl.play().catch(() => setPlaying(false));
+    else audioEl.pause();
+  }, [playing, audioUrl, audioEl]);
+
+  useEffect(() => {
+    if (!audioEl) return;
+    audioEl.load();
+    setCurrentTime(0);
+    setDuration(0);
+  }, [audioUrl, audioEl]);
+
+  useEditEvent(conf.id, () => {
+    setDraft(tracks.map(t => ({ ...t })));
+    setOpen(true);
+  });
+
+  const openManage = () => {
+    setDraft(tracks.map(t => ({ ...t })));
+    setOpen(true);
+  };
+
+  const uploadFor = async (id: string, kind: 'audioRef' | 'coverRef', file?: File) => {
+    if (!file) return;
+    const ref = await putBlob(file);
+    setDraft(list => list.map(t => t.id === id ? { ...t, [kind]: ref } : t));
+  };
+
+  const saveTracks = () => {
+    const cleaned = draft
+      .map(t => ({ ...t, title: t.title.trim() || 'UNTITLED', creator: t.creator.trim() }))
+      .filter(t => t.audioRef);
+    updateWidget(conf.id, { settings: { ...conf.settings, tracks: cleaned } }, { persist: true });
+    setOpen(false);
+  };
+
+  const skip = () => {
+    const keepPlaying = playing;
+    chooseRandom(current?.id);
+    setPlaying(keepPlaying);
+  };
+
+  const onEnded = () => {
+    chooseRandom(current?.id);
+    setPlaying(true);
+  };
+
+  return (
+    <div className="panel widget music-widget" style={{ margin: 0, position: 'relative', minHeight: 142 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <h4 style={{ margin: 0 }}>NOW PLAYING</h4>
+        {isAdmin && !editOn && (
+          <button className="more" style={{ border: 0, background: 'transparent', cursor: 'pointer', padding: 0 }} onClick={openManage}>
+            MANAGE ›
+          </button>
+        )}
+      </div>
+
+      {current ? (
+        <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+          <div style={{ width: 88, height: 88, flex: '0 0 88px', overflow: 'hidden', borderRadius: 8, background: 'rgba(127,127,127,.08)' }}>
+            {coverUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={coverUrl} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            ) : (
+              <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', fontSize: 9, letterSpacing: '.12em', opacity: .45 }}>
+                NO COVER
+              </div>
+            )}
+          </div>
+
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 650, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {current.title || 'UNTITLED'}
+            </div>
+            <div style={{ marginTop: 3, fontSize: 10.5, opacity: .58, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {current.creator || 'UNKNOWN CREATOR'}
+            </div>
+
+            <input
+              aria-label="再生位置"
+              type="range"
+              min={0}
+              max={duration || 0}
+              step={0.1}
+              value={Math.min(currentTime, duration || 0)}
+              onChange={e => {
+                const v = Number(e.target.value);
+                if (audioEl) audioEl.currentTime = v;
+                setCurrentTime(v);
+              }}
+              style={{ width: '100%', margin: '12px 0 2px' }}
+            />
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9.5, opacity: .52, fontVariantNumeric: 'tabular-nums' }}>
+              <span>{formatMusicTime(currentTime)}</span>
+              <span>{formatMusicTime(duration)}</span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 16, marginTop: 6 }}>
+              <button type="button" aria-label="ランダムに前の曲" onClick={skip}
+                style={{ border: 0, background: 'transparent', cursor: 'pointer', opacity: .72, fontSize: 16 }}>‹</button>
+              <button type="button" aria-label={playing ? '一時停止' : '再生'} onClick={() => setPlaying(v => !v)} disabled={!audioUrl}
+                style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid currentColor', background: 'transparent', cursor: audioUrl ? 'pointer' : 'default', fontSize: 11 }}>
+                {playing ? 'Ⅱ' : '▶'}
+              </button>
+              <button type="button" aria-label="ランダムに次の曲" onClick={skip}
+                style={{ border: 0, background: 'transparent', cursor: 'pointer', opacity: .72, fontSize: 16 }}>›</button>
+            </div>
+          </div>
+
+          <audio
+            ref={setAudioEl}
+            src={audioUrl}
+            preload="metadata"
+            onTimeUpdate={e => setCurrentTime(e.currentTarget.currentTime)}
+            onLoadedMetadata={e => setDuration(e.currentTarget.duration || 0)}
+            onDurationChange={e => setDuration(e.currentTarget.duration || 0)}
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onEnded={onEnded}
+          />
+        </div>
+      ) : (
+        <div style={{ minHeight: 88, display: 'grid', placeItems: 'center', fontSize: 11, opacity: .5, letterSpacing: '.08em' }}>
+          {isAdmin ? 'MANAGE から曲を登録してください' : 'NO TRACK'}
+        </div>
+      )}
+
+      <Modal open={open} onClose={() => setOpen(false)} title="MUSIC LIBRARY"
+        desc="曲タイトル・作者名・MP3・カバー画像を登録できます。HOMEでは登録曲からランダムに選曲します。"
+        actions={<>
+          <button className="btn btn-ghost" onClick={() => setOpen(false)}>CANCEL</button>
+          <button className="btn btn-dark" onClick={saveTracks}>SAVE</button>
+        </>}>
+        <div style={{ display: 'grid', gap: 12 }}>
+          {draft.map((track, i) => (
+            <div key={track.id} style={{ padding: 12, border: '1px solid rgba(127,127,127,.25)', borderRadius: 10, display: 'grid', gap: 9 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <b style={{ fontSize: 11, letterSpacing: '.08em' }}>TRACK {String(i + 1).padStart(2, '0')}</b>
+                <button type="button" className="btn btn-ghost" onClick={() => setDraft(list => list.filter(x => x.id !== track.id))}>DELETE</button>
+              </div>
+
+              <label style={{ display: 'grid', gap: 4, fontSize: 10 }}>
+                <span>TITLE</span>
+                <input className="input" value={track.title}
+                  onChange={e => setDraft(list => list.map(x => x.id === track.id ? { ...x, title: e.target.value } : x))} />
+              </label>
+
+              <label style={{ display: 'grid', gap: 4, fontSize: 10 }}>
+                <span>CREATOR</span>
+                <input className="input" value={track.creator}
+                  onChange={e => setDraft(list => list.map(x => x.id === track.id ? { ...x, creator: e.target.value } : x))} />
+              </label>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
+                <label style={{ display: 'grid', gap: 4, fontSize: 10 }}>
+                  <span>MP3 / AUDIO</span>
+                  <input type="file" accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/mp4,.mp3,.wav,.ogg,.m4a"
+                    onChange={e => uploadFor(track.id, 'audioRef', e.target.files?.[0])} />
+                  <small style={{ opacity: .55 }}>{track.audioRef ? '登録済み' : '未登録'}</small>
+                </label>
+
+                <label style={{ display: 'grid', gap: 4, fontSize: 10 }}>
+                  <span>COVER IMAGE</span>
+                  <input type="file" accept="image/png,image/jpeg,image/webp,image/gif"
+                    onChange={e => uploadFor(track.id, 'coverRef', e.target.files?.[0])} />
+                  <small style={{ opacity: .55 }}>{track.coverRef ? '登録済み' : '未登録'}</small>
+                </label>
+              </div>
+            </div>
+          ))}
+
+          <button type="button" className="btn btn-ghost"
+            onClick={() => setDraft(list => [...list, {
+              id: `music-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+              title: '', creator: '', audioRef: '', coverRef: '',
+            }])}>
+            ＋ ADD TRACK
+          </button>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
 
 /* ---------- D-DAY (4.12 — スケジューラー連携は第3段階) ---------- */
 interface DdayItem { title: string; date: string; plusOne?: boolean }
@@ -588,6 +828,7 @@ export function renderWidget(conf: WidgetConf) {
     case 'memo': return <MemoWidget conf={conf} />;
     case 'diary': return <DiaryWidget />;
     case 'latest': return <LatestWidget />;
+    case 'music': return <MusicWidget conf={conf} />;
     case 'dday': return <DdayWidget conf={conf} />;
     case 'todo': return <TodoWidget conf={conf} />;
     case 'upcoming': return <UpcomingWidget />;
