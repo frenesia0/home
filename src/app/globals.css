@@ -195,6 +195,55 @@ a{color:inherit;text-decoration:none}
 .vol i{position:absolute;left:0;top:0;height:100%;width:62%;background:var(--bgm-vol);border-radius:3px}
 .vol i::after{content:"";position:absolute;right:-4px;top:-3.5px;width:10px;height:10px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.5)}
 
+
+/* ---------- HOME MUSIC PLAYER (Gallery 연동) ---------- */
+/* 구형 고정 BGM은 Gallery 연동 MUSIC 위젯으로 대체 — 모바일 이중 플레이어 방지 */
+.bgm{display:none !important}
+
+.music-widget .music-range{
+  --music-fill:0%;
+  width:100%;height:14px;margin:0;padding:0;
+  appearance:none;-webkit-appearance:none;
+  background:transparent;cursor:var(--cur-pointer,pointer);outline:none;
+}
+.music-widget .music-range::-webkit-slider-runnable-track{
+  height:3px;border-radius:999px;
+  background:linear-gradient(to right,
+    #555b64 0%,#555b64 var(--music-fill),
+    #d7d9dd var(--music-fill),#d7d9dd 100%);
+}
+.music-widget .music-range::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:9px;height:9px;border-radius:50%;border:0;
+  background:#34383f;box-shadow:0 1px 3px rgba(0,0,0,.22);
+  margin-top:-3px;transition:transform .12s ease,background .12s ease;
+}
+.music-widget .music-range:hover::-webkit-slider-thumb{transform:scale(1.18);background:#1f2227}
+.music-widget .music-range::-moz-range-track{
+  height:3px;border-radius:999px;background:#d7d9dd;
+}
+.music-widget .music-range::-moz-range-progress{
+  height:3px;border-radius:999px;background:#555b64;
+}
+.music-widget .music-range::-moz-range-thumb{
+  width:9px;height:9px;border-radius:50%;border:0;
+  background:#34383f;box-shadow:0 1px 3px rgba(0,0,0,.22);
+}
+.music-widget .music-play{
+  width:28px;height:28px;border-radius:50%;
+  border:1px solid #8e939b;background:rgba(255,255,255,.24);
+  display:grid;place-items:center;padding:0;
+  font-size:9px;color:#34383f;line-height:1;
+  transition:.14s ease;
+}
+.music-widget .music-play:hover{background:#34383f;color:#fff;border-color:#34383f}
+.music-widget .music-skip{
+  width:24px;height:24px;display:grid;place-items:center;
+  border-radius:50%;font-size:16px;line-height:1;color:#6d727a;
+  transition:.14s ease;
+}
+.music-widget .music-skip:hover{background:rgba(60,64,72,.08);color:#262a30}
+
 /* ---------- 공통 레이아웃 ---------- */
 /* 하단 여백은 BGM 미니 플레이어(약 73px)를 가리지 않는 최소치 — 과하면 불필요한 스크롤 발생 */
 .page{max-width:1180px;margin:0 auto;padding:16px 28px 80px;animation:fade .35s}
