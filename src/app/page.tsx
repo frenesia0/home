@@ -297,6 +297,8 @@ export default function MainPage() {
               <MusicWidget
                 key={linkedMusicPostId ?? 'random-home-music'}
                 forcedPostId={linkedMusicPostId}
+                sourcePosts={homePosts}
+                sourcePostsLoaded={homeVisualLoaded}
               />
             </div>
           </div>
@@ -370,9 +372,9 @@ export default function MainPage() {
             border: 0;
             padding: 0;
             overflow: hidden;
-            border-radius: var(--radius);
-            background: rgba(255,255,255,.045);
-            box-shadow: var(--sh-sm);
+            border-radius: 0;
+            background: transparent;
+            box-shadow: none;
             cursor: var(--cur-pointer, pointer);
             color: inherit;
           }
@@ -495,7 +497,7 @@ export default function MainPage() {
 
             .home-public-grid {
               width: 100%;
-              gap: 8px;
+              gap: 18px;
             }
 
             .home-top-grid {
