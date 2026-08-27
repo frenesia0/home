@@ -343,7 +343,16 @@ function galleryPostToMusicTrack(post: GalleryPost): MusicTrack | null {
   };
 }
 
-export function MusicWidget({ forcedPostId }: { conf?: WidgetConf; forcedPostId?: string | null }) {
+export function MusicWidget({
+  forcedPostId,
+  sourcePosts,
+  sourcePostsLoaded,
+}: {
+  conf?: WidgetConf;
+  forcedPostId?: string | null;
+  sourcePosts?: GalleryPost[];
+  sourcePostsLoaded?: boolean;
+}) {
   const router = useRouter();
   const [tracks, setTracks] = useState<MusicTrack[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -358,6 +367,20 @@ export function MusicWidget({ forcedPostId }: { conf?: WidgetConf; forcedPostId?
   const forcedAppliedRef = useRef<string | null>(null);
 
   useEffect(() => {
+    // HOME本体がすでにGallery投稿を読み込んでいる場合は、
+    // MUSICだけ別通信をせず同じデータを使う。
+    // これでHOME VISUALは表示済みなのにMUSICだけLOADING...のまま、
+    // という二重取得由来のズレを防ぐ。
+    if (sourcePosts !== undefined) {
+      const nextTracks = sourcePosts
+        .map(galleryPostToMusicTrack)
+        .filter((track): track is MusicTrack => track !== null);
+
+      setTracks(nextTracks);
+      setLoaded(sourcePostsLoaded ?? true);
+      return;
+    }
+
     let alive = true;
 
     const load = async () => {
@@ -388,7 +411,7 @@ export function MusicWidget({ forcedPostId }: { conf?: WidgetConf; forcedPostId?
       alive = false;
       off();
     };
-  }, []);
+  }, [sourcePosts, sourcePostsLoaded]);
 
   const current =
     tracks.find(track => track.id === currentId) ??
