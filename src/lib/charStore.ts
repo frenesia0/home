@@ -207,7 +207,67 @@ export interface Relation {
   qaEnabled?: boolean;           // base AU의 QUESTIONS 섹션 사용 여부 (구버전은 questions 존재로 판정)
 }
 
-export const CHAR_SEED: Character[] = [];
+export const CHAR_SEED: Character[] = [
+  {
+    id: 'shiki',
+    name: 'シキ・ハクレイ',
+    sub: '',
+    color: '#8083D6',
+    themeMode: 'default',
+    colors: [],
+    specs: [
+      { label: 'Birthday', value: '8/2' },
+      { label: 'Age', value: '1歳' },
+      { label: 'Height', value: '186cm' },
+      { label: 'Weight', value: '100.021kg' },
+      { label: 'Hobby', value: '人間生活を謳歌すること' },
+    ],
+    tabs: [],
+    basicHtml:
+      'フレネシア第224代目王ソラスによって造られた人工生命体。<br />知の星であるフレネシアの知識を詰め込んだ存在であるが、人間生活はまだまだ初心者。<br />破天荒なソラスの手綱を握っている。',
+    quote:
+      'シキ・ハクレイ。\\nフレネシアの人間は、俺の事を「フレネシアの叡智」だと呼んだりするな。\\n…ハクレイの姓について？ああ、これはソラスのファミリーネームだ。',
+    voices: [
+      { label: 'SAMPLE 01' },
+      { label: 'SAMPLE 02' },
+      { label: 'SAMPLE 03' },
+    ],
+    visibility: 'public',
+    thumbClass: '',
+    own: true,
+  },
+  {
+    id: 'solas',
+    name: 'ソラス・フレネシア',
+    sub: '',
+    color: '#8083D6',
+    themeMode: 'default',
+    colors: [],
+    specs: [
+      { label: 'Birthday', value: '8/6' },
+      { label: 'Age', value: '21歳' },
+      { label: 'Height', value: '192cm' },
+      { label: 'Weight', value: '71kg' },
+      {
+        label: 'Hobby',
+        value: '自身の論文を無断転載した人を訴訟すること',
+      },
+    ],
+    tabs: [],
+    basicHtml:
+      '知の星「フレネシア」の第224代目王。<br />基本穏やかで理性的な性格だが、外交時に皮肉を言われると数倍に言い返す幼稚さと頭の回転の速さを持ち合わせる。',
+    quote:
+      '第224代目王、ソラス・フレネシア。\\n……そんなに畏まらなくていい。フレネシアにおいて、王の権威はさほど強くないんだ。\\n実際、誰も俺に「様」をつけない……。それはそれでどうなんだろうな？',
+    voices: [
+      { label: 'SAMPLE 01' },
+      { label: 'SAMPLE 02' },
+      { label: 'SAMPLE 03' },
+    ],
+    visibility: 'public',
+    thumbClass: '',
+    own: true,
+  },
+];
 
 export const REL_SEED: Relation[] = [];
 
