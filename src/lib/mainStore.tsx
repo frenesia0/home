@@ -78,13 +78,12 @@ const DEFAULT_STATE: MainState = {
     { id: 'banner', type: 'banner', col: 2, enabled: true, fixed: true, tx: 0, ty: 0, ax: 240, ay: 0, w: 610, h: 210, settings: {} },
     { id: 'diary', type: 'diary', col: 2, enabled: true, tx: 0, ty: 0, ax: 240, ay: 220, w: 300, h: 150, settings: {} },
     { id: 'latest', type: 'latest', col: 2, enabled: true, tx: 0, ty: 0, ax: 550, ay: 220, w: 300, h: 150, settings: {} },
+    { id: 'music', type: 'music', col: 3, enabled: true, tx: 0, ty: 0, ax: 860, ay: 0, w: 260, h: 150, settings: { tracks: [] } },
     // 회원정보창은 로그인 상태 내용(프로필+버튼)에 딱 맞는 높이 — 더 키우면 아래가 비어 보임 (v1.9 사용자 확정)
-    { id: 'member', type: 'member', col: 3, enabled: true, fixed: true, tx: 0, ty: 0, ax: 860, ay: 0, w: 260, h: 150, settings: {} },
-    { id: 'dday', type: 'dday', col: 3, enabled: true, tx: 0, ty: 0, ax: 860, ay: 160, w: 260, h: 90, settings: { items: [] } },
-    { id: 'todo', type: 'todo', col: 3, enabled: true, tx: 0, ty: 0, ax: 860, ay: 260, w: 260, h: 90, settings: { items: [] } },
+    { id: 'music', type: 'music', col: 3, enabled: true, tx: 0, ty: 0, ax: 860, ay: 0, w: 260, h: 150, settings: { tracks: [] } },
     // UPCOMING은 기본 구성에서 제외 — 필요하면 [＋ 위젯]으로 추가 (v1.9: 켬/끔 대신 추가/삭제 모델)
   ],
-  mobileOrder: ['menu', 'memo', 'diary', 'latest', 'dday', 'todo'],
+  mobileOrder: ['menu', 'memo', 'diary', 'latest', 'music'],
 };
 
 const STORAGE_KEY = 'ohome.main.v1';
