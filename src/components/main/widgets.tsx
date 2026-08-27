@@ -1,6 +1,6 @@
 'use client';
 // メインウィジェットレンダラー (4.0) — DIARY/LATEST/UPCOMINGなどは該当機能（第2・第3段階）まではデモデータ
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { WidgetConf, useMainStore, WIDGET_META, decoSlides } from '@/lib/mainStore';
 import { useAuth } from '@/lib/auth';
@@ -343,7 +343,7 @@ function galleryPostToMusicTrack(post: GalleryPost): MusicTrack | null {
   };
 }
 
-export function MusicWidget({ conf }: { conf: WidgetConf }) {
+export function MusicWidget({ forcedPostId }: { conf?: WidgetConf; forcedPostId?: string | null }) {
   const router = useRouter();
   const [tracks, setTracks] = useState<MusicTrack[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -355,6 +355,7 @@ export function MusicWidget({ conf }: { conf: WidgetConf }) {
   const [lastVolume, setLastVolume] = useState(50);
   const [volumeOpen, setVolumeOpen] = useState(false);
   const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null);
+  const forcedAppliedRef = useRef<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -417,6 +418,24 @@ export function MusicWidget({ conf }: { conf: WidgetConf }) {
       return;
     }
 
+    const forcedTrack =
+      forcedPostId
+        ? tracks.find(track => track.id === forcedPostId)
+        : undefined;
+
+    // HOME VISUALがMP3付きSONG PARODYなら、そのページ表示時の初期曲を必ず合わせる。
+    // 一度合わせた後は、ユーザーが前後ボタンで別の曲へ移動できる。
+    if (
+      forcedTrack &&
+      forcedAppliedRef.current !== forcedPostId
+    ) {
+      forcedAppliedRef.current = forcedPostId ?? null;
+      setCurrentId(forcedTrack.id);
+      setCurrentTime(0);
+      setDuration(0);
+      return;
+    }
+
     if (!currentId || !tracks.some(track => track.id === currentId)) {
       const random =
         tracks[Math.floor(Math.random() * tracks.length)] ??
@@ -424,7 +443,7 @@ export function MusicWidget({ conf }: { conf: WidgetConf }) {
 
       setCurrentId(random.id);
     }
-  }, [tracks, currentId]);
+  }, [tracks, currentId, forcedPostId]);
 
   useEffect(() => {
     if (!audioEl) return;
@@ -562,7 +581,7 @@ export function MusicWidget({ conf }: { conf: WidgetConf }) {
             )}
           </button>
 
-          <div style={{ minWidth: 0, flex: 1, position: 'relative' }}>
+          <div className="music-info" style={{ minWidth: 0, flex: 1, position: 'relative' }}>
             <div
               title={current.title}
               style={{
