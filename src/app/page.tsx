@@ -158,6 +158,19 @@ export default function MainPage() {
     return () => window.removeEventListener('ohome-add-widget', open);
   }, []);
 
+  // HOMEへ入った時は、前ページのスクロール位置を引き継がない。
+  useEffect(() => {
+    const id = window.requestAnimationFrame(() => {
+      window.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: 'auto',
+      });
+    });
+
+    return () => window.cancelAnimationFrame(id);
+  }, []);
+
   // 모달을 열 때 선택돼 있던 종류가 이미 추가된 것이면 항상 가능한 자유 텍스트로 (v1.9)
   useEffect(() => {
     if (!addOpen) return;
@@ -288,7 +301,7 @@ export default function MainPage() {
             </div>
           </div>
 
-          <section className="home-news">
+          <section className="home-news" aria-label="RECENT UPDATE">
             <div className="home-news-head">
               <span>RECENT UPDATE</span>
               <button
@@ -414,19 +427,20 @@ export default function MainPage() {
           }
 
           .home-news {
-            min-height: 118px;
-            padding: 16px 18px 14px;
-            border-radius: var(--radius);
-            background: var(--panel);
-            box-shadow: var(--sh-sm);
+            min-height: 0;
+            padding: 4px 2px 0;
+            background: transparent;
+            border: 0;
+            border-radius: 0;
+            box-shadow: none;
           }
 
           .home-news-head {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding-bottom: 9px;
-            border-bottom: 1px solid rgba(127,127,127,.15);
+            padding-bottom: 10px;
+            border: 0;
             font-size: 10px;
             letter-spacing: .14em;
             color: var(--faint);
@@ -447,16 +461,14 @@ export default function MainPage() {
             grid-template-columns: 110px 1fr;
             gap: 18px;
             align-items: center;
-            min-height: 29px;
+            min-height: 28px;
+            padding: 0;
             text-align: left;
-            border-bottom: 1px dashed rgba(127,127,127,.13);
+            border: 0;
+            background: transparent;
             color: var(--sub);
             font-size: 10.5px;
             letter-spacing: .05em;
-          }
-
-          .home-news-row:last-child {
-            border-bottom: 0;
           }
 
           .home-news-row time {
@@ -476,9 +488,12 @@ export default function MainPage() {
           @media (max-width: 760px) {
             .home-public-page {
               padding-top: 4px;
+              padding-left: 8px;
+              padding-right: 8px;
             }
 
             .home-public-grid {
+              width: 100%;
               gap: 14px;
             }
 
@@ -491,6 +506,7 @@ export default function MainPage() {
             .home-visual {
               width: 100%;
               aspect-ratio: 4 / 3;
+              min-height: 0;
             }
 
             /* スマホMUSICは現在の横長UIをそのまま使用する。 */
@@ -523,7 +539,7 @@ export default function MainPage() {
 
             .home-news {
               min-height: 0;
-              padding: 14px 14px 12px;
+              padding: 2px 2px 0;
             }
 
             .home-news-row {
