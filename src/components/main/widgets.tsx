@@ -387,6 +387,12 @@ function rgbStats(r: number, g: number, b: number) {
   };
 }
 
+function isPurpleHue(hue: number) {
+  // 青紫〜紫〜赤紫までを「紫系」として扱う。
+  // 青や緑、赤、黄などはここに入れず、最終的にグレーへ落とす。
+  return hue >= 230 && hue <= 315;
+}
+
 function foregroundForBackground(r: number, g: number, b: number):
   '#FFFFFF' | '#111318' {
   return rgbStats(r, g, b).luminance > 0.53
@@ -574,11 +580,14 @@ async function extractMusicTheme(
         const r = clampByte(edgeDominant.r);
         const g = clampByte(edgeDominant.g);
         const b = clampByte(edgeDominant.b);
+        const hue = rgbStats(r, g, b).hue;
 
-        return {
-          background: rgbHex(r, g, b),
-          foreground: foregroundForBackground(r, g, b),
-        };
+        if (isPurpleHue(hue)) {
+          return {
+            background: rgbHex(r, g, b),
+            foreground: foregroundForBackground(r, g, b),
+          };
+        }
       }
     }
 
@@ -591,11 +600,14 @@ async function extractMusicTheme(
         const r = clampByte(dominant.r);
         const g = clampByte(dominant.g);
         const b = clampByte(dominant.b);
+        const hue = rgbStats(r, g, b).hue;
 
-        return {
-          background: rgbHex(r, g, b),
-          foreground: foregroundForBackground(r, g, b),
-        };
+        if (isPurpleHue(hue)) {
+          return {
+            background: rgbHex(r, g, b),
+            foreground: foregroundForBackground(r, g, b),
+          };
+        }
       }
     }
 
@@ -638,11 +650,14 @@ async function extractMusicTheme(
         const r = clampByte(accent.r);
         const g = clampByte(accent.g);
         const b = clampByte(accent.b);
+        const hue = rgbStats(r, g, b).hue;
 
-        return {
-          background: rgbHex(r, g, b),
-          foreground: foregroundForBackground(r, g, b),
-        };
+        if (isPurpleHue(hue)) {
+          return {
+            background: rgbHex(r, g, b),
+            foreground: foregroundForBackground(r, g, b),
+          };
+        }
       }
     }
 
