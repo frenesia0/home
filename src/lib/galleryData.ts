@@ -375,6 +375,12 @@ export interface GallerySong {
     string;
 
   /**
+   * 曲の作者名 / アーティスト名
+   */
+  creator?:
+    string;
+
+  /**
    * YouTubeなど、元曲への外部リンク
    */
   url?:
@@ -975,6 +981,14 @@ export function getGallerySong(
       : undefined;
 
 
+  const creator =
+    typeof song.creator ===
+      'string' &&
+    song.creator.trim()
+      ? song.creator.trim()
+      : undefined;
+
+
   const url =
     typeof song.url ===
       'string' &&
@@ -993,6 +1007,7 @@ export function getGallerySong(
 
   if (
     !title &&
+    !creator &&
     !url &&
     !audioUrl
   ) {
@@ -1002,6 +1017,7 @@ export function getGallerySong(
 
   return {
     title,
+    creator,
     url,
     audioUrl,
   };
