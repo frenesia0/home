@@ -319,7 +319,7 @@ export default function AddIllustrationPage() {
      SONG
   ======================================================= */
 
-    const [
+  const [
     songTitle,
     setSongTitle,
   ] =
@@ -330,34 +330,7 @@ export default function AddIllustrationPage() {
     setSongCreator,
   ] =
     useState('');
-                    <label
-                      style={
-                        fieldStyle
-                      }
-                    >
-                      <span>
-                        CREATOR
-                      </span>
 
-                      <input
-                        type="text"
-                        value={
-                          songCreator
-                        }
-                        onChange={(
-                          e
-                        ) =>
-                          setSongCreator(
-                            e.target.value
-                          )
-                        }
-                        placeholder="作者名"
-                        style={
-                          inputStyle
-                        }
-                      />
-                    </label>
-  
   const [
     songUrl,
     setSongUrl,
@@ -688,6 +661,7 @@ export default function AddIllustrationPage() {
       !isSongParody
     ) {
       setSongTitle('');
+      setSongCreator('');
       setSongUrl('');
       setSongAudio(
         null
@@ -821,6 +795,7 @@ export default function AddIllustrationPage() {
     ) {
       setTags([]);
       setSongTitle('');
+      setSongCreator('');
       setSongUrl('');
       setSongAudio(
         null
@@ -1634,12 +1609,17 @@ export default function AddIllustrationPage() {
             isSongParody &&
             (
               songTitle.trim() ||
+              songCreator.trim() ||
               songUrl.trim() ||
               uploadedSongAudioUrl
             )
               ? ({
                   title:
                     songTitle.trim() ||
+                    undefined,
+
+                  creator:
+                    songCreator.trim() ||
                     undefined,
 
                   url:
@@ -3781,7 +3761,7 @@ export default function AddIllustrationPage() {
                           1.6,
                       }}
                     >
-                      曲名・リンクはどちらも任意です。
+                      曲名・作者名・リンクは任意です。MP3を登録するとHOMEの音楽プレーヤー候補になります。
                     </p>
 
                     <label
@@ -3806,6 +3786,35 @@ export default function AddIllustrationPage() {
                           )
                         }
                         placeholder="曲名"
+                        style={
+                          inputStyle
+                        }
+                      />
+                    </label>
+
+
+                    <label
+                      style={
+                        fieldStyle
+                      }
+                    >
+                      <span>
+                        CREATOR
+                      </span>
+
+                      <input
+                        type="text"
+                        value={
+                          songCreator
+                        }
+                        onChange={(
+                          e
+                        ) =>
+                          setSongCreator(
+                            e.target.value
+                          )
+                        }
+                        placeholder="作者名"
                         style={
                           inputStyle
                         }
