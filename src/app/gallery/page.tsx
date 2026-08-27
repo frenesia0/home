@@ -1199,23 +1199,33 @@ export default function GalleryPage() {
           GALLERY HEADER
       ====================== */}
 
-      <section
-        className="gallery-banner"
+      <header
+        style={{
+          marginBottom: '30px',
+        }}
       >
-        <div
-          className="gallery-banner-copy"
+        <h1
+          style={{
+            margin: 0,
+            fontSize: '32px',
+            fontWeight: 800,
+            letterSpacing: '.08em',
+          }}
         >
-          <h1>
-            GALLERY
-          </h1>
+          GALLERY
+        </h1>
 
-          <p>
-            shiki &amp; solas
-            illustration archive
-          </p>
-        </div>
-
-      </section>
+        <p
+          style={{
+            margin: '8px 0 0',
+            color: 'rgba(255,255,255,.55)',
+            fontSize: '13px',
+            letterSpacing: '.04em',
+          }}
+        >
+          shiki &amp; solas illustration archive
+        </p>
+      </header>
 
       {isAdmin && (
         <div className="gallery-admin-actions">
