@@ -173,8 +173,8 @@ export default function EditIllustrationPage() {
 
   const [cropOpen, setCropOpen] = useState(false);
 
-  // ギャラリー右上ランダム表示用。
-  // false の作品は候補から除外し、トリミングUIも表示しない。
+  // HOMEランダムビジュアル表示用。
+  // false の作品はHOME VISUAL候補から除外し、トリミングUIも表示しない。
   const [heroEnabled, setHeroEnabled] = useState(true);
   const [heroMode, setHeroMode] =
     useState<GalleryHeroMode>('post');
@@ -1157,7 +1157,7 @@ export default function EditIllustrationPage() {
         !existingCustomHeroImage
       ) {
         setError(
-          'GALLERY HERO専用画像を選択してください。'
+          'HOME VISUAL専用画像を選択してください。'
         );
         return;
       }
@@ -1316,7 +1316,7 @@ export default function EditIllustrationPage() {
           newCustomHeroImage
         ) {
           setProgress(
-            'GALLERY HERO画像をアップロード中...'
+            'HOME VISUAL画像をアップロード中...'
           );
 
           finalCustomHeroImage =
@@ -3127,7 +3127,7 @@ export default function EditIllustrationPage() {
                 </div>
               )}
 
-              {/* GALLERY HERO */}
+              {/* HOME VISUAL */}
 
               <div
                 style={{
@@ -3146,7 +3146,7 @@ export default function EditIllustrationPage() {
                       'rgba(255,255,255,.58)',
                   }}
                 >
-                  GALLERY HERO
+                  HOME VISUAL
                 </div>
 
                 <label
@@ -3172,7 +3172,7 @@ export default function EditIllustrationPage() {
                       }
                     }}
                   />
-                  ギャラリー右上のランダム表示候補に含める
+                  HOMEのランダムビジュアル候補に含める
                 </label>
 
                 {heroEnabled && (
@@ -3318,7 +3318,7 @@ export default function EditIllustrationPage() {
                         }}
                       >
                         <span>
-                          GALLERY HERO専用画像
+                          HOME VISUAL専用画像
                         </span>
                         <input
                           type="file"
@@ -3353,7 +3353,7 @@ export default function EditIllustrationPage() {
                             position: 'relative',
                             width:
                               'min(420px, 100%)',
-                            aspectRatio: '5 / 2',
+                            aspectRatio: '4 / 3',
                             overflow: 'hidden',
                             borderRadius: '10px',
                             border:
@@ -3376,7 +3376,7 @@ export default function EditIllustrationPage() {
                             setHeroCropOpen(true)
                           }
                         >
-                          バナー表示を調整
+                          4:3表示を調整
                         </button>
                       </div>
                     )}
@@ -4310,7 +4310,7 @@ export default function EditIllustrationPage() {
           <CropEditor
             open={heroCropOpen}
             src={heroSrc}
-            aspect={5 / 2}
+            aspect={4 / 3}
             initial={heroCrop}
             onClose={() =>
               setHeroCropOpen(false)
