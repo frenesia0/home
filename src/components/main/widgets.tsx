@@ -524,7 +524,7 @@ export function MusicWidget({
         minHeight: 116,
         padding: '12px 14px',
         overflow: 'hidden',
-        background: '#555DBE',
+        background: '#8083D6',
         color: '#FFFFFF',
       }}
     >
