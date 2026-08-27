@@ -439,16 +439,17 @@ export default function MainPage() {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding-bottom: 10px;
+            padding-bottom: 11px;
             border: 0;
-            font-size: 10px;
-            letter-spacing: .14em;
-            color: var(--faint);
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: .13em;
+            color: rgba(255,255,255,.68);
           }
 
           .home-news-head button {
-            color: var(--faint);
-            font-size: 9px;
+            color: rgba(255,255,255,.48);
+            font-size: 10px;
             letter-spacing: .08em;
           }
 
@@ -458,21 +459,21 @@ export default function MainPage() {
 
           .home-news-row {
             display: grid;
-            grid-template-columns: 110px 1fr;
-            gap: 18px;
+            grid-template-columns: 118px 1fr;
+            gap: 20px;
             align-items: center;
-            min-height: 28px;
+            min-height: 31px;
             padding: 0;
             text-align: left;
             border: 0;
             background: transparent;
-            color: var(--sub);
-            font-size: 10.5px;
-            letter-spacing: .05em;
+            color: rgba(255,255,255,.58);
+            font-size: 12px;
+            letter-spacing: .045em;
           }
 
           .home-news-row time {
-            color: var(--faint);
+            color: rgba(255,255,255,.46);
             font-variant-numeric: tabular-nums;
           }
 
@@ -494,19 +495,26 @@ export default function MainPage() {
 
             .home-public-grid {
               width: 100%;
-              gap: 14px;
+              gap: 8px;
             }
 
             .home-top-grid {
               display: flex;
               flex-direction: column;
-              gap: 14px;
+              gap: 12px;
             }
 
             .home-visual {
-              width: 100%;
-              aspect-ratio: 4 / 3;
-              min-height: 0;
+              display: block;
+              width: 100% !important;
+              max-width: none !important;
+              height: auto !important;
+              min-height: 0 !important;
+              aspect-ratio: 4 / 3 !important;
+            }
+
+            .home-music {
+              height: auto !important;
             }
 
             /* スマホMUSICは現在の横長UIをそのまま使用する。 */
@@ -542,9 +550,15 @@ export default function MainPage() {
               padding: 2px 2px 0;
             }
 
+            .home-news-head {
+              font-size: 11px;
+            }
+
             .home-news-row {
               grid-template-columns: 94px 1fr;
               gap: 10px;
+              min-height: 29px;
+              font-size: 11px;
             }
           }
         `}</style>
