@@ -1,6 +1,6 @@
 'use client';
 // メインウィジェットレンダラー (4.0) — DIARY/LATEST/UPCOMINGなどは該当機能（第2・第3段階）まではデモデータ
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { WidgetConf, useMainStore, WIDGET_META, decoSlides } from '@/lib/mainStore';
 import { useAuth } from '@/lib/auth';
@@ -312,38 +312,6 @@ function formatMusicTime(sec: number): string {
   return `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
 }
 
-function optimizeMusicCoverUrl(
-  url?: string,
-  publicId?: string
-): string | undefined {
-  if (!url) return undefined;
-  if (!url.includes('/upload/')) return url;
-
-  try {
-    const parsed = new URL(url);
-
-    if (publicId) {
-      return `${parsed.origin}/image/upload/f_auto,q_auto:best,w_900,dpr_2.0/${publicId}`;
-    }
-
-    const marker = '/image/upload/';
-    const markerIndex = parsed.pathname.indexOf(marker);
-    if (markerIndex === -1) return url;
-
-    const afterUpload = parsed.pathname.slice(markerIndex + marker.length);
-    const versionMatch = afterUpload.match(/(?:^|\/)(v\d+\/.*)$/);
-    const assetPath = versionMatch?.[1] ?? afterUpload;
-
-    parsed.pathname = `${parsed.pathname.slice(0, markerIndex)}${marker}f_auto,q_auto:best,w_900,dpr_2.0/${assetPath}`;
-    return parsed.toString();
-  } catch {
-    return url.replace(
-      '/upload/',
-      '/upload/f_auto,q_auto:best,w_900,dpr_2.0/'
-    );
-  }
-}
-
 function galleryPostToMusicTrack(post: GalleryPost): MusicTrack | null {
   if (!getGalleryTags(post).includes('song-parody')) return null;
 
@@ -358,7 +326,7 @@ function galleryPostToMusicTrack(post: GalleryPost): MusicTrack | null {
     title: song?.title?.trim() || 'UNTITLED',
     creator: song?.creator?.trim() || 'UNKNOWN CREATOR',
     audioUrl,
-    coverUrl: optimizeMusicCoverUrl(thumbnail?.url, thumbnail?.publicId),
+    coverUrl: thumbnail?.url,
     href: `/gallery/${encodeURIComponent(post.id)}`,
   };
 }
@@ -372,9 +340,8 @@ export function MusicWidget({ conf }: { conf: WidgetConf }) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(50);
-  const [muted, setMuted] = useState(false);
+  const [lastVolume, setLastVolume] = useState(50);
   const [volumeOpen, setVolumeOpen] = useState(false);
-  const volumeWrapRef = useRef<HTMLDivElement | null>(null);
   const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -467,21 +434,8 @@ export function MusicWidget({ conf }: { conf: WidgetConf }) {
 
   useEffect(() => {
     if (!audioEl) return;
-    audioEl.volume = muted ? 0 : volume / 100;
-  }, [audioEl, muted, volume]);
-
-  useEffect(() => {
-    if (!volumeOpen) return;
-
-    const close = (event: PointerEvent) => {
-      if (!volumeWrapRef.current?.contains(event.target as Node)) {
-        setVolumeOpen(false);
-      }
-    };
-
-    document.addEventListener('pointerdown', close);
-    return () => document.removeEventListener('pointerdown', close);
-  }, [volumeOpen]);
+    audioEl.volume = volume / 100;
+  }, [audioEl, volume]);
 
   const skip = () => {
     const keepPlaying = playing;
@@ -494,27 +448,18 @@ export function MusicWidget({ conf }: { conf: WidgetConf }) {
     setPlaying(true);
   };
 
+  const toggleMute = () => {
+    if (volume === 0) {
+      setVolume(lastVolume > 0 ? lastVolume : 50);
+      return;
+    }
+    setLastVolume(volume);
+    setVolume(0);
+  };
+
   const progress = duration > 0
     ? Math.max(0, Math.min(100, (currentTime / duration) * 100))
     : 0;
-
-  const speakerIcon = muted || volume === 0 ? (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M4 10v4h4l5 4V6l-5 4H4" />
-      <path d="m17 9 4 6m0-6-4 6" />
-    </svg>
-  ) : volume < 50 ? (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M4 10v4h4l5 4V6l-5 4H4" />
-      <path d="M16 10.2c.8 1 .8 2.6 0 3.6" />
-    </svg>
-  ) : (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M4 10v4h4l5 4V6l-5 4H4" />
-      <path d="M16 9c1.6 1.6 1.6 4.4 0 6" />
-      <path d="M19 6.8c2.8 2.8 2.8 7.6 0 10.4" />
-    </svg>
-  );
 
   return (
     <div
@@ -522,27 +467,58 @@ export function MusicWidget({ conf }: { conf: WidgetConf }) {
       style={{
         margin: 0,
         position: 'relative',
-        minHeight: 150,
-        padding: '11px 14px',
+        minHeight: 116,
+        padding: '12px 14px',
+        overflow: 'hidden',
       }}
     >
       {current && (
         <button
           type="button"
-          className="more music-view"
+          className="more"
           onClick={() => router.push(current.href)}
+          style={{
+            position: 'absolute',
+            top: 10,
+            right: 12,
+            zIndex: 4,
+            border: 0,
+            background: 'transparent',
+            cursor: 'pointer',
+            padding: 0,
+          }}
         >
           VIEW ›
         </button>
       )}
 
       {current ? (
-        <div className="music-layout">
+        <div
+          className="music-inner"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+            minWidth: 0,
+            height: '100%',
+          }}
+        >
           <button
             type="button"
-            className="music-cover"
             aria-label="この曲パロ作品を開く"
             onClick={() => router.push(current.href)}
+            className="music-cover"
+            style={{
+              width: 88,
+              height: 88,
+              flex: '0 0 88px',
+              overflow: 'hidden',
+              borderRadius: 8,
+              background: 'rgba(127,127,127,.08)',
+              border: 0,
+              padding: 0,
+              cursor: 'pointer',
+            }}
           >
             {current.coverUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -550,7 +526,6 @@ export function MusicWidget({ conf }: { conf: WidgetConf }) {
                 src={current.coverUrl}
                 alt=""
                 draggable={false}
-                decoding="async"
                 style={{
                   width: '100%',
                   height: '100%',
@@ -559,28 +534,54 @@ export function MusicWidget({ conf }: { conf: WidgetConf }) {
                 }}
               />
             ) : (
-              <div className="music-no-cover">NO COVER</div>
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'grid',
+                  placeItems: 'center',
+                  fontSize: 9,
+                  letterSpacing: '.12em',
+                  opacity: .45,
+                }}
+              >
+                NO COVER
+              </div>
             )}
           </button>
 
-          <div className="music-main">
+          <div style={{ minWidth: 0, flex: 1, position: 'relative' }}>
             <div
-              className="music-title"
               title={current.title}
+              style={{
+                paddingRight: 52,
+                fontSize: 13,
+                fontWeight: 650,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
             >
               {current.title}
             </div>
 
             <div
-              className="music-creator"
               title={current.creator}
+              style={{
+                marginTop: 3,
+                fontSize: 10.5,
+                opacity: .58,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
             >
               {current.creator}
             </div>
 
             <input
-              className="music-range music-progress"
               aria-label="再生位置"
+              className="music-range"
               type="range"
               min={0}
               max={duration || 0}
@@ -592,21 +593,47 @@ export function MusicWidget({ conf }: { conf: WidgetConf }) {
                 setCurrentTime(value);
               }}
               style={{
-                ['--music-fill' as string]: `${progress}%`,
-                accentColor: '#555b64',
-              }}
+                '--music-fill': `${progress}%`,
+                width: '100%',
+                margin: '7px 0 0',
+              } as React.CSSProperties}
             />
 
-            <div className="music-time">
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: 9.5,
+                opacity: .52,
+                fontVariantNumeric: 'tabular-nums',
+                marginTop: -1,
+              }}
+            >
               <span>{formatMusicTime(currentTime)}</span>
               <span>{formatMusicTime(duration)}</span>
             </div>
 
-            <div className="music-control-row">
-              <div className="music-control-center">
+            <div
+              style={{
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginTop: 2,
+                minHeight: 28,
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 12,
+                }}
+              >
                 <button
                   type="button"
-                  aria-label="別の曲へ"
+                  aria-label="別の曲をランダム再生"
                   onClick={skip}
                   className="music-skip"
                 >
@@ -624,7 +651,7 @@ export function MusicWidget({ conf }: { conf: WidgetConf }) {
 
                 <button
                   type="button"
-                  aria-label="別の曲へ"
+                  aria-label="別の曲をランダム再生"
                   onClick={skip}
                   className="music-skip"
                 >
@@ -632,49 +659,52 @@ export function MusicWidget({ conf }: { conf: WidgetConf }) {
                 </button>
               </div>
 
-              <div className="music-volume-wrap" ref={volumeWrapRef}>
+              <div
+                className="music-volume-wrap"
+                style={{ position: 'absolute', right: 0, bottom: 0 }}
+              >
                 {volumeOpen && (
-                  <div className="music-volume-pop">
+                  <div className="music-volume-pop" role="group" aria-label="音量調整">
+                    <button
+                      type="button"
+                      aria-label={volume === 0 ? 'ミュート解除' : 'ミュート'}
+                      className="music-speaker"
+                      onClick={toggleMute}
+                    >
+                      {volume === 0 ? '×' : '⌁'}
+                    </button>
                     <input
-                      className="music-range music-volume"
                       aria-label="音量"
+                      className="music-range music-volume-range"
                       type="range"
                       min={0}
                       max={100}
                       step={1}
                       value={volume}
                       onChange={event => {
-                        const next = Number(event.target.value);
-                        setVolume(next);
-                        if (next > 0) setMuted(false);
+                        const value = Number(event.target.value);
+                        if (value > 0) setLastVolume(value);
+                        setVolume(value);
                       }}
                       style={{
-                        ['--music-fill' as string]: `${muted ? 0 : volume}%`,
-                        accentColor: '#555b64',
-                      }}
+                        '--music-fill': `${volume}%`,
+                      } as React.CSSProperties}
                     />
                   </div>
                 )}
 
                 <button
                   type="button"
-                  className={`music-speaker${muted ? ' muted' : ''}`}
-                  aria-label={
-                    volumeOpen
-                      ? muted
-                        ? 'ミュート解除'
-                        : 'ミュート'
-                      : '音量調節を開く'
-                  }
-                  onClick={() => {
-                    if (!volumeOpen) {
-                      setVolumeOpen(true);
-                      return;
-                    }
-                    setMuted(value => !value);
-                  }}
+                  aria-label="音量調整を開く"
+                  className="music-speaker"
+                  onClick={() => setVolumeOpen(open => !open)}
                 >
-                  {speakerIcon}
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M5 9v6h4l5 4V5L9 9H5Z" />
+                    {volume > 0 && <path d="M17 9.2c1.1 1.1 1.1 4.5 0 5.6" />}
+                    {volume > 45 && <path d="M19.3 6.8c2.4 2.4 2.4 8 0 10.4" />}
+                    {volume === 0 && <path d="m17 10 4 4m0-4-4 4" />}
+                  </svg>
                 </button>
               </div>
             </div>
@@ -699,7 +729,19 @@ export function MusicWidget({ conf }: { conf: WidgetConf }) {
           />
         </div>
       ) : (
-        <div className="music-empty">
+        <div
+          style={{
+            minHeight: 88,
+            display: 'grid',
+            placeItems: 'center',
+            padding: '0 12px',
+            textAlign: 'center',
+            fontSize: 10.5,
+            lineHeight: 1.6,
+            opacity: .5,
+            letterSpacing: '.05em',
+          }}
+        >
           {loaded
             ? 'MP3付きのSONG PARODYはまだありません'
             : 'LOADING...'}
@@ -708,7 +750,6 @@ export function MusicWidget({ conf }: { conf: WidgetConf }) {
     </div>
   );
 }
-
 
 /* ---------- D-DAY (4.12 — スケジューラー連携は第3段階) ---------- */
 interface DdayItem { title: string; date: string; plusOne?: boolean }
