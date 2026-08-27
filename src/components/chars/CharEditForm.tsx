@@ -116,6 +116,11 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
     );
 
     onSave({
+      // 既存キャラクター編集では、今回のフォームで触っていない
+      // CHARACTER専用項目（quote / voices / profileFullId / profileBustId 等）を
+      // 絶対に消さない。
+      ...(initial ?? {}),
+
       id:
         initial?.id ??
         (slug || newId()),
