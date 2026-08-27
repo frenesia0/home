@@ -138,6 +138,12 @@ export function MainStoreProvider({ children }: { children: React.ReactNode }) {
         const seenIds = new Set<string>();
         for (const source of parsed.widgets) {
           if ((source.type as string) === 'image') continue;
+          // 旧MEMBERウィジェットは上部LOGIN導線へ統合済み。
+          // 過去の保存レイアウトに残っていてもPCでMUSICの背後に重ならないよう除去する。
+          if ((source.type as string) === 'member' || source.id === 'member') {
+            removed.add(source.id);
+            continue;
+          }
           if (seenIds.has(source.id)) continue; // 과거 DEFAULT_STATE의 MUSIC 중복을 자동 정리
           seenIds.add(source.id);
 
@@ -152,7 +158,14 @@ export function MainStoreProvider({ children }: { children: React.ReactNode }) {
         const ids = new Set(kept.map(w => w.id));
         // 삭제한 기본 위젯은 병합으로 되살리지 않음
         const merged = [...kept, ...DEFAULT_STATE.widgets.filter(w => !ids.has(w.id) && !removed.has(w.id))];
-        setState({ ...DEFAULT_STATE, ...parsed, widgets: merged, removedIds: [...removed] });
+        setState({
+          ...DEFAULT_STATE,
+          ...parsed,
+          widgets: merged,
+          mobileOrder: (parsed.mobileOrder ?? DEFAULT_STATE.mobileOrder)
+            .filter(id => id !== 'member'),
+          removedIds: [...removed],
+        });
       }
     } catch { /* 기본값 사용 */ }
   }, []);
