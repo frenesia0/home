@@ -1526,9 +1526,10 @@ export default function GalleryPage() {
           <section
             className="gallery-tag-mobile"
           >
-            <button
-              type="button"
-              className="gallery-tag-toggle"
+            <div className="gallery-tag-mobile-top">
+              <button
+                type="button"
+                className="gallery-tag-toggle"
               aria-expanded={
                 mobileTagOpen
               }
@@ -1563,7 +1564,34 @@ export default function GalleryPage() {
                   ? '⌃'
                   : '⌄'}
               </span>
-            </button>
+              </button>
+
+              <button
+                type="button"
+                className="gallery-sort-mobile-button"
+                aria-label={
+                  sortOrder === 'newest'
+                    ? '新しい順。押すと古い順に切り替えます'
+                    : '古い順。押すと新しい順に切り替えます'
+                }
+                title={
+                  sortOrder === 'newest'
+                    ? '新しい順'
+                    : '古い順'
+                }
+                onClick={() =>
+                  setSortOrder(current =>
+                    current === 'newest'
+                      ? 'oldest'
+                      : 'newest'
+                  )
+                }
+              >
+                <span aria-hidden="true">
+                  {sortOrder === 'newest' ? '↓' : '↑'}
+                </span>
+              </button>
+            </div>
 
             {mobileTagOpen && (
               <div
@@ -2250,6 +2278,10 @@ export default function GalleryPage() {
           display: none;
         }
 
+        .gallery-sort-mobile-button {
+          display: none;
+        }
+
         .gallery-tag-toggle {
           width: 100%;
           display: grid;
@@ -2532,6 +2564,42 @@ export default function GalleryPage() {
               18px;
           }
 
+          .gallery-tag-mobile-top {
+            display: grid;
+            grid-template-columns:
+              minmax(0, 1fr) 42px;
+            gap: 10px;
+            align-items: stretch;
+          }
+
+          .gallery-tag-mobile-top
+            .gallery-tag-toggle {
+            min-width: 0;
+          }
+
+          .gallery-sort-mobile-button {
+            display: grid;
+            place-items: center;
+            width: 42px;
+            height: 100%;
+            min-height: 42px;
+            padding: 0;
+            border-radius: 12px;
+            border:
+              1px solid
+              rgba(255,255,255,.18);
+            background:
+              rgba(255,255,255,.045);
+            color: #f5f5f5;
+            cursor: pointer;
+          }
+
+          .gallery-sort-mobile-button
+            span {
+            font-size: 17px;
+            line-height: 1;
+          }
+
           .gallery-tag-panel
             button {
             font-size:
@@ -2565,13 +2633,7 @@ export default function GalleryPage() {
           }
 
           .gallery-sort-row {
-            margin:
-              -8px 0 20px;
-          }
-
-          .gallery-sort-row button {
-            width: 42px;
-            height: 40px;
+            display: none;
           }
 
           .gallery-grid {
