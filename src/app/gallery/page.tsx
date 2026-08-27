@@ -1238,23 +1238,20 @@ export default function GalleryPage() {
           />
         )}
 
-        {isAdmin && (
-          <div
-            className="gallery-admin-actions"
+              </section>
+
+      {isAdmin && (
+        <div className="gallery-admin-actions">
+          <button
+            type="button"
+            onClick={() =>
+              router.push('/gallery/add')
+            }
           >
-            <button
-              type="button"
-              onClick={() =>
-                router.push(
-                  '/gallery/add'
-                )
-              }
-            >
-              ＋ ADD WORK
-            </button>
-          </div>
-        )}
-      </section>
+            ＋ ADD WORK
+          </button>
+        </div>
+      )}
 
       {/* =====================
           CATEGORY
@@ -2199,13 +2196,11 @@ export default function GalleryPage() {
         }
 
         .gallery-admin-actions {
-          position: absolute;
-          right: 12px;
-          top: 12px;
-          z-index: 10;
-          display: flex;
-          gap: 8px;
-        }
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: -10px 0 18px;
+}
 
         .gallery-admin-actions button {
           padding: 9px 13px;
@@ -2529,11 +2524,6 @@ export default function GalleryPage() {
                 transparent calc(100% - 9px),
                 #1f232a 100%
               );
-          }
-
-          .gallery-admin-actions {
-            right: 8px;
-            top: 8px;
           }
 
           .gallery-admin-actions button {
