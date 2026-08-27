@@ -319,12 +319,45 @@ export default function AddIllustrationPage() {
      SONG
   ======================================================= */
 
-  const [
+    const [
     songTitle,
     setSongTitle,
   ] =
     useState('');
 
+  const [
+    songCreator,
+    setSongCreator,
+  ] =
+    useState('');
+                    <label
+                      style={
+                        fieldStyle
+                      }
+                    >
+                      <span>
+                        CREATOR
+                      </span>
+
+                      <input
+                        type="text"
+                        value={
+                          songCreator
+                        }
+                        onChange={(
+                          e
+                        ) =>
+                          setSongCreator(
+                            e.target.value
+                          )
+                        }
+                        placeholder="作者名"
+                        style={
+                          inputStyle
+                        }
+                      />
+                    </label>
+  
   const [
     songUrl,
     setSongUrl,
