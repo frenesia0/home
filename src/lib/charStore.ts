@@ -34,12 +34,22 @@ export interface Character {
   arts?: string[];       // 아트 목록 (IndexedDB — 첫 장이 대표 풀 아트이자 썸네일 원본)
   artId?: string;        // (구) 단일 풀 아트
   artUrl?: string;       // (구) 풀 아트 URL
-    profileFullId?: string;   // PC用 全身立ち絵
-  profileBustId?: string;   // スマホ用 腰上立ち絵
-  quote?: string;           // CHARACTER冒頭の台詞
+      /** CHARACTERページで表示する3行の台詞 */
+  quote?: string;
+
+  /** PC版CHARACTERページ専用の全身立ち絵 */
+  profileFullId?: string;
+
+  /** スマホ版CHARACTERページ専用の腰上立ち絵 */
+  profileBustId?: string;
+
+  /** 立ち絵右下に重ねるキャラクターサイン */
+  signId?: string;
+
+  /** サンプルボイス */
   voices?: {
     label: string;
-    audioUrl?: string;
+    audioId?: string;
   }[];
   fontId?: string;       // 전용 폰트 — 이름·타이틀 (5.1)
   /** 상세 페이지 큰 이름의 글씨 크기 px (v2.0) — 기본 38.
@@ -226,7 +236,7 @@ export const CHAR_SEED: Character[] = [
     basicHtml:
       'フレネシア第224代目王ソラスによって造られた人工生命体。<br />知の星であるフレネシアの知識を詰め込んだ存在であるが、人間生活はまだまだ初心者。<br />破天荒なソラスの手綱を握っている。',
     quote:
-      'シキ・ハクレイ。\\nフレネシアの人間は、俺の事を「フレネシアの叡智」だと呼んだりするな。\\n…ハクレイの姓について？ああ、これはソラスのファミリーネームだ。',
+  '「シキ・ハクレイ。\nフレネシアの人間は、俺の事を『フレネシアの叡智』だと呼んだりするな。\n…ハクレイの姓について？ああ、これはソラスのファミリーネームだ。」',
     voices: [
       { label: 'SAMPLE 01' },
       { label: 'SAMPLE 02' },
@@ -257,7 +267,7 @@ export const CHAR_SEED: Character[] = [
     basicHtml:
       '知の星「フレネシア」の第224代目王。<br />基本穏やかで理性的な性格だが、外交時に皮肉を言われると数倍に言い返す幼稚さと頭の回転の速さを持ち合わせる。',
     quote:
-      '第224代目王、ソラス・フレネシア。\\n……そんなに畏まらなくていい。フレネシアにおいて、王の権威はさほど強くないんだ。\\n実際、誰も俺に「様」をつけない……。それはそれでどうなんだろうな？',
+  '「第224代目王、ソラス・フレネシア。\n……そんなに畏まらなくていい。フレネシアにおいて、王の権威はさほど強くないんだ。\n実際、誰も俺に『様』をつけない……。それはそれでどうなんだろうな？」',
     voices: [
       { label: 'SAMPLE 01' },
       { label: 'SAMPLE 02' },
