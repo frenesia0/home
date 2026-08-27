@@ -1,9 +1,6 @@
 'use client';
-// 캐릭터 프로필 상세 (4.4) — 좌측 아이콘 탭 · 중앙 스티키 아트 · 우측 정보 패널
-// 스크롤: 정보가 길면 페이지가 이어지고 탭·아트는 스티키 (v1.9)
-// AU 선택 시 프로필 전체(이름·스펙·아트·탭·소개)가 그 AU의 값으로 전환 (charWithAu) —
-// 편집은 EDIT → /character/[id]/edit?au= 전용 페이지에서 새 프로필처럼 작성 (v1.9 사용자 확정)
-import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useLocalList } from '@/lib/postStore';
@@ -11,319 +8,168 @@ import { Character, CHAR_SEED, charGrant, charWithAu, Relation, REL_SEED } from 
 import { sanitizeHtml } from '@/lib/sanitize';
 import { useFonts } from '@/lib/fontStore';
 import { useTheme } from '@/lib/ThemeProvider';
-import { createPortal } from 'react-dom';
-import { BlobImg, useBlobUrl } from '@/lib/blobStore';
-import { CroppedBlobImg, CropEditor, type CropValue } from '@/components/ui/CropEditor';
-
-import { EditableDesc, PageTitle } from '@/components/ui/PageText';
+import { useBlobUrl } from '@/lib/blobStore';
 import { ConfirmModal } from '@/components/ui/Modal';
 
-function CharDetailInner() {
+const textOf = (c: Character) => `${c.id} ${c.name} ${c.sub}`.toLowerCase();
+const isShiki = (c: Character) => textOf(c).includes('shiki') || textOf(c).includes('シキ');
+const isSolas = (c: Character) => textOf(c).includes('solas') || textOf(c).includes('ソラス');
+
+function ProfileArt({ fullRef, bustRef, alt }: { fullRef?: string; bustRef?: string; alt: string }) {
+  const fullUrl = useBlobUrl(fullRef);
+  const bustUrl = useBlobUrl(bustRef ?? fullRef);
+  const mobileUrl = bustUrl ?? fullUrl;
+
+  if (!fullUrl && !mobileUrl) {
+    return <div className="char-art-empty">CHARACTER ART</div>;
+  }
+
+  return (
+    <>
+      {fullUrl && <img className="char-art-full" src={fullUrl} alt={alt} draggable={false} />}
+      {mobileUrl && <img className="char-art-bust" src={mobileUrl} alt={alt} draggable={false} />}
+    </>
+  );
+}
+
+function CharacterDetailInner() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const params = useSearchParams();
   const { user, isAdmin } = useAuth();
   const [chars, setChars, loaded] = useLocalList<Character>('ohome.chars.v1', CHAR_SEED);
   const [rels] = useLocalList<Relation>('ohome.rels.v1', REL_SEED);
   const { familyOf } = useFonts();
-  const params = useSearchParams();
-  const [tab, setTab] = useState('basic');
-  const [artIdx, setArtIdx] = useState(0);
-  const [delAsk, setDelAsk] = useState(false);   // 캐릭터 삭제 확인
-  const infoRef = useRef<HTMLDivElement>(null);
+  const { setPageTheme } = useTheme();
+  const [delAsk, setDelAsk] = useState(false);
+  const [playingVoice, setPlayingVoice] = useState<number | null>(null);
 
   const ch = chars.find(c => c.id === id);
-
-  // AU 프로필 (v1.9) — 이 캐릭터가 속한 자관들의 AU 리스트 (base 제외), 우상단에 썸네일로
-  const charAus = useMemo(() => (ch
-    ? rels.flatMap(r => r.members.some(m => m.charId === ch.id)
-      ? r.aus.filter(a => a.id !== 'base').map(a => ({ key: `${r.id}:${a.id}`, label: a.label, relName: r.name }))
-      : [])
-    : []), [rels, ch]);
-  // AU 편집에서 ?au= 로 돌아오면 그 AU가 선택된 채 시작
   const [auKey, setAuKey] = useState<string | null>(() => params.get('au'));
-  // 대표 아트 우클릭 → 상세 화면에 보일 위치 조정 (v2.0)
-  const [artCtx, setArtCtx] = useState<{ x: number; y: number; ref: string } | null>(null);
-  // 편집 중인 아트 참조 + 그때 실제 표시 영역의 가로/세로 비 (3:4가 아니라 화면 높이에 따라 달라진다)
-  const [artCropOpen, setArtCropOpen] = useState<{ ref: string; ratio: number } | null>(null);
-  const artBoxRef = useRef<HTMLDivElement>(null);
-  const artBoxRatio = () => {
-    const r = artBoxRef.current?.getBoundingClientRect();
-    return r && r.height > 1 ? r.width / r.height : 3 / 4;
-  };
-  useEffect(() => {
-    if (!artCtx) return;
-    const close = () => setArtCtx(null);
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setArtCtx(null); };
-    window.addEventListener('click', close);
-    window.addEventListener('keydown', key);
-    return () => { window.removeEventListener('click', close); window.removeEventListener('keydown', key); };
-  }, [artCtx]);
-  // AU는 "새로 등록"하는 프로필 (v1.9 사용자 확정) — 등록 전엔 base를 보여주지 않고 등록 안내
-  const auRegistered = !auKey || !!ch?.auProfiles?.[auKey];
-  // 표시용 캐릭터 — AU에서 지정한 필드만 base를 대체 (이름·키·성별부터 전부 바뀔 수 있음)
+  const charAus = useMemo(() => ch ? rels.flatMap(r => r.members.some(m => m.charId === ch.id)
+    ? r.aus.filter(a => a.id !== 'base').map(a => ({ key: `${r.id}:${a.id}`, label: a.label }))
+    : []) : [], [rels, ch]);
   const eff = ch ? charWithAu(ch, auKey) : undefined;
+  const auRegistered = !auKey || !!ch?.auProfiles?.[auKey];
 
-  /** 상세 화면 아트 위치 저장 (v2.0) — AU를 보는 중이면 그 AU에만, 아니면 원본에 */
-  const saveArtCrop = (c: CropValue | undefined) => {
-    setChars(chars.map(x => {
-      if (x.id !== id) return x;
-      if (!auKey) return { ...x, artCrop: c };
-      return { ...x, auProfiles: { ...x.auProfiles, [auKey]: { ...x.auProfiles?.[auKey], artCrop: c } } };
-    }));
-  };
-
-  // AU 전환 시 탭 구성·아트가 달라지므로 리셋
-  useEffect(() => { setTab('basic'); setArtIdx(0); }, [auKey]);
-
-  // 캐릭터 테마색 → 페이지 임시 테마 (4.18 방식, v1.9) — 「캐릭터 테마색」 선택 시에만, 벗어나면 원복
-  const { setPageTheme } = useTheme();
-  const pageColor = auRegistered && eff?.themeMode === 'custom' ? eff.color : null;
   useEffect(() => {
-    setPageTheme(pageColor);
+    const color = auRegistered && eff?.themeMode === 'custom' ? eff.color : null;
+    setPageTheme(color);
     return () => setPageTheme(null);
-  }, [pageColor, setPageTheme]);
+  }, [auRegistered, eff, setPageTheme]);
 
-  const curTab = eff?.tabs.find(t => t.id === tab);
-  const tabHtml = useMemo(
-    () => (loaded && curTab ? sanitizeHtml(curTab.html) : ''),
-    [loaded, curTab],
-  );
-  const basicHtml = useMemo(
-    () => (loaded && eff ? sanitizeHtml(eff.basicHtml) : ''),
-    [loaded, eff],
-  );
+  const basicHtml = useMemo(() => loaded && eff ? sanitizeHtml(eff.basicHtml) : '', [loaded, eff]);
 
   if (!loaded) return <section className="page" />;
-  if (!ch || !eff) {
-    return (
-      <section className="page">
-        <div className="page-head"><PageTitle>CHARACTER</PageTitle><p>キャラクターが見つかりません</p></div>
-      </section>
-    );
-  }
-  if (ch.visibility === 'private' && !isAdmin) {
-    return (
-      <section className="page">
-        <div className="page-head"><PageTitle>CHARACTER</PageTitle><p>非公開のキャラクターです</p></div>
-      </section>
-    );
-  }
-  if (ch.visibility === 'member' && !user) {
-    return (
-      <section className="page">
-        <div className="page-head"><PageTitle>CHARACTER</PageTitle><p>メンバー限定公開です。ログイン後に閲覧できます。</p></div>
-      </section>
-    );
-  }
+  if (!ch || !eff) return <section className="page"><p>キャラクターが見つかりません。</p></section>;
+  if (ch.visibility === 'private' && !isAdmin) return <section className="page"><p>非公開のキャラクターです。</p></section>;
+  if (ch.visibility === 'member' && !user) return <section className="page"><p>メンバー限定公開です。</p></section>;
 
-  // 탭 전환 시 정보 상단이 화면 맨 위로 오도록 스크롤 (모바일형, v1.9)
-  const pickTab = (t: string) => {
-    setTab(t);
-    if (window.matchMedia('(max-width:960px)').matches) {
-      infoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
-
+  const visible = chars.filter(c => c.own && (isAdmin || c.visibility === 'public' || (c.visibility === 'member' && !!user)));
+  const shiki = visible.find(isShiki);
+  const solas = visible.find(isSolas);
+  const fullRef = eff.profileFullId ?? eff.arts?.[0] ?? eff.artId;
+  const bustRef = eff.profileBustId ?? eff.profileFullId ?? eff.arts?.[0] ?? eff.artId;
+  const galleryCharacter = isSolas(ch) ? 'solas' : 'shiki';
   const editHref = auKey ? `/character/${ch.id}/edit?au=${encodeURIComponent(auKey)}` : `/character/${ch.id}/edit`;
+  const voices = Array.from({ length: 3 }, (_, i) => ({
+    label: eff.voices?.[i]?.label?.trim() || `SAMPLE ${String(i + 1).padStart(2, '0')}`,
+    audioUrl: eff.voices?.[i]?.audioUrl?.trim() || '',
+  }));
+
+  if (auKey && !auRegistered) {
+    return (
+      <section className="page character-page">
+        <button className="au-back" onClick={() => setAuKey(null)}>← ORIGINAL</button>
+        <div className="au-empty">このAUの「{ch.name}」はまだ登録されていません。</div>
+      </section>
+    );
+  }
 
   return (
-    <section className="page page-char-detail">
-      <div className="page-head">
-        {/* 제목 자리는 메뉴 이름 — 클릭 시 목록 복귀. 캐릭터 이름은 우측 프로필 패널에 크게 표시 */}
-        <PageTitle>CHARACTER</PageTitle>
-        {/* 캐릭터별로 별도 저장 — 키에 캐릭터 id 포함 */}
-        <EditableDesc k={`char-detail-desc:${ch.id}`} def="左のアイコンタブからプロフィール情報を切り替えられます" />
-        <div className="head-actions">
-          {/* 관리자 또는 「편집까지」 권한 회원 (3차 회원-캐릭터 연결, v1.9)
-              — AU 선택 상태의 EDIT은 그 AU 전용 프로필 편집으로 진입 */}
-          {(isAdmin || charGrant(ch, user?.id) === 'edit') && (
+    <section className="page character-page">
+      <div className="char-head">
+        <h1>CHARACTER</h1>
+        <div className="char-switch">
+          <button className={isShiki(ch) ? 'on' : ''} disabled={!shiki} onClick={() => shiki && router.push(`/character/${shiki.id}`)}>SHIKI</button>
+          <span>/</span>
+          <button className={isSolas(ch) ? 'on' : ''} disabled={!solas} onClick={() => solas && router.push(`/character/${solas.id}`)}>SOLAS</button>
+        </div>
+        {(isAdmin || charGrant(ch, user?.id) === 'edit') && (
+          <div className="char-admin">
             <button className="btn btn-dark" onClick={() => router.push(editHref)}>EDIT</button>
-          )}
-          {isAdmin && <button className="btn btn-dark" onClick={() => setDelAsk(true)}>DELETE</button>}
-        </div>
-
-        <ConfirmModal open={delAsk} title="キャラクターを削除しますか？"
-          body="プロフィールとタブ情報も削除され、元に戻せません。関連データ上のこのキャラクター表示も消えます。"
-          onClose={() => setDelAsk(false)}
-          buttons={[
-            { label: 'DELETE', kind: 'accent', onClick: () => { setChars(chars.filter(c => c.id !== ch.id)); router.push('/character'); } },
-            { label: 'CANCEL', kind: 'ghost', onClick: () => setDelAsk(false) },
-          ]} />
+            {isAdmin && <button className="btn btn-dark" onClick={() => setDelAsk(true)}>DELETE</button>}
+          </div>
+        )}
       </div>
-      {/* AU 프로필 리스트 (v1.9) — 자관에 추가된 AU가 있으면 우상단, 각 AU의 저장 썸네일 기준 */}
+
       {charAus.length > 0 && (
-        <div className="au-list" style={{ justifyContent: 'flex-end', marginBottom: 10 }}>
-          <div className={`au-item ${auKey === null ? 'on' : ''} ph ${ch.thumbClass}`} style={{ borderColor: auKey === null ? 'var(--accent)' : 'var(--line)' }}
-            onClick={() => setAuKey(null)}>
-            {(ch.thumbId || ch.arts?.[0]) && <CroppedBlobImg fileRef={ch.thumbId ?? ch.arts?.[0]} crop={ch.thumbCrop} ph={ch.thumbClass} />}
-            <small>ORIGINAL</small>
-          </div>
-          {charAus.map(a => {
-            const av = charWithAu(ch, a.key);   // AU 저장분 반영된 썸네일 (없으면 base)
-            return (
-              <div key={a.key} className={`au-item ${auKey === a.key ? 'on' : ''} ph ${ch.thumbClass}`}
-                style={{ borderColor: auKey === a.key ? 'var(--accent)' : 'var(--line)' }}
-                data-tip={`${a.relName} · ${a.label}`}
-                onClick={() => setAuKey(a.key)}>
-                {(av.thumbId || av.arts?.[0]) && (
-                  <CroppedBlobImg fileRef={av.thumbId ?? av.arts?.[0]} crop={av.thumbCrop} ph={ch.thumbClass} />
-                )}
-                <small>{a.label}</small>
-              </div>
-            );
-          })}
+        <div className="au-switch">
+          <button className={!auKey ? 'on' : ''} onClick={() => setAuKey(null)}>ORIGINAL</button>
+          {charAus.map(a => <button key={a.key} className={auKey === a.key ? 'on' : ''} onClick={() => setAuKey(a.key)}>{a.label}</button>)}
         </div>
       )}
-      {/* AU 미등록 (v1.9 사용자 확정) — base를 보여주지 않고 그 AU에 맞춰 캐릭터를 새로 등록 */}
-      {auKey && !auRegistered ? (
-        <div className="panel" style={{ textAlign: 'center', padding: 56 }}>
-          <div style={{ fontFamily: 'var(--serif)', fontSize: 24, letterSpacing: '.14em', marginBottom: 8 }}>
-            {charAus.find(a => a.key === auKey)?.label ?? 'AU'}
-          </div>
-          <p style={{ fontSize: 13, color: 'var(--faint)', marginBottom: 16 }}>
-            このAUの「{ch.name}」はまだ登録されていません。登録すると、このキャラクターのAUプロフィールとして連携されます。
-          </p>
-          {(isAdmin || charGrant(ch, user?.id) === 'edit') && (
-            <button className="btn btn-dark" onClick={() => router.push(editHref)}>＋ AUキャラクターを登録</button>
-          )}
-        </div>
-      ) : (
-      <div className="profile-wrap">
-        {/* 좌측 아이콘 탭 — AU면 그 AU의 탭 구성 */}
-        <div className="side-icons">
-          <button className={tab === 'basic' ? 'on' : ''} data-tip="基本情報" onClick={() => pickTab('basic')}>☰</button>
-          {eff.tabs.map(t => (
-            <button key={t.id} className={tab === t.id ? 'on' : ''} data-tip={t.title} onClick={() => pickTab(t.id)}>{t.icon}</button>
-          ))}
-          {isAdmin && (
-            <button data-tip="タブを追加（編集モード）" style={{ borderStyle: 'dashed', fontSize: 13 }}
-              onClick={() => router.push(editHref)}>＋</button>
-          )}
-        </div>
 
-        {/* 중앙 아트 — 스티키 · 추가 아트가 있으면 클릭으로 넘겨보기 */}
-        {(() => {
-          const arts = eff.arts && eff.arts.length > 0 ? eff.arts : (eff.artId ? [eff.artId] : []);
-          if (arts.length === 0 && !eff.artUrl) {
-            return <div className={`profile-center ph ${ch.thumbClass}`}><span>CHARACTER FULL ART</span></div>;
-          }
-          const cur = Math.min(artIdx, arts.length - 1);
-          return (
-            <div className="profile-center" ref={artBoxRef}
-              style={{ cursor: arts.length > 1 ? 'pointer' : undefined }}
-              onClick={() => { if (arts.length > 1) setArtIdx(i => (i + 1) % arts.length); }}
-              /* 대표 아트 우클릭 → 이 화면에 보일 위치 조정 (관리자, v2.0 사용자 확정) */
-              onContextMenu={e => {
-                if (!(isAdmin || charGrant(ch, user?.id) === 'edit') || cur !== 0) return;
-                e.preventDefault();
-                setArtCtx({ x: e.clientX, y: e.clientY, ref: arts[0] });
-              }}>
-              {/* 지정한 크롭 위치를 여기서도 쓴다 — 예전에는 가운데 기준으로 잘려서
-                  리스트에서 맞춰 둔 위치와 다른 곳이 보였다 (대표 아트에만 적용) */}
-              {/* 리스트 썸네일 크롭은 3:4 기준이라 여기(화면 높이에 따라 비율이 달라지는 영역)에는
-                  맞지 않는다 — 여기서 따로 잡은 값이 있을 때만 쓰고, 없으면 가운데 기준 (v2.0) */}
-              <CroppedBlobImg fileRef={arts[cur] ?? eff.artUrl}
-                crop={cur === 0 ? eff.artCrop : undefined}
-                ph={ch.thumbClass} label="CHARACTER FULL ART" />
-              {arts.length > 1 && (
-                <div style={{ position: 'absolute', left: 0, right: 0, bottom: 12, display: 'flex', justifyContent: 'center', gap: 5, zIndex: 3 }}>
-                  {arts.map((_, i) => (
-                    <i key={i} style={{
-                      width: i === cur ? 16 : 6, height: 6, borderRadius: 4,
-                      background: i === cur ? '#fff' : 'rgba(255,255,255,.45)', transition: '.2s',
-                    }} />
-                  ))}
-                </div>
-              )}
+      <div className="char-hero" style={{ '--char-color': eff.color || '#8083D6' } as React.CSSProperties}>
+        <div className="char-copy" style={{ fontFamily: familyOf(eff.bodyFontId) }}>
+          <div className="char-name" style={{ fontFamily: familyOf(eff.fontId) ?? 'var(--serif)', fontSize: eff.nameSize ?? 48 }}>{eff.name}</div>
+          {eff.sub && <div className="char-sub">{eff.sub}</div>}
+
+          {eff.quote?.trim() && <blockquote>{eff.quote}</blockquote>}
+          {basicHtml && <div className="char-intro prose" dangerouslySetInnerHTML={{ __html: basicHtml }} />}
+
+          <section className="profile-section">
+            <h2>PROFILE</h2>
+            <dl>
+              {eff.specs.map(s => <React.Fragment key={`${s.label}-${s.value}`}><dt>{s.label}</dt><dd>{s.value}</dd></React.Fragment>)}
+            </dl>
+          </section>
+
+          <section className="voice-section">
+            <h2>VOICE</h2>
+            <div className="voice-grid">
+              {voices.map((v, i) => (
+                <button key={i} disabled={!v.audioUrl} className={playingVoice === i ? 'playing' : ''} onClick={() => {
+                  if (!v.audioUrl) return;
+                  const audio = new Audio(v.audioUrl);
+                  setPlayingVoice(i);
+                  audio.play().catch(() => setPlayingVoice(null));
+                  audio.addEventListener('ended', () => setPlayingVoice(null), { once: true });
+                }}>
+                  <span>{playingVoice === i ? 'Ⅱ' : '▶'}</span>{v.label}
+                </button>
+              ))}
             </div>
-          );
-        })()}
+          </section>
 
-        {/* 우측 정보 패널 — 최상단 캐릭터 이름 크게 (v1.6) · AU면 그 AU의 이름·폰트 */}
-        <div className="panel profile-info" ref={infoRef} style={{ fontFamily: familyOf(eff.bodyFontId) }}>
-          {/* 크기는 캐릭터마다 직접 정한다 (등록·수정의 「이름 크기」) — 자동으로 줄이면
-              이름 길이에 따라 어중간해져서, 정한 크기를 그대로 쓴다 (v2.0 사용자 확정) */}
-          <div style={{
-            fontFamily: familyOf(eff.fontId) ?? 'var(--serif)', fontSize: eff.nameSize ?? 38,
-            fontWeight: 600, letterSpacing: '.2em', lineHeight: 1.1,
-          }}>{eff.name}</div>
-          <div className="sub" style={{ marginBottom: 14 }}>{eff.sub}</div>
+          <button className="gallery-link" onClick={() => router.push(`/gallery?character=${galleryCharacter}`)}>
+            VIEW GALLERY <span>→</span>
+          </button>
+        </div>
 
-          {tab === 'basic' ? (
-            <>
-              {/* 기본 정보 탭은 제목을 두지 않는다 — 처음 보이는 화면이라 안내가 필요 없다
-                  (다른 탭은 무엇을 보는 중인지 알아야 하므로 제목을 그대로 둔다) */}
-              <dl className="spec">
-                {eff.specs.map(s => (
-                  <React.Fragment key={s.label}><dt>{s.label}</dt><dd>{s.value}</dd></React.Fragment>
-                ))}
-                {eff.colors.length > 0 && (
-                  <>
-                    <dt>テーマカラー</dt>
-                    <dd>
-                      <span style={{ display: 'inline-flex', gap: 7, alignItems: 'center' }}>
-                        {/* 색 점 나열 — hex는 호버 툴팁만 (v1.8) */}
-                        {eff.colors.map(c => {
-                          // 툴팁 표기: hex / 이름+hex / 이름만 (등록 시 선택)
-                          const tip = eff.colorTipMode === 'label' ? (c.label || c.hex.toUpperCase())
-                            : eff.colorTipMode === 'both' ? (c.label ? `${c.label} · ${c.hex.toUpperCase()}` : c.hex.toUpperCase())
-                            : c.hex.toUpperCase();
-                          return <span key={c.hex + c.label} className="sw-static" data-hex={tip} style={{ background: c.hex }} />;
-                        })}
-                      </span>
-                    </dd>
-                  </>
-                )}
-              </dl>
-              <div className="prose" dangerouslySetInnerHTML={{ __html: basicHtml }} />
-            </>
-          ) : (
-            <>
-              <h3>{curTab?.title}</h3>
-              {curTab?.subtitle && <div className="sub">{curTab.subtitle}</div>}
-              <div className="prose" dangerouslySetInnerHTML={{ __html: tabHtml }} />
-            </>
-          )}
+        <div className="char-art">
+          <div className="char-glow" />
+          <ProfileArt fullRef={fullRef} bustRef={bustRef} alt={eff.name} />
         </div>
       </div>
-      )}
 
-      {/* 대표 아트 우클릭 메뉴 (v2.0) — 상세 화면에 보일 위치 조정 */}
-      {artCtx && createPortal(
-        <div className="ctx-menu on" style={{ left: artCtx.x, top: artCtx.y }} onClick={e => e.stopPropagation()}>
-          <div className="ctx-ttl">代表アート</div>
-          <button onClick={() => { setArtCropOpen({ ref: artCtx.ref, ratio: artBoxRatio() }); setArtCtx(null); }}>
-            画像位置を調整
-          </button>
-          {(eff?.artCrop) && (
-            <button onClick={() => { saveArtCrop(undefined); setArtCtx(null); }}>位置指定を解除</button>
-          )}
-        </div>,
-        document.body,
-      )}
-      {artCropOpen && (
-        <ArtCropModal fileRef={artCropOpen.ref} ratio={artCropOpen.ratio} crop={eff?.artCrop}
-          onClose={() => setArtCropOpen(null)}
-          onApply={c => { saveArtCrop(c); setArtCropOpen(null); }} />
-      )}
+      <div className="char-bottom-switch">
+        <button className={isShiki(ch) ? 'on' : ''} disabled={!shiki} onClick={() => shiki && router.push(`/character/${shiki.id}`)}><small>01</small> SHIKI</button>
+        <i />
+        <button className={isSolas(ch) ? 'on' : ''} disabled={!solas} onClick={() => solas && router.push(`/character/${solas.id}`)}><small>02</small> SOLAS</button>
+      </div>
+
+      <ConfirmModal open={delAsk} title="キャラクターを削除しますか？" body="プロフィール情報も削除され、元に戻せません。" onClose={() => setDelAsk(false)} buttons={[
+        { label: 'DELETE', kind: 'accent', onClick: () => { setChars(chars.filter(c => c.id !== ch.id)); router.push('/character'); } },
+        { label: 'CANCEL', kind: 'ghost', onClick: () => setDelAsk(false) },
+      ]} />
+
+      <style jsx>{`
+        .character-page{max-width:1240px;margin:0 auto;padding-top:30px;padding-bottom:70px}.char-head{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;margin-bottom:14px}.char-head h1{margin:0;font-size:12px;letter-spacing:.18em;color:var(--faint)}.char-switch{display:flex;align-items:center;gap:10px;font-size:10px;letter-spacing:.14em}.char-switch button{padding:5px 2px;color:var(--faint);border-bottom:1px solid transparent}.char-switch button.on{color:var(--text);border-color:currentColor}.char-switch span{opacity:.25}.char-admin{justify-self:end;display:flex;gap:8px}.au-switch{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-bottom:10px}.au-switch button{padding:6px 10px;border:1px solid var(--line);border-radius:999px;color:var(--faint);font-size:9px}.au-switch button.on{color:var(--text);border-color:var(--accent)}.char-hero{display:grid;grid-template-columns:minmax(400px,.92fr) minmax(420px,1.08fr);min-height:min(760px,calc(100vh - 150px));overflow:hidden;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.char-copy{z-index:3;align-self:center;padding:52px 42px 48px 16px}.char-name{font-weight:600;line-height:1.05;letter-spacing:.07em;overflow-wrap:anywhere}.char-sub{margin-top:8px;color:var(--faint);font-size:11px;letter-spacing:.1em}.char-copy blockquote{margin:26px 0;padding-left:18px;border-left:2px solid var(--char-color);white-space:pre-line;color:var(--sub);font-size:14px;line-height:1.9}.char-intro{margin-bottom:30px;color:var(--sub);font-size:13px;line-height:1.9}.profile-section,.voice-section{margin-top:28px}.profile-section h2,.voice-section h2{margin:0 0 14px;color:var(--faint);font-size:10px;letter-spacing:.18em}.profile-section dl{display:grid;grid-template-columns:112px 1fr;margin:0;border-top:1px solid var(--line)}.profile-section dt,.profile-section dd{min-height:34px;margin:0;padding:8px 0;border-bottom:1px solid var(--line);font-size:11px;line-height:1.55}.profile-section dt{color:var(--faint);letter-spacing:.08em;text-transform:uppercase}.profile-section dd{color:var(--sub)}.voice-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.voice-grid button{min-height:38px;padding:8px 10px;border:1px solid var(--line);border-radius:999px;color:var(--sub);font-size:9px;letter-spacing:.06em}.voice-grid button span{margin-right:6px}.voice-grid button:disabled{opacity:.35;cursor:default}.voice-grid button.playing{border-color:var(--char-color);color:var(--text)}.gallery-link{width:100%;min-height:46px;margin-top:22px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--line);border-bottom:1px solid var(--line);color:var(--text);font-size:10px;letter-spacing:.16em}.char-art{position:relative;min-width:0;min-height:640px}.char-glow{position:absolute;inset:12% 0 0 4%;background:radial-gradient(circle at 55% 42%,color-mix(in srgb,var(--char-color) 24%,transparent),transparent 58%);filter:blur(16px);opacity:.75}.char-art :global(.char-art-full){position:absolute;z-index:2;right:0;bottom:0;width:auto;height:min(96%,735px);max-width:100%;object-fit:contain;filter:drop-shadow(0 24px 34px rgba(0,0,0,.22))}.char-art :global(.char-art-bust){display:none}.char-art :global(.char-art-empty){position:absolute;inset:0;display:grid;place-items:center;color:var(--faint);font-size:10px;letter-spacing:.14em}.char-bottom-switch{margin-top:24px;display:flex;justify-content:center;align-items:center;gap:18px}.char-bottom-switch button{display:flex;align-items:baseline;gap:8px;color:var(--faint);font-size:10px;letter-spacing:.14em}.char-bottom-switch button.on{color:var(--text)}.char-bottom-switch small{font-size:8px;opacity:.55}.char-bottom-switch i{width:44px;height:1px;background:var(--line)}.au-back{margin-bottom:18px;color:var(--faint);font-size:10px}.au-empty{padding:60px 18px;text-align:center;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+        @media(max-width:900px){.character-page{padding-top:18px}.char-head{grid-template-columns:1fr auto}.char-switch{grid-column:1/-1;grid-row:2;justify-content:center;margin-top:10px}.char-admin{grid-column:2;grid-row:1}.char-hero{display:flex;flex-direction:column;min-height:0;overflow:visible;border-top:0}.char-art{order:1;width:100%;height:min(118vw,520px);min-height:360px;overflow:hidden;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.char-art :global(.char-art-full){display:none}.char-art :global(.char-art-bust){display:block;position:absolute;z-index:2;left:50%;bottom:0;width:auto;height:96%;max-width:none;transform:translateX(-50%);object-fit:contain;filter:drop-shadow(0 18px 24px rgba(0,0,0,.18))}.char-copy{order:2;padding:34px 2px 28px}.char-name{font-size:clamp(34px,11vw,48px)!important}.char-copy blockquote{font-size:13px}.char-intro{font-size:12.5px}.profile-section dl{grid-template-columns:96px 1fr}.voice-grid{grid-template-columns:1fr}.voice-grid button{min-height:44px;text-align:left;padding-left:16px}.char-bottom-switch{margin-top:18px}}
+      `}</style>
     </section>
   );
 }
 
-/** 상세 아트 위치 편집기 (v2.0) — 실제 표시 영역의 비율 그대로 열어야 보이는 대로 맞출 수 있다.
- *  이 영역은 화면 높이에 따라 달라지므로 고정 비율(3:4 등)을 쓰면 편집기와 결과가 어긋난다. */
-function ArtCropModal({ fileRef, ratio, crop, onClose, onApply }: {
-  fileRef: string; ratio: number; crop?: CropValue; onClose: () => void; onApply: (c: CropValue) => void;
-}) {
-  const url = useBlobUrl(fileRef);
-  if (!url) return null;
-  return (
-    <CropEditor open src={url} aspect={ratio} aspectLabel="詳細画面と同じ比率"
-      initial={crop} onClose={onClose} onApply={onApply} />
-  );
-}
-
-export default function CharDetailPage() {
-  // useSearchParams는 Suspense 경계 필요 (Next App Router)
-  return <Suspense fallback={<section className="page" />}><CharDetailInner /></Suspense>;
-}
+export default function CharacterDetailPage(){return <Suspense fallback={<section className="page"/>}><CharacterDetailInner/></Suspense>}
