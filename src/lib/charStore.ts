@@ -34,6 +34,13 @@ export interface Character {
   arts?: string[];       // 아트 목록 (IndexedDB — 첫 장이 대표 풀 아트이자 썸네일 원본)
   artId?: string;        // (구) 단일 풀 아트
   artUrl?: string;       // (구) 풀 아트 URL
+    profileFullId?: string;   // PC用 全身立ち絵
+  profileBustId?: string;   // スマホ用 腰上立ち絵
+  quote?: string;           // CHARACTER冒頭の台詞
+  voices?: {
+    label: string;
+    audioUrl?: string;
+  }[];
   fontId?: string;       // 전용 폰트 — 이름·타이틀 (5.1)
   /** 상세 페이지 큰 이름의 글씨 크기 px (v2.0) — 기본 38.
    *  이름 길이가 제각각이라 자동으로 줄이면 어중간해진다. 캐릭터마다 직접 정한다. */
