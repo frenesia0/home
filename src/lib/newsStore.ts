@@ -32,7 +32,10 @@ export const NEWS_TAGS: {
   label: string;
 }[] = [
   { value: 'news', label: 'NEWS' },
-  { value: 'world', label: '世界観説明' },
+{
+  value: 'world',
+  label: 'WORLD',
+},
   { value: 'solas', label: 'SOLAS' },
   { value: 'shiki', label: 'SHIKI' },
 ];
