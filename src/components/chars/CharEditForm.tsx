@@ -993,13 +993,49 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
           </div>
         </div>
         <div className="form-actions">
-          <button className="btn btn-accent" onClick={onCancel} disabled={saving}>CANCEL</button>
           <button
-            className="btn btn-onbk"
+            onClick={onCancel}
+            disabled={saving}
+            style={{
+              minWidth: 112,
+              minHeight: 42,
+              padding: '10px 14px',
+              borderRadius: 8,
+              border: '1px solid rgba(255,255,255,.18)',
+              background: 'rgba(255,255,255,.07)',
+              color: '#f5f5f5',
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: '.06em',
+              cursor: saving ? 'wait' : 'pointer',
+              opacity: saving ? 0.65 : 1,
+            }}
+          >
+            CANCEL
+          </button>
+
+          <button
             onClick={save}
             disabled={saving}
             aria-busy={saving}
-            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, minWidth: 112 }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              minWidth: 112,
+              minHeight: 42,
+              padding: '10px 14px',
+              borderRadius: 8,
+              border: '1px solid rgba(255,255,255,.35)',
+              background: '#f1f1f1',
+              color: '#17191d',
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: '.06em',
+              cursor: saving ? 'wait' : 'pointer',
+              opacity: saving ? 0.65 : 1,
+            }}
           >
             {saving ? <><span className="save-spinner" />保存中…</> : (isNew ? 'ADD' : 'SAVE')}
           </button>
