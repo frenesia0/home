@@ -119,9 +119,10 @@ export const COLLECTION_OF: Record<string, string> = {
   'ohome.playlog.v1': 'playlog',
   'ohome.rp.v1': 'rp_rooms',
   'ohome.threads.v1': 'threads',
-  'ohome.diary.v1': 'diary',
-  'ohome.memo.v1': 'memos',
-  'ohome.comm.v1': 'commissions',
+'ohome.diary.v1': 'diary',
+'ohome.news.v1': 'news',
+'ohome.memo.v1': 'memos',
+'ohome.comm.v1': 'commissions',
   'ohome.commapply.v1': 'applicants',
   'ohome.moods.v1': 'moods',
 

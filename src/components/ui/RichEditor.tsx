@@ -161,7 +161,16 @@ export function RichEditor({
         </span>
       </div>
 
-      <div className="re-body">
+      <div
+  className="re-wrap"
+  style={{
+    background: '#1b1e25',
+    border: '1px solid rgba(255,255,255,.18)',
+    borderRadius: 6,
+    overflow: 'hidden',
+    color: '#f5f5f5',
+  }}
+>
         <EditorContent editor={editor} />
         {placeholder && editor.isEmpty && (
           <div className="re-ph">{placeholder}</div>

@@ -406,7 +406,9 @@ function CharacterDetailInner() {
 
 .char-bottom-switch{margin-top:24px;display:flex;justify-content:center;align-items:center;gap:18px}.char-bottom-switch button{display:flex;align-items:baseline;gap:8px;color:var(--faint);font-size:10px;letter-spacing:.14em}.char-bottom-switch button.on{color:var(--text)}.char-bottom-switch small{font-size:8px;opacity:.55}.char-bottom-switch i{width:44px;height:1px;background:var(--line)}.au-back{margin-bottom:18px;color:var(--faint);font-size:10px}.au-empty{padding:60px 18px;text-align:center;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
         @media(max-width:900px){
-.character-page{padding-top:18px}
+        .character-page{
+  padding-top:18px !important;
+}
 .char-head{grid-template-columns:1fr auto}
 .char-switch{grid-column:1/-1;grid-row:2;justify-content:center;margin-top:10px}
 .char-admin{grid-column:2;grid-row:1}
@@ -1212,6 +1214,69 @@ function CharacterDetailInner() {
     padding:6px 8px !important;
     font-size:9px !important;
     line-height:1 !important;
+    white-space:nowrap !important;
+  }
+}
+
+@media(max-width:900px){
+  .char-head{
+    display:flex !important;
+    flex-wrap:nowrap !important;
+    align-items:center !important;
+    gap:8px !important;
+    width:100% !important;
+    min-width:0 !important;
+  }
+
+  .char-head h1{
+    flex:0 0 auto !important;
+    white-space:nowrap !important;
+  }
+
+  .char-switch{
+    flex:1 1 auto !important;
+    min-width:0 !important;
+    display:flex !important;
+    flex-wrap:nowrap !important;
+    align-items:center !important;
+    justify-content:center !important;
+    gap:6px !important;
+    white-space:nowrap !important;
+  }
+
+  .char-switch button,
+  .char-switch span{
+    flex:0 0 auto !important;
+    white-space:nowrap !important;
+  }
+
+  .char-admin{
+    flex:0 0 auto !important;
+    margin-left:auto !important;
+  }
+}
+
+
+/* --- CHARACTER heading: match GALLERY --- */
+.char-head h1{
+  margin:0 0 8px !important;
+  color:#f5f5f5 !important;
+  font-family:var(--sans) !important;
+  font-size:32px !important;
+  font-weight:700 !important;
+  line-height:1 !important;
+  letter-spacing:.08em !important;
+}
+
+/* Mobile keeps the one-line CHARACTER / SHIKI-SOLAS / EDIT layout. */
+@media(max-width:900px){
+  .char-head h1{
+    margin:0 !important;
+    font-family:var(--sans) !important;
+    font-size:18px !important;
+    font-weight:700 !important;
+    line-height:1 !important;
+    letter-spacing:.08em !important;
     white-space:nowrap !important;
   }
 }
