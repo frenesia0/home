@@ -6,7 +6,8 @@ import React, { useEffect, useState } from 'react';
 import { Character, CharacterOutfit, CharTab, ColorChip, Visibility, CharGrant } from '@/lib/charStore';
 import { GrantsEditor } from '@/components/chars/GrantsEditor';
 import { newId } from '@/lib/postStore';
-import { putBlob, getBlob, useBlobUrl } from '@/lib/blobStore';
+import { getBlob, useBlobUrl } from '@/lib/blobStore';
+import { uploadImageToCloudinary } from '@/lib/cloudinaryUpload';
 import { useFonts } from '@/lib/fontStore';
 import { KInput, KSelect, KStep } from '@/components/ui/Kit';
 import { RichEditor } from '@/components/ui/RichEditor';
@@ -159,7 +160,7 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
     const artIds = await Promise.all(
       arts.map((a) =>
         a.file
-          ? putBlob(a.file)
+          ? uploadImageToCloudinary(a.file).then(x => x.url)
           : Promise.resolve(a.ref!)
       )
     );
@@ -168,8 +169,8 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
       outfits.map(async (o) => ({
         id: o.id,
         label: o.label.trim() || 'OUTFIT',
-        fullImageId: o.fullFile ? await putBlob(o.fullFile) : o.fullImageId,
-        bustImageId: o.bustFile ? await putBlob(o.bustFile) : o.bustImageId,
+        fullImageId: o.fullFile ? (await uploadImageToCloudinary(o.fullFile)).url : o.fullImageId,
+        bustImageId: o.bustFile ? (await uploadImageToCloudinary(o.bustFile)).url : o.bustImageId,
         isDefault: !!o.isDefault,
       }))
     );
