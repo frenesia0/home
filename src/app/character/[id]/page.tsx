@@ -15,6 +15,15 @@ const textOf = (c: Character) => `${c.id} ${c.name} ${c.sub}`.toLowerCase();
 const isShiki = (c: Character) => textOf(c).includes('shiki') || textOf(c).includes('シキ');
 const isSolas = (c: Character) => textOf(c).includes('solas') || textOf(c).includes('ソラス');
 
+
+function useResolvedImage(ref?: string) {
+  const blobUrl = useBlobUrl(ref);
+  if (!ref) return undefined;
+  if (/^(?:https?:|data:|blob:)/.test(ref)) return ref;
+  return blobUrl;
+}
+
+
 function ProfileArt({
   fullRef,
   bustRef,
@@ -28,8 +37,8 @@ function ProfileArt({
   alt: string;
   mobileFull: boolean;
 }) {
-  const fullUrl = useBlobUrl(fullRef);
-  const bustUrl = useBlobUrl(bustRef ?? fullRef);
+  const fullUrl = useResolvedImage(fullRef);
+  const bustUrl = useResolvedImage(bustRef ?? fullRef);
   const mobileUrl = bustUrl ?? fullUrl;
 
   if (!fullUrl && !mobileUrl) {
@@ -50,7 +59,7 @@ function ProfileArt({
 
 
 function SignatureOverlay({ signRef, alt }: { signRef?: string; alt: string }) {
-  const signUrl = useBlobUrl(signRef);
+  const signUrl = useResolvedImage(signRef);
   if (!signUrl) return null;
 
   return (
@@ -278,7 +287,7 @@ function CharacterDetailInner() {
         .character-page{max-width:1240px;margin:0 auto;padding-top:30px;padding-bottom:70px;font-family:"SmartFontUI",-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif}.char-head{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;margin-bottom:14px}.char-head h1{margin:0;font-size:12px;letter-spacing:.18em;color:var(--faint)}.char-switch{display:flex;align-items:center;gap:10px;font-size:10px;letter-spacing:.14em}.char-switch button{padding:5px 2px;color:var(--faint);border-bottom:1px solid transparent}.char-switch button.on{color:var(--text);border-color:currentColor}.char-switch span{opacity:.25}.char-admin{justify-self:end;display:flex;gap:8px}.au-switch{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-bottom:10px}.au-switch button{padding:6px 10px;border:1px solid var(--line);border-radius:999px;color:var(--faint);font-size:9px}.au-switch button.on{color:var(--text);border-color:var(--accent)}.char-hero{display:grid;grid-template-columns:minmax(420px,.96fr) minmax(420px,1.04fr);min-height:min(760px,calc(100vh - 150px));overflow:hidden;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.char-copy{z-index:3;align-self:start;padding:40px 50px 48px 16px}.char-name{font-family:"Yu Gothic","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;font-weight:800;line-height:1.08;letter-spacing:.045em;overflow-wrap:anywhere;color:var(--char-color);text-shadow:0 1px 18px rgba(0,0,0,.24)}.char-sub{margin-top:12px;color:rgba(236,239,246,.78);font-size:12.5px;letter-spacing:.08em}.char-cv{margin-top:10px;color:rgba(242,244,249,.9);font-size:12.5px;font-weight:700;letter-spacing:.08em}.char-copy blockquote{margin:0}.quote-ribbons{display:grid;gap:7px;justify-items:start}
 .quote-ribbons span{display:inline-block;max-width:100%;padding:7px 12px;background:color-mix(in srgb,var(--char-color) 74%,#12141a);color:#fff;font-size:13.5px;line-height:1.65;font-weight:700;letter-spacing:.02em;box-shadow:6px 6px 0 rgba(0,0,0,.12)}
 .char-intro{margin-top:24px;margin-bottom:38px;color:rgba(248,249,252,.98);font-size:15px;line-height:2.08;font-weight:600}.profile-section,.voice-section{margin-top:30px}.profile-section h2,.voice-section h2{margin:0 0 12px;color:rgba(232,234,240,.86);font-size:10.5px;font-weight:700;letter-spacing:.2em}.profile-section dl{display:grid;grid-template-columns:126px 1fr;margin:0;border-top:1px solid rgba(255,255,255,.42);border-bottom:1px solid rgba(255,255,255,.16)}.profile-section dt,.profile-section dd{min-height:44px;margin:0;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.18);line-height:1.45}.profile-section dt{position:relative;padding-left:12px;color:rgba(215,219,231,.74);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:700}.profile-section dt::before{content:"";position:absolute;left:0;top:14px;width:3px;height:15px;background:var(--char-color);border-radius:999px}.profile-section dd{color:rgba(250,250,252,.98);font-size:15.5px;font-weight:700;letter-spacing:.015em}.profile-section dt:nth-last-of-type(1),.profile-section dd:nth-last-of-type(1){border-bottom:0}.voice-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.voice-grid button{min-height:38px;padding:8px 10px;border:1px solid rgba(220,224,232,.28);border-radius:999px;color:rgba(225,228,235,.76);font-size:9px;letter-spacing:.06em}.voice-grid button span{margin-right:6px}.voice-grid button:disabled{opacity:.35;cursor:default}.voice-grid button.playing{border-color:var(--char-color);color:var(--text)}.gallery-link{width:100%;min-height:46px;margin-top:22px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(220,224,232,.28);border-bottom:1px solid rgba(220,224,232,.28);color:rgba(244,245,248,.9);font-size:10px;letter-spacing:.16em}.char-art{position:relative;min-width:0;min-height:720px;margin-bottom:52px;overflow:visible;padding-top:18px}.char-glow{position:absolute;inset:12% 0 0 4%;background:radial-gradient(circle at 55% 42%,color-mix(in srgb,var(--char-color) 24%,transparent),transparent 58%);filter:blur(16px);opacity:.75}.char-art :global(.char-art-full){position:absolute;z-index:2;right:8px;bottom:0;width:auto;height:min(102%,775px);max-width:100%;object-fit:contain;filter:drop-shadow(0 24px 34px rgba(0,0,0,.22))}.char-art :global(.char-art-bust){display:none}
-.char-sign{
+:global(.char-sign){
   position:absolute;
   z-index:7;
   right:28px;
@@ -340,14 +349,14 @@ function CharacterDetailInner() {
 .char-art :global(.char-art-full){display:none}
 .char-art :global(.char-art-bust){display:block;position:absolute;z-index:2;inset:0;width:100%;height:100%;overflow:hidden;filter:drop-shadow(0 18px 24px rgba(0,0,0,.18))}
 .char-art :global(.char-art-bust > *){width:100%;height:100%}
-.char-sign{
+:global(.char-sign){
   right:14px;
   bottom:14px;
   width:clamp(64px,19%,92px);
   max-height:62px;
   transform:rotate(-8deg);
 }
-.char-art.is-mobile-full .char-sign{
+.char-art.is-mobile-full :global(.char-sign){
   right:16px;
   bottom:22px;
   width:clamp(70px,18%,100px);
@@ -445,7 +454,7 @@ function CharacterDetailInner() {
     display:block !important;
   }
 
-  .char-sign{
+  :global(.char-sign){
     z-index:8 !important;
     right:7% !important;
     bottom:7% !important;
@@ -454,7 +463,7 @@ function CharacterDetailInner() {
     transform:rotate(-8deg) !important;
   }
 
-  .char-art.is-mobile-full .char-sign{
+  .char-art.is-mobile-full :global(.char-sign){
     right:7% !important;
     bottom:7% !important;
     width:clamp(74px,21vw,112px) !important;
@@ -472,6 +481,77 @@ function CharacterDetailInner() {
     padding:7px 4px !important;
     font-size:10px !important;
     line-height:1.12 !important;
+  }
+}
+
+
+@media(max-width:900px){
+  .char-art{
+    min-height:clamp(660px,126vw,900px) !important;
+  }
+
+  .char-art :global(.char-art-bust){
+    display:block !important;
+    position:absolute !important;
+    inset:0 !important;
+    z-index:2 !important;
+    width:100% !important;
+    height:100% !important;
+    overflow:hidden !important;
+  }
+
+  .char-art :global(.char-art-bust > *){
+    display:block !important;
+    width:100% !important;
+    height:100% !important;
+    opacity:1 !important;
+    visibility:visible !important;
+  }
+
+  .char-art :global(.char-art-bust img){
+    display:block !important;
+    opacity:1 !important;
+    visibility:visible !important;
+  }
+
+  .char-art.is-mobile-full :global(.char-art-bust){
+    display:none !important;
+  }
+
+  .char-art.is-mobile-full :global(.char-art-full){
+    display:block !important;
+  }
+
+  /* Larger mobile ribbons */
+  .quote-vertical span{
+    font-size:15px !important;
+    padding:7px 4px 8px !important;
+    line-height:1.08 !important;
+  }
+
+  .quote-vertical span.is-long{
+    font-size:12px !important;
+    padding:7px 4px !important;
+    line-height:1.1 !important;
+  }
+
+  /* Signature is a child component, so the selector must be global. */
+  :global(.char-sign){
+    position:absolute !important;
+    z-index:9 !important;
+    right:6% !important;
+    bottom:6% !important;
+    width:clamp(72px,21vw,108px) !important;
+    max-height:74px !important;
+    object-fit:contain !important;
+    transform:rotate(-8deg) !important;
+    pointer-events:none !important;
+  }
+
+  .char-art.is-mobile-full :global(.char-sign){
+    right:6% !important;
+    bottom:6% !important;
+    width:clamp(78px,22vw,116px) !important;
   }
 }
 
