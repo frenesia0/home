@@ -334,10 +334,10 @@ function CharacterDetailInner() {
 :global(.char-sign){
   position:absolute;
   z-index:7;
-  right:-42px;
-  bottom:-4px;
-  width:clamp(380px,58%,660px);
-  max-height:280px;
+  right:-86px;
+  bottom:-16px;
+  width:clamp(520px,72%,820px);
+  max-height:340px;
   object-fit:contain;
   pointer-events:none;
   opacity:.98;
@@ -725,6 +725,120 @@ function CharacterDetailInner() {
     right:-3% !important;
     bottom:2% !important;
     width:clamp(220px,64vw,320px) !important;
+  }
+}
+
+
+/* --- mobile CHARACTER stage / selector final pass --- */
+@media(max-width:900px){
+  .char-art{
+    width:100% !important;
+    aspect-ratio:3 / 4 !important;
+    height:auto !important;
+    min-height:0 !important;
+    margin:0 auto 88px !important;
+    padding-top:0 !important;
+    overflow:hidden !important;
+    border-top:1px solid var(--line) !important;
+    border-bottom:1px solid var(--line) !important;
+  }
+
+  .char-art :global(.char-art-bust),
+  .char-art :global(.char-art-bust-img){
+    position:absolute !important;
+    inset:0 !important;
+    width:100% !important;
+    height:100% !important;
+  }
+
+  .char-art :global(.char-art-bust-img){
+    display:block !important;
+    object-fit:cover !important;
+    object-position:center center !important;
+  }
+
+  /* Full-body mode can still use a taller viewport stage. */
+  .char-art.is-mobile-full{
+    width:100vw !important;
+    max-width:none !important;
+    margin-left:calc(50% - 50vw) !important;
+    margin-bottom:88px !important;
+    aspect-ratio:auto !important;
+    height:calc(100svh - 210px) !important;
+    min-height:620px !important;
+  }
+
+  /* Standing-art selector is always visible directly under the art. */
+  .outfit-switch{
+    position:absolute !important;
+    z-index:10 !important;
+    top:calc(100% + 14px) !important;
+    bottom:auto !important;
+    left:50% !important;
+    right:auto !important;
+    width:max-content !important;
+    max-width:calc(100vw - 28px) !important;
+    transform:translateX(-50%) !important;
+    display:flex !important;
+    justify-content:flex-start !important;
+    gap:8px !important;
+    overflow-x:auto !important;
+    padding:2px 2px 10px !important;
+  }
+  .outfit-switch button{
+    flex:0 0 auto !important;
+    padding:9px 13px !important;
+    font-size:10px !important;
+    color:rgba(255,255,255,.78) !important;
+    background:rgba(24,27,34,.88) !important;
+  }
+  .outfit-switch button.on{
+    color:#fff !important;
+    background:color-mix(in srgb,var(--char-color) 38%,#242932) !important;
+    border-color:var(--char-color) !important;
+    box-shadow:0 0 0 1px color-mix(in srgb,var(--char-color) 45%,transparent),
+               0 0 18px color-mix(in srgb,var(--char-color) 20%,transparent) !important;
+  }
+
+  /* Bigger mobile ribbons. */
+  .quote-vertical span{
+    font-size:18px !important;
+    padding:8px 5px 9px !important;
+    line-height:1.05 !important;
+  }
+  .quote-vertical span.is-long{
+    font-size:14px !important;
+    padding:8px 5px !important;
+    line-height:1.07 !important;
+  }
+
+  /* Huge signature, still bottom-right and above the art. */
+  :global(.char-sign){
+    z-index:9 !important;
+    right:-10% !important;
+    bottom:0 !important;
+    width:clamp(260px,78vw,390px) !important;
+    max-height:190px !important;
+    transform:rotate(-6deg) !important;
+    opacity:.98 !important;
+  }
+  .char-art.is-mobile-full :global(.char-sign){
+    right:-8% !important;
+    bottom:1% !important;
+    width:clamp(280px,82vw,410px) !important;
+  }
+
+  /* Top SHIKI / SOLAS selector */
+  .char-switch button{
+    color:rgba(255,255,255,.78) !important;
+    -webkit-text-fill-color:rgba(255,255,255,.78) !important;
+    opacity:1 !important;
+  }
+  .char-switch button.on{
+    color:var(--char-color) !important;
+    -webkit-text-fill-color:var(--char-color) !important;
+    border-bottom:2px solid var(--char-color) !important;
+    text-shadow:0 0 16px color-mix(in srgb,var(--char-color) 42%,transparent) !important;
   }
 }
 
