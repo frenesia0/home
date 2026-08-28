@@ -13,7 +13,7 @@ type CloudinaryUploadResponse = {
   };
 };
 
-const CACHE_KEY = 'ohome.cloudinary.imageHash.v1';
+const CACHE_KEY = 'ohome.cloudinary.imageHash.v2';
 
 /**
  * 同じ画像をSAVE/再試行で何度もCloudinaryへ送らないためのキャッシュ。
@@ -60,6 +60,35 @@ function writeCache(hash: string, value: CloudinaryImageUpload) {
     );
   } catch {
     // localStorageが使えなくてもアップロード自体は続行
+  }
+}
+
+
+function removeCache(hash: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = readCache();
+    delete current[hash];
+    window.localStorage.setItem(CACHE_KEY, JSON.stringify(current));
+  } catch {
+    // 失敗してもアップロード自体は続ける
+  }
+}
+
+function tinyCloudinaryProbeUrl(url: string) {
+  if (!url.includes('/upload/')) return url;
+  return url.replace('/upload/', '/upload/w_2,h_2,c_fill,q_auto,f_auto/');
+}
+
+async function cachedUploadStillExists(value: CloudinaryImageUpload) {
+  try {
+    const response = await fetch(tinyCloudinaryProbeUrl(value.url), {
+      method: 'GET',
+      cache: 'no-store',
+    });
+    return response.ok;
+  } catch {
+    return false;
   }
 }
 
@@ -125,7 +154,11 @@ export async function uploadImageToCloudinary(
 
   const cached = readCache()[hash];
   if (cached?.url && cached?.publicId) {
-    return cached;
+    if (await cachedUploadStillExists(cached)) {
+      return cached;
+    }
+    // Cloudinary本体が既に消えている古いURLは再利用しない。
+    removeCache(hash);
   }
 
   const inFlight = sent.get(hash);
