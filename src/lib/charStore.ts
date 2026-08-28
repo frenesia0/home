@@ -12,6 +12,14 @@ export interface CharTab {
   html: string;          // HTML 에디터 내용 (스크립트 불허 — 렌더 시 sanitize)
 }
 
+export interface CharacterOutfit {
+  id: string;                 // 衣装ID（例: default / formal / casual）
+  label: string;              // EDIT画面・切替UIに出す衣装名
+  fullImageId?: string;       // PC版・FULL BODY表示用の全身立ち絵
+  bustImageId?: string;       // スマホ通常表示用の腰上立ち絵（3:4前提）
+  isDefault?: boolean;        // 初期表示衣装。trueは1件だけにする
+}
+
 export interface Character {
   id: string;
   name: string;          // 대표 이름 (전용 폰트 적용 대상)
@@ -40,8 +48,16 @@ export interface Character {
   /** PC版CHARACTERページ専用の全身立ち絵 */
   profileFullId?: string;
 
-  /** スマホ版CHARACTERページ専用の腰上立ち絵 */
+  /** スマホ版CHARACTERページ専用の腰上立ち絵（旧互換。新規はoutfitsを使う） */
   profileBustId?: string;
+
+  /**
+   * CHARACTERページの衣装一覧。
+   * - isDefault:true の衣装を必ず初期表示
+   * - isDefault が無い旧データでは先頭を初期表示として扱う
+   * - bustImageId はスマホ表示で 3:4 縦長前提
+   */
+  outfits?: CharacterOutfit[];
 
   /** 立ち絵右下に重ねるキャラクターサイン */
   signId?: string;
@@ -241,6 +257,13 @@ export const CHAR_SEED: Character[] = [
       { label: 'SAMPLE 02' },
       { label: 'SAMPLE 03' },
     ],
+    outfits: [
+      {
+        id: 'default',
+        label: 'DEFAULT',
+        isDefault: true,
+      },
+    ],
     visibility: 'public',
     thumbClass: '',
     own: true,
@@ -271,6 +294,13 @@ export const CHAR_SEED: Character[] = [
       { label: 'SAMPLE 01' },
       { label: 'SAMPLE 02' },
       { label: 'SAMPLE 03' },
+    ],
+    outfits: [
+      {
+        id: 'default',
+        label: 'DEFAULT',
+        isDefault: true,
+      },
     ],
     visibility: 'public',
     thumbClass: '',
