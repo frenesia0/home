@@ -245,6 +245,19 @@ export default function NewsEditForm({
           color:
             rgba(255, 255, 255, 0.35) !important;
         }
+.news-body-field :global(.re-btn){
+  color:#f5f5f5 !important;
+  -webkit-text-fill-color:#f5f5f5 !important;
+}
+
+.news-body-field :global(.re-btn.on){
+  color:#aaaef2 !important;
+  -webkit-text-fill-color:#aaaef2 !important;
+}
+
+.news-body-field :global(.re-sep){
+  background:rgba(255,255,255,.22) !important;
+}
 
         .news-actions {
           display: flex;
