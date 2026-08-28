@@ -188,6 +188,58 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
   // 画面切替：メインフォーム／タブ専用編集画面
   const [view, setView] = useState<'main' | string>('main');
 
+  useEffect(() => {
+    const jaMap: Record<string, string> = {
+      '굵게': '太字',
+      '기울임': '斜体',
+      '취소선': '取り消し線',
+      '제목 2': '見出し2',
+      '제목2': '見出し2',
+      '제목 3': '見出し3',
+      '제목3': '見出し3',
+      '글머리 기호 목록': '箇条書き',
+      '글머리 목록': '箇条書き',
+      '번호 매기기 목록': '番号付きリスト',
+      '번호 목록': '番号付きリスト',
+      '인용': '引用',
+      '가로선': '区切り線',
+      '이미지': '画像を挿入',
+      '이미지 삽입': '画像を挿入',
+      '실행 취소': '元に戻す',
+      '되돌리기': '元に戻す',
+      '다시 실행': 'やり直す',
+      '다시하기': 'やり直す',
+      '링크': 'リンク',
+    };
+
+    const localize = () => {
+      document
+        .querySelectorAll<HTMLElement>('.write-grid .re-toolbar [title], .write-grid .re-toolbar [aria-label]')
+        .forEach((el) => {
+          const title = el.getAttribute('title');
+          const aria = el.getAttribute('aria-label');
+
+          if (title) {
+            const translated = jaMap[title.trim()];
+            if (translated) el.setAttribute('title', translated);
+          }
+
+          if (aria) {
+            const translated = jaMap[aria.trim()];
+            if (translated) el.setAttribute('aria-label', translated);
+          }
+        });
+    };
+
+    localize();
+
+    const observer = new MutationObserver(localize);
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    return () => observer.disconnect();
+  }, []);
+
+
   const queueCloudinaryDelete = (ref?: string) => {
     if (!ref || !cloudinaryPublicIdFromRef(ref)) return;
     setDeleteQueue(current => current.includes(ref) ? current : [...current, ref]);
@@ -901,7 +953,7 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
         </div>
 
         {/* 基本プロフィール本文 — リッチエディタ */}
-        <label className="k-label" style={{ margin: 0 }}>基本プロフィール本文</label>
+        <label className="k-label" style={{ margin: 0 }}>基本プロフィール</label>
         <RichEditor value={basicHtml} onChange={setBasicHtml}
           placeholder="キャラクター紹介を入力してください — 画像挿入可（スクリプト不可 6.3）" />
 
@@ -992,11 +1044,13 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
             </div>
           </div>
         </div>
-        <div className="form-actions">
+        <div className="form-actions" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
           <button
             onClick={onCancel}
             disabled={saving}
             style={{
+              width: '100%',
+              width: '100%',
               minWidth: 112,
               minHeight: 42,
               padding: '10px 14px',
@@ -1156,6 +1210,76 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
         :global(main .panel),
         :global(main .widget){
           border-color:rgba(255,255,255,.13);
+        }
+
+
+        :global(.write-grid .re-wrap){
+          overflow:hidden !important;
+          border:1px solid rgba(255,255,255,.16) !important;
+          border-radius:9px !important;
+          background:#20252d !important;
+          color:#f3f5f8 !important;
+          box-shadow:none !important;
+        }
+
+        :global(.write-grid .re-toolbar){
+          background:#181c22 !important;
+          border-bottom:1px solid rgba(255,255,255,.12) !important;
+          color:rgba(245,247,251,.72) !important;
+        }
+
+        :global(.write-grid .re-btn){
+          background:transparent !important;
+          color:rgba(245,247,251,.68) !important;
+          border:0 !important;
+          box-shadow:none !important;
+        }
+
+        :global(.write-grid .re-btn:hover){
+          background:#2a3039 !important;
+          color:#fff !important;
+        }
+
+        :global(.write-grid .re-btn.on){
+          background:#343b46 !important;
+          color:#fff !important;
+        }
+
+        :global(.write-grid .re-btn:first-child){
+          color:#fff !important;
+          font-weight:800 !important;
+        }
+
+        :global(.write-grid .re-sep){
+          background:rgba(255,255,255,.14) !important;
+        }
+
+        :global(.write-grid .re-body){
+          background:#222730 !important;
+        }
+
+        :global(.write-grid .re-content),
+        :global(.write-grid .re-wrap .re-content){
+          min-height:260px !important;
+          background:#222730 !important;
+          color:#f2f4f8 !important;
+          caret-color:#fff !important;
+        }
+
+        :global(.write-grid .re-content p),
+        :global(.write-grid .re-content h2),
+        :global(.write-grid .re-content h3),
+        :global(.write-grid .re-content li){
+          color:#f2f4f8 !important;
+        }
+
+        :global(.write-grid .re-content blockquote){
+          color:rgba(242,244,248,.75) !important;
+          border-left-color:rgba(255,255,255,.24) !important;
+        }
+
+        :global(.write-grid .re-ph){
+          color:rgba(240,243,248,.34) !important;
         }
 
         .save-spinner{
