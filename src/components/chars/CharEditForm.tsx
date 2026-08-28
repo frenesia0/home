@@ -96,6 +96,9 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
   const [colors, setColors] = useState<ColorRow[]>((initial?.colors ?? []).map(c => ({ ...c, id: newId() })));
   const [colorTipMode, setColorTipMode] = useState<'hex' | 'both' | 'label'>(initial?.colorTipMode ?? 'hex');
   const [basicHtml, setBasicHtml] = useState(initial?.basicHtml ?? '');
+  const [quote, setQuote] = useState(initial?.quote ?? '');
+  const [saving, setSaving] = useState(false);
+  const [outfitCropId, setOutfitCropId] = useState<string | null>(null);
   const [tabs, setTabs] = useState<CharTab[]>(initial?.tabs ?? []);
   const [arts, setArts] = useState<ArtItem[]>(() => {
     const refs = initial?.arts ?? (initial?.artId ? [initial.artId] : initial?.thumbId ? [initial.thumbId] : []);
@@ -134,6 +137,7 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
   };
 
   const save = async () => {
+  if (saving) return;
   if (!name.trim()) {
     toast('名前を入力してください');
     return;
@@ -156,6 +160,8 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
     }
   }
 
+  setSaving(true);
+
   try {
     const artIds = await Promise.all(
       arts.map((a) =>
@@ -171,6 +177,7 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
         label: o.label.trim() || 'OUTFIT',
         fullImageId: o.fullFile ? (await uploadImageToCloudinary(o.fullFile)).url : o.fullImageId,
         bustImageId: o.bustFile ? (await uploadImageToCloudinary(o.bustFile)).url : o.bustImageId,
+        bustCrop: o.bustCrop,
         isDefault: !!o.isDefault,
       }))
     );
@@ -215,6 +222,7 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
 
       tabs,
       basicHtml,
+      quote,
       visibility,
       fontId,
       nameSize,
@@ -256,6 +264,8 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
         : 'キャラクターの保存に失敗しました。';
 
     toast(message);
+  } finally {
+    setSaving(false);
   }
 };
 
@@ -282,7 +292,41 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
     }, 'タブに入力した内容も一緒に削除されます。SAVE前であればCANCELでフォームを離れることで元に戻せます。');
   };
 
-  /* ---------- タブ専用編集画面 ---------- */
+  
+function OutfitBustPreview({ refId, url, crop, alt }: {
+  refId?: string;
+  url?: string;
+  crop?: CropValue;
+  alt: string;
+}) {
+  const loaded = useBlobUrl(refId);
+  const src = url ?? loaded;
+  if (!src) return null;
+  return <CropImg src={src} crop={crop} />;
+}
+
+function OutfitBustCrop({ item, open, onClose, onApply }: {
+  item: OutfitItem;
+  open: boolean;
+  onClose: () => void;
+  onApply: (crop: CropValue) => void;
+}) {
+  const loaded = useBlobUrl(item.bustImageId);
+  const src = item.bustUrl ?? loaded;
+  if (!src || !open) return null;
+  return (
+    <CropEditor
+      open
+      src={src}
+      aspect="3:4"
+      initial={item.bustCrop}
+      onClose={onClose}
+      onApply={onApply}
+    />
+  );
+}
+
+/* ---------- タブ専用編集画面 ---------- */
   const curTab = tabs.find(t => t.id === view);
   if (curTab) {
     return <>
@@ -426,7 +470,16 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
                     <div style={{ display: 'grid', gap: 7 }}>
                       <span className="hint" style={{ margin: 0 }}>MOBILE — 腰上立ち絵（3:4）</span>
                       <div style={{ width: '100%', maxWidth: 165, aspectRatio: '3 / 4', justifySelf: 'center', border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden' }}>
-                        <OutfitPreview refId={o.bustImageId} url={o.bustUrl} alt={`${name} ${o.label} bust`} bust />
+                        {(o.bustUrl || o.bustImageId) ? (
+                          <OutfitBustPreview
+                            refId={o.bustImageId}
+                            url={o.bustUrl}
+                            crop={o.bustCrop}
+                            alt={`${name} ${o.label} bust`}
+                          />
+                        ) : (
+                          <div className="ph" style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', fontSize: 10, color: 'var(--faint)' }}>NO IMAGE</div>
+                        )}
                       </div>
                       <input
                         id={`outfitBust-${o.id}`}
@@ -452,6 +505,16 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
                       >
                         {o.bustImageId || o.bustFile ? 'CHANGE 3:4 BUST' : '＋ ADD 3:4 BUST'}
                       </button>
+                      {(o.bustImageId || o.bustFile) && (
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          style={addBtn}
+                          onClick={() => setOutfitCropId(o.id)}
+                        >
+                          ✂ 3:4 CROP
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -517,6 +580,28 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
         </div>
         <button className="btn btn-ghost" style={addBtn}
           onClick={() => setColors(l => [...l, { id: newId(), hex: '#888888', label: '' }])}>＋ ADD COLOR</button>
+
+        {/* CHARACTER台詞 — 改行をそのまま保存 */}
+        <label className="k-label" style={{ margin: 0 }}>CHARACTERの台詞（3行）</label>
+        <textarea
+          value={quote}
+          onChange={e => setQuote(e.target.value)}
+          rows={5}
+          placeholder="「台詞を3行で入力」"
+          style={{
+            width: '100%',
+            resize: 'vertical',
+            padding: '10px 12px',
+            border: '1px solid var(--line)',
+            borderRadius: 8,
+            background: 'var(--panel)',
+            color: 'var(--text)',
+            font: 'inherit',
+            fontSize: 12,
+            lineHeight: 1.8,
+            boxSizing: 'border-box',
+          }}
+        />
 
         {/* 基本プロフィール本文 — リッチエディタ */}
         <label className="k-label" style={{ margin: 0 }}>基本プロフィール本文</label>
@@ -628,6 +713,28 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
       {lb !== null && (
         <Lightbox srcs={arts.map(a => a.url ?? a.ref ?? '')} index={lb} onClose={() => setLb(null)} />
       )}
+      {outfitCropId && (() => {
+        const o = outfits.find(x => x.id === outfitCropId);
+        if (!o) return null;
+        return (
+          <OutfitBustCrop
+            item={o}
+            open
+            onClose={() => setOutfitCropId(null)}
+            onApply={crop => {
+              setOutfits(list => list.map(x => x.id === o.id ? { ...x, bustCrop: crop } : x));
+              setOutfitCropId(null);
+            }}
+          />
+        );
+      })()}
+      <style jsx>{`
+        .save-spinner{
+          width:12px;height:12px;border:2px solid currentColor;border-right-color:transparent;
+          border-radius:50%;display:inline-block;animation:spin .7s linear infinite
+        }
+        @keyframes spin{to{transform:rotate(360deg)}}
+      `}</style>
       {del.element}
     </div>
   );
