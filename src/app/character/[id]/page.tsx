@@ -87,6 +87,12 @@ function CharacterDetailInner() {
     [eff?.quote, seedQuote]
   );
 
+  useEffect(() => {
+    const first = eff?.outfits?.find(o => o.isDefault) ?? eff?.outfits?.[0];
+    setSelectedOutfitId(first?.id ?? '');
+    setMobileFull(false);
+  }, [eff?.id]);
+
   if (!loaded) return <section className="page" />;
   if (!ch || !eff) return <section className="page"><p>キャラクターが見つかりません。</p></section>;
   if (ch.visibility === 'private' && !isAdmin) return <section className="page"><p>非公開のキャラクターです。</p></section>;
@@ -117,12 +123,6 @@ function CharacterDetailInner() {
     label: eff.voices?.[i]?.label?.trim() || `SAMPLE ${String(i + 1).padStart(2, '0')}`,
     audioUrl: '',
   }));
-
-  useEffect(() => {
-    const first = eff?.outfits?.find(o => o.isDefault) ?? eff?.outfits?.[0];
-    setSelectedOutfitId(first?.id ?? '');
-    setMobileFull(false);
-  }, [eff?.id]);
 
 
   if (auKey && !auRegistered) {
