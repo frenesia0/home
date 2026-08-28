@@ -440,7 +440,7 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                     <div style={{ display: 'grid', gap: 7 }}>
                       <span className="hint" style={{ margin: 0 }}>PC / FULL BODY — 全身立ち絵</span>
-                      <div style={{ height: 220, border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden' }}>
+                      <div style={{ height: 220, border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
                         <OutfitPreview refId={o.fullImageId} url={o.fullUrl} alt={`${name} ${o.label} full body`} />
                       </div>
                       <input
@@ -471,7 +471,7 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
 
                     <div style={{ display: 'grid', gap: 7 }}>
                       <span className="hint" style={{ margin: 0 }}>MOBILE — 腰上立ち絵（3:4）</span>
-                      <div style={{ width: '100%', maxWidth: 165, aspectRatio: '3 / 4', justifySelf: 'center', border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden' }}>
+                      <div style={{ width: '100%', maxWidth: 165, aspectRatio: '3 / 4', justifySelf: 'center', border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
                         {(o.bustUrl || o.bustImageId) ? (
                           <OutfitBustPreview
                             refId={o.bustImageId}
@@ -740,6 +740,7 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
         );
       })()}
       <style jsx>{`
+        :global(.write-grid img){max-width:100%}
         .save-spinner{
           width:12px;height:12px;border:2px solid currentColor;border-right-color:transparent;
           border-radius:50%;display:inline-block;animation:spin .7s linear infinite
