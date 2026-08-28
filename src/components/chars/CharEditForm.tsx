@@ -97,6 +97,7 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
   const [colorTipMode, setColorTipMode] = useState<'hex' | 'both' | 'label'>(initial?.colorTipMode ?? 'hex');
   const [basicHtml, setBasicHtml] = useState(initial?.basicHtml ?? '');
   const [quote, setQuote] = useState(initial?.quote ?? '');
+  const [cv, setCv] = useState(initial?.cv ?? '');
   const [saving, setSaving] = useState(false);
   const [outfitCropId, setOutfitCropId] = useState<string | null>(null);
   const [tabs, setTabs] = useState<CharTab[]>(initial?.tabs ?? []);
@@ -223,6 +224,7 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
       tabs,
       basicHtml,
       quote,
+      cv,
       visibility,
       fontId,
       nameSize,
@@ -580,6 +582,15 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
         </div>
         <button className="btn btn-ghost" style={addBtn}
           onClick={() => setColors(l => [...l, { id: newId(), hex: '#888888', label: '' }])}>＋ ADD COLOR</button>
+
+        {/* CV表記 */}
+        <label className="k-label" style={{ margin: 0 }}>CV表記</label>
+        <KInput
+          placeholder="例：CV.かっこいい"
+          value={cv}
+          onChange={e => setCv(e.target.value)}
+          style={rowInp}
+        />
 
         {/* CHARACTER台詞 — 改行をそのまま保存 */}
         <label className="k-label" style={{ margin: 0 }}>CHARACTERの台詞（3行）</label>
