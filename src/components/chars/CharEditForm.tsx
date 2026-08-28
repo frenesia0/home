@@ -193,48 +193,58 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
       '굵게': '太字',
       '기울임': '斜体',
       '취소선': '取り消し線',
+      '제목': '見出し',
       '제목 2': '見出し2',
       '제목2': '見出し2',
       '제목 3': '見出し3',
       '제목3': '見出し3',
       '글머리 기호 목록': '箇条書き',
       '글머리 목록': '箇条書き',
+      '글머리표 목록': '箇条書き',
       '번호 매기기 목록': '番号付きリスト',
       '번호 목록': '番号付きリスト',
+      '번호 매기기': '番号付きリスト',
       '인용': '引用',
+      '인용문': '引用',
       '가로선': '区切り線',
+      '수평선': '区切り線',
       '이미지': '画像を挿入',
       '이미지 삽입': '画像を挿入',
+      '링크': 'リンク',
+      '링크 삽입': 'リンク',
       '실행 취소': '元に戻す',
       '되돌리기': '元に戻す',
       '다시 실행': 'やり直す',
       '다시하기': 'やり直す',
-      '링크': 'リンク',
     };
 
     const localize = () => {
       document
-        .querySelectorAll<HTMLElement>('.write-grid .re-toolbar [title], .write-grid .re-toolbar [aria-label]')
+        .querySelectorAll<HTMLElement>('.write-grid .re-toolbar [title], .write-grid .re-toolbar [aria-label], .write-grid .re-toolbar [data-tooltip], .write-grid .re-toolbar [data-title]')
         .forEach((el) => {
-          const title = el.getAttribute('title');
-          const aria = el.getAttribute('aria-label');
+          const attrs = ['title', 'aria-label', 'data-tooltip', 'data-title'] as const;
 
-          if (title) {
-            const translated = jaMap[title.trim()];
-            if (translated) el.setAttribute('title', translated);
-          }
+          attrs.forEach((attr) => {
+            const value = el.getAttribute(attr);
+            if (!value) return;
 
-          if (aria) {
-            const translated = jaMap[aria.trim()];
-            if (translated) el.setAttribute('aria-label', translated);
-          }
+            const translated = jaMap[value.trim()];
+            if (translated) {
+              el.setAttribute(attr, translated);
+            }
+          });
         });
     };
 
     localize();
 
     const observer = new MutationObserver(localize);
-    observer.observe(document.body, { childList: true, subtree: true });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['title', 'aria-label', 'data-tooltip', 'data-title'],
+    });
 
     return () => observer.disconnect();
   }, []);
