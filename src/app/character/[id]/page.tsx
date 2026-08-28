@@ -9,7 +9,6 @@ import { sanitizeHtml } from '@/lib/sanitize';
 import { useFonts } from '@/lib/fontStore';
 import { useTheme } from '@/lib/ThemeProvider';
 import { useBlobUrl } from '@/lib/blobStore';
-import { ConfirmModal } from '@/components/ui/Modal';
 
 const textOf = (c: Character) => `${c.id} ${c.name} ${c.sub}`.toLowerCase();
 const isShiki = (c: Character) => textOf(c).includes('shiki') || textOf(c).includes('シキ');
@@ -37,11 +36,10 @@ function CharacterDetailInner() {
   const router = useRouter();
   const params = useSearchParams();
   const { user, isAdmin } = useAuth();
-  const [chars, setChars, loaded] = useLocalList<Character>('ohome.chars.v1', CHAR_SEED);
+  const [chars, , loaded] = useLocalList<Character>('ohome.chars.v1', CHAR_SEED);
   const [rels] = useLocalList<Relation>('ohome.rels.v1', REL_SEED);
   const { familyOf } = useFonts();
   const { setPageTheme } = useTheme();
-  const [delAsk, setDelAsk] = useState(false);
   const [playingVoice, setPlayingVoice] = useState<number | null>(null);
 
   const effectiveChars = chars.length > 0 ? chars : CHAR_SEED;
@@ -119,7 +117,6 @@ function CharacterDetailInner() {
         {(isAdmin || charGrant(ch, user?.id) === 'edit') && (
           <div className="char-admin">
             <button className="btn btn-dark" onClick={() => router.push(editHref)}>EDIT</button>
-            {isAdmin && <button className="btn btn-dark" onClick={() => setDelAsk(true)}>DELETE</button>}
           </div>
         )}
       </div>
@@ -188,11 +185,6 @@ function CharacterDetailInner() {
         <i />
         <button className={isSolas(ch) ? 'on' : ''} disabled={!solas} onClick={() => solas && router.push(`/character/${solas.id}`)}><small>02</small> SOLAS</button>
       </div>
-
-      <ConfirmModal open={delAsk} title="キャラクターを削除しますか？" body="プロフィール情報も削除され、元に戻せません。" onClose={() => setDelAsk(false)} buttons={[
-        { label: 'DELETE', kind: 'accent', onClick: () => { setChars(chars.filter(c => c.id !== ch.id)); router.push('/character'); } },
-        { label: 'CANCEL', kind: 'ghost', onClick: () => setDelAsk(false) },
-      ]} />
 
       <style jsx>{`
         .character-page{max-width:1240px;margin:0 auto;padding-top:30px;padding-bottom:70px}.char-head{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;margin-bottom:14px}.char-head h1{margin:0;font-size:12px;letter-spacing:.18em;color:var(--faint)}.char-switch{display:flex;align-items:center;gap:10px;font-size:10px;letter-spacing:.14em}.char-switch button{padding:5px 2px;color:var(--faint);border-bottom:1px solid transparent}.char-switch button.on{color:var(--text);border-color:currentColor}.char-switch span{opacity:.25}.char-admin{justify-self:end;display:flex;gap:8px}.au-switch{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-bottom:10px}.au-switch button{padding:6px 10px;border:1px solid var(--line);border-radius:999px;color:var(--faint);font-size:9px}.au-switch button.on{color:var(--text);border-color:var(--accent)}.char-hero{display:grid;grid-template-columns:minmax(400px,.92fr) minmax(420px,1.08fr);min-height:min(760px,calc(100vh - 150px));overflow:hidden;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.char-copy{z-index:3;align-self:center;padding:52px 42px 48px 16px}.char-name{font-family:"Yu Mincho","Hiragino Mincho ProN","Hiragino Mincho Pro","Noto Serif JP",Georgia,serif;font-weight:500;line-height:1.12;letter-spacing:.055em;overflow-wrap:anywhere;color:rgba(248,248,250,.96);text-shadow:0 1px 18px rgba(0,0,0,.16)}.char-sub{margin-top:8px;color:var(--faint);font-size:11px;letter-spacing:.1em}.char-copy blockquote{margin:26px 0;padding-left:18px;border-left:2px solid var(--char-color);white-space:normal;color:rgba(228,230,236,.86);font-size:14px;line-height:2;font-family:"Yu Gothic","Hiragino Kaku Gothic ProN",sans-serif;font-weight:400}.char-intro{margin-bottom:30px;color:rgba(210,214,223,.78);font-size:13px;line-height:1.95}.profile-section,.voice-section{margin-top:28px}.profile-section h2,.voice-section h2{margin:0 0 14px;color:rgba(232,234,240,.82);font-size:10px;font-weight:600;letter-spacing:.18em}.profile-section dl{display:grid;grid-template-columns:112px 1fr;margin:0;border-top:1px solid var(--line)}.profile-section dt,.profile-section dd{min-height:34px;margin:0;padding:8px 0;border-bottom:1px solid var(--line);font-size:11px;line-height:1.55}.profile-section dt{color:rgba(204,208,217,.68);letter-spacing:.08em;text-transform:uppercase}.profile-section dd{color:rgba(228,230,236,.84)}.voice-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.voice-grid button{min-height:38px;padding:8px 10px;border:1px solid rgba(220,224,232,.28);border-radius:999px;color:rgba(225,228,235,.76);font-size:9px;letter-spacing:.06em}.voice-grid button span{margin-right:6px}.voice-grid button:disabled{opacity:.35;cursor:default}.voice-grid button.playing{border-color:var(--char-color);color:var(--text)}.gallery-link{width:100%;min-height:46px;margin-top:22px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(220,224,232,.28);border-bottom:1px solid rgba(220,224,232,.28);color:rgba(244,245,248,.9);font-size:10px;letter-spacing:.16em}.char-art{position:relative;min-width:0;min-height:640px}.char-glow{position:absolute;inset:12% 0 0 4%;background:radial-gradient(circle at 55% 42%,color-mix(in srgb,var(--char-color) 24%,transparent),transparent 58%);filter:blur(16px);opacity:.75}.char-art :global(.char-art-full){position:absolute;z-index:2;right:0;bottom:0;width:auto;height:min(96%,735px);max-width:100%;object-fit:contain;filter:drop-shadow(0 24px 34px rgba(0,0,0,.22))}.char-art :global(.char-art-bust){display:none}.char-art :global(.char-art-empty){position:absolute;inset:0;display:grid;place-items:center;color:var(--faint);font-size:10px;letter-spacing:.14em}.char-bottom-switch{margin-top:24px;display:flex;justify-content:center;align-items:center;gap:18px}.char-bottom-switch button{display:flex;align-items:baseline;gap:8px;color:var(--faint);font-size:10px;letter-spacing:.14em}.char-bottom-switch button.on{color:var(--text)}.char-bottom-switch small{font-size:8px;opacity:.55}.char-bottom-switch i{width:44px;height:1px;background:var(--line)}.au-back{margin-bottom:18px;color:var(--faint);font-size:10px}.au-empty{padding:60px 18px;text-align:center;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
