@@ -286,13 +286,25 @@ function CharacterDetailInner() {
           {displayQuote && (
             <blockquote className="quote-vertical" aria-label="キャラクター台詞">
               {displayQuote.split(/\n+/).filter(Boolean).map((line, i) => {
-                const verticalLine = line.replace(/(?:…{2,}|\.{3,})/g, '︙');
+                // 「……」は2つとも残す。ASCIIの...も3個ごとに縦三点へ変換。
+                const verticalLine = line
+                  .replace(/…/g, '︙')
+                  .replace(/\.{3}/g, '︙');
+
+                const parts = verticalLine.split(/(\d+)/g);
+
                 return (
                   <span
                     key={`${line}-${i}`}
                     className={line.length > 28 ? 'is-long' : ''}
                   >
-                    {verticalLine}
+                    {parts.map((part, partIndex) =>
+                      /^\d{1,2}$/.test(part) ? (
+                        <b className="tcy" key={`${part}-${partIndex}`}>{part}</b>
+                      ) : (
+                        <React.Fragment key={`${part}-${partIndex}`}>{part}</React.Fragment>
+                      )
+                    )}
                   </span>
                 );
               })}
@@ -1113,6 +1125,94 @@ function CharacterDetailInner() {
     font-weight:700 !important;
     letter-spacing:.04em !important;
     text-shadow:0 1px 3px rgba(0,0,0,.55) !important;
+  }
+}
+
+
+.quote-vertical .tcy{
+  display:inline;
+  font:inherit;
+  font-weight:inherit;
+  color:inherit;
+  text-combine-upright:all;
+  -webkit-text-combine:horizontal;
+}
+
+@media(min-width:901px){
+  :global(.char-sign){
+    right:-18% !important;
+    bottom:58px !important;
+    width:clamp(700px,96%,1080px) !important;
+    max-height:390px !important;
+  }
+}
+
+@media(max-width:900px){
+  :global(.char-sign){
+    left:2% !important;
+    right:auto !important;
+    bottom:10% !important;
+    width:96% !important;
+    max-width:none !important;
+    max-height:220px !important;
+    transform:rotate(-5deg) !important;
+  }
+
+  .char-art.is-mobile-full :global(.char-sign){
+    left:2% !important;
+    right:auto !important;
+    bottom:9% !important;
+    width:96% !important;
+  }
+}
+
+@media(max-width:900px){
+  .char-head{
+    display:grid !important;
+    grid-template-columns:max-content minmax(0,1fr) max-content !important;
+    align-items:center !important;
+    gap:8px !important;
+    min-height:48px !important;
+    padding:0 !important;
+  }
+
+  .char-head h1{
+    margin:0 !important;
+    font-size:9.5px !important;
+    line-height:1 !important;
+    letter-spacing:.10em !important;
+    white-space:nowrap !important;
+  }
+
+  .char-switch{
+    justify-self:center !important;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    gap:6px !important;
+    min-width:0 !important;
+    font-size:9.5px !important;
+    white-space:nowrap !important;
+  }
+
+  .char-switch button{
+    padding:4px 1px !important;
+    white-space:nowrap !important;
+  }
+
+  .char-switch span{
+    flex:0 0 auto !important;
+  }
+
+  .char-admin{
+    justify-self:end !important;
+  }
+
+  .char-admin .btn{
+    padding:6px 8px !important;
+    font-size:9px !important;
+    line-height:1 !important;
+    white-space:nowrap !important;
   }
 }
 
