@@ -378,15 +378,15 @@ function CharacterDetailInner() {
 .voice-grid button span{margin-right:3px}
 .char-bottom-switch{margin-top:18px}
 }
-      `}
+
 /* --- CHARACTER final visibility fixes --- */
-.outfit-pill.is-active{
-  background:color-mix(in srgb,var(--char-color) 30%,#262b34) !important;
-  border-color:var(--char-color) !important;
+.outfit-switch button.on{
   color:#fff !important;
-  opacity:1 !important;
-  box-shadow:0 0 0 1px color-mix(in srgb,var(--char-color) 48%,transparent),
+  border-color:var(--char-color) !important;
+  background:color-mix(in srgb,var(--char-color) 28%,#242932) !important;
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--char-color) 45%,transparent),
              0 0 16px color-mix(in srgb,var(--char-color) 18%,transparent) !important;
+  opacity:1 !important;
 }
 
 @media(max-width:900px){
@@ -396,39 +396,38 @@ function CharacterDetailInner() {
     overflow:hidden !important;
   }
 
-  .char-art :global(.char-art-full),
   .char-art :global(.char-art-bust){
+    display:block !important;
     position:absolute !important;
     inset:0 !important;
     width:100% !important;
     height:100% !important;
+    z-index:2 !important;
   }
-  .char-art :global(.char-art-full > *),
+
+  .char-art :global(.char-art-full){
+    display:none !important;
+    position:absolute !important;
+    left:50% !important;
+    bottom:0 !important;
+    top:auto !important;
+    width:auto !important;
+    height:100% !important;
+    max-width:none !important;
+    transform:translateX(-50%) !important;
+    object-fit:contain !important;
+    object-position:center bottom !important;
+    z-index:2 !important;
+    opacity:1 !important;
+    visibility:visible !important;
+  }
+
   .char-art :global(.char-art-bust > *){
     width:100% !important;
     height:100% !important;
   }
 
-  /* normal mobile = 3:4 bust */
-  .char-art :global(.char-art-bust){
-    display:block !important;
-    z-index:2 !important;
-  }
-  .char-art :global(.char-art-full){
-    display:none !important;
-    z-index:2 !important;
-  }
-
-  /* expand button = full body */
-  .char-art.is-mobile-full :global(.char-art-bust){
-    display:none !important;
-  }
-  .char-art.is-mobile-full :global(.char-art-full){
-    display:block !important;
-  }
-
-  .char-art :global(.char-art-bust img),
-  .char-art :global(.char-art-full img){
+  .char-art :global(.char-art-bust img){
     display:block !important;
     width:100% !important;
     height:100% !important;
@@ -438,7 +437,14 @@ function CharacterDetailInner() {
     visibility:visible !important;
   }
 
-  /* signature: above art, small, fully inside bottom-right */
+  .char-art.is-mobile-full :global(.char-art-bust){
+    display:none !important;
+  }
+
+  .char-art.is-mobile-full :global(.char-art-full){
+    display:block !important;
+  }
+
   .char-sign{
     z-index:8 !important;
     right:7% !important;
@@ -446,15 +452,14 @@ function CharacterDetailInner() {
     width:clamp(68px,20vw,104px) !important;
     max-height:72px !important;
     transform:rotate(-8deg) !important;
-    transform-origin:center !important;
   }
+
   .char-art.is-mobile-full .char-sign{
     right:7% !important;
     bottom:7% !important;
     width:clamp(74px,21vw,112px) !important;
   }
 
-  /* ribbon: moderate size; dedicated ︙ glyph stays vertical */
   .quote-vertical span{
     padding:7px 4px 8px !important;
     font-size:12px !important;
@@ -462,6 +467,7 @@ function CharacterDetailInner() {
     letter-spacing:.01em !important;
     text-orientation:mixed !important;
   }
+
   .quote-vertical span.is-long{
     padding:7px 4px !important;
     font-size:10px !important;
@@ -469,7 +475,7 @@ function CharacterDetailInner() {
   }
 }
 
-</style>
+      `}</style>
     </section>
   );
 }
