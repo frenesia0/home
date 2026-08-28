@@ -36,8 +36,8 @@ export const NEWS_TAGS: {
   value: 'world',
   label: 'WORLD',
 },
-  { value: 'solas', label: 'SOLAS' },
   { value: 'shiki', label: 'SHIKI' },
+  { value: 'solas', label: 'SOLAS' },
 ];
 
 export const newsTagLabel = (tag: NewsTag): string =>
