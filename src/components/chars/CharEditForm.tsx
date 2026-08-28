@@ -1001,14 +1001,14 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
               minHeight: 42,
               padding: '10px 14px',
               borderRadius: 8,
-              border: '1px solid rgba(255,255,255,.18)',
-              background: 'rgba(255,255,255,.07)',
-              color: '#f5f5f5',
+              border: '1px solid rgba(255,105,115,.42)',
+              background: 'rgba(145,35,45,.12)',
+              color: '#f3aab0',
               fontSize: 12,
               fontWeight: 700,
               letterSpacing: '.06em',
               cursor: saving ? 'wait' : 'pointer',
-              opacity: saving ? 0.65 : 1,
+              opacity: saving ? 0.62 : 0.88,
             }}
           >
             CANCEL
@@ -1027,9 +1027,9 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
               minHeight: 42,
               padding: '10px 14px',
               borderRadius: 8,
-              border: '1px solid rgba(255,255,255,.35)',
-              background: '#f1f1f1',
-              color: '#17191d',
+              border: '1px solid rgba(255,255,255,.72)',
+              background: 'rgba(255,255,255,.055)',
+              color: '#ffffff',
               fontSize: 12,
               fontWeight: 700,
               letterSpacing: '.06em',
@@ -1068,11 +1068,101 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
         );
       })()}
       <style jsx>{`
+        :global(.write-grid){
+          --panel:#1d2128;
+          --panel2:#222730;
+          --text:#f3f5f8;
+          --faint:rgba(235,239,246,.48);
+          --line:rgba(255,255,255,.14);
+          color:#f3f5f8;
+        }
+
         :global(.write-grid img){max-width:100%}
+
+        :global(.write-grid .panel){
+          background:#1d2128 !important;
+          color:#f3f5f8 !important;
+          border-color:rgba(255,255,255,.13) !important;
+          box-shadow:0 12px 28px rgba(0,0,0,.16) !important;
+        }
+
+        :global(.write-grid .widget){
+          background:#20252d !important;
+          color:#f3f5f8 !important;
+        }
+
+        :global(.write-grid .panel h4),
+        :global(.write-grid .k-label),
+        :global(.write-grid .cp-lb),
+        :global(.write-grid b),
+        :global(.write-grid strong){
+          color:#f5f7fb !important;
+        }
+
+        :global(.write-grid input:not([type="file"]):not([type="checkbox"]):not([type="radio"]):not([type="color"])),
+        :global(.write-grid select),
+        :global(.write-grid textarea){
+          background:#272c35 !important;
+          color:#f6f7fa !important;
+          border-color:rgba(255,255,255,.16) !important;
+        }
+
+        :global(.write-grid input::placeholder),
+        :global(.write-grid textarea::placeholder){
+          color:rgba(239,242,248,.34) !important;
+        }
+
+        :global(.write-grid .btn-ghost){
+          background:rgba(255,255,255,.045) !important;
+          color:rgba(248,249,252,.86) !important;
+          border-color:rgba(255,255,255,.16) !important;
+        }
+
+        :global(.write-grid .btn-dark){
+          background:#14171c !important;
+          color:#fff !important;
+          border-color:rgba(255,255,255,.18) !important;
+        }
+
+        :global(.write-grid .mini-seg){
+          background:#171a20 !important;
+          border-color:rgba(255,255,255,.12) !important;
+        }
+
+        :global(.write-grid .mini-seg button){
+          color:rgba(245,247,251,.58) !important;
+        }
+
+        :global(.write-grid .mini-seg button.on){
+          background:#2d323c !important;
+          color:#fff !important;
+        }
+
+        :global(.write-grid .ph){
+          background:#16191f !important;
+          color:rgba(255,255,255,.34) !important;
+        }
+
+        /* このコンポーネントはCHARACTER EDITページだけに出るので、
+           ページ側タイトルもここで暗色UIに合わせる。 */
+        :global(main h1){
+          color:#f5f7fb !important;
+        }
+
+        :global(main h1 + *){
+          color:rgba(240,243,248,.52) !important;
+        }
+
+        :global(main .panel),
+        :global(main .widget){
+          border-color:rgba(255,255,255,.13);
+        }
+
         .save-spinner{
           width:12px;height:12px;border:2px solid currentColor;border-right-color:transparent;
           border-radius:50%;display:inline-block;animation:spin .7s linear infinite
         }
+
         .form-actions button:disabled{opacity:.62;cursor:wait}
         @keyframes spin{to{transform:rotate(360deg)}}
       `}</style>
