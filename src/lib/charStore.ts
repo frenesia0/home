@@ -17,6 +17,7 @@ export interface CharacterOutfit {
   label: string;              // EDIT画面・切替UIに出す衣装名
   fullImageId?: string;       // PC版・FULL BODY表示用の全身立ち絵
   bustImageId?: string;       // スマホ通常表示用の腰上立ち絵（3:4前提）
+  bustCrop?: import("@/components/ui/CropEditor").CropValue; // 腰上画像の3:4表示位置
   isDefault?: boolean;        // 初期表示衣装。trueは1件だけにする
 }
 
