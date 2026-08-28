@@ -139,6 +139,78 @@ function collectCharacterPublicIds(chars: Character[]): string[] {
   return [...ids];
 }
 
+
+type CharacterRefInfo = {
+  characterId: string;
+  characterName: string;
+  label: string;
+  ref: string;
+  publicId: string;
+};
+
+function collectCharacterRefInfo(chars: Character[]): CharacterRefInfo[] {
+  const out: CharacterRefInfo[] = [];
+
+  const add = (
+    char: Character,
+    label: string,
+    ref?: string
+  ) => {
+    if (!ref) return;
+    const publicId = cloudinaryPublicIdFromRef(ref);
+    if (!publicId) return;
+
+    out.push({
+      characterId: char.id,
+      characterName: char.name,
+      label,
+      ref,
+      publicId,
+    });
+  };
+
+  for (const char of chars) {
+    add(char, '旧・全身立ち絵', char.profileFullId);
+    add(char, '旧・腰上立ち絵', char.profileBustId);
+    add(char, 'サイン', char.signId);
+    add(char, '代表アート', char.artId);
+    add(char, '旧アートURL', char.artUrl);
+    add(char, 'サムネイル', char.thumbId);
+
+    (char.arts ?? []).forEach((ref, i) => {
+      add(char, `アート ${i + 1}`, ref);
+    });
+
+    (char.outfits ?? []).forEach((outfit, i) => {
+      const outfitName =
+        outfit.label?.trim() ||
+        `OUTFIT ${i + 1}`;
+
+      add(
+        char,
+        `${outfitName} / FULL`,
+        outfit.fullImageId
+      );
+
+      add(
+        char,
+        `${outfitName} / BUST`,
+        outfit.bustImageId
+      );
+    });
+  }
+
+  // 同じURLを旧互換フィールドとoutfits双方が参照している場合は1件にまとめる
+  const seen = new Set<string>();
+
+  return out.filter(item => {
+    const key = `${item.characterId}:${item.publicId}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function thumbnailUrl(url: string) {
   if (
     !url ||
@@ -298,6 +370,15 @@ export default function OrphanImagesPage() {
       orphans,
       currentPage,
     ]);
+
+  const characterRefs =
+    useMemo(
+      () =>
+        collectCharacterRefInfo(
+          effectiveChars
+        ),
+      [effectiveChars]
+    );
 
   const selectedCount =
     selected.size;
@@ -891,6 +972,151 @@ export default function OrphanImagesPage() {
         >
           {message}
         </p>
+      )}
+
+      {charsLoaded && characterRefs.length > 0 && (
+        <section
+          style={{
+            marginBottom: 26,
+            padding: 18,
+            border:
+              '1px solid rgba(128,131,214,.42)',
+            borderRadius: 12,
+            background:
+              'rgba(128,131,214,.07)',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              justifyContent:
+                'space-between',
+              gap: 12,
+              alignItems:
+                'baseline',
+              flexWrap: 'wrap',
+              marginBottom: 14,
+            }}
+          >
+            <div>
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: 15,
+                  letterSpacing:
+                    '.08em',
+                }}
+              >
+                CURRENT CHARACTER IMAGES
+              </h2>
+
+              <p
+                style={{
+                  margin:
+                    '5px 0 0',
+                  color:
+                    'rgba(255,255,255,.56)',
+                  fontSize: 11,
+                }}
+              >
+                ここに出ている画像は現在CHARACTERデータから参照中です。削除しないでください。
+              </p>
+            </div>
+
+            <span
+              style={{
+                color:
+                  'rgba(255,255,255,.6)',
+                fontSize: 11,
+              }}
+            >
+              {characterRefs.length} refs
+            </span>
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns:
+                'repeat(auto-fill, minmax(170px, 1fr))',
+              gap: 12,
+            }}
+          >
+            {characterRefs.map(item => (
+              <article
+                key={`${item.characterId}-${item.publicId}`}
+                style={{
+                  overflow: 'hidden',
+                  borderRadius: 10,
+                  border:
+                    '1px solid rgba(255,255,255,.14)',
+                  background:
+                    'rgba(255,255,255,.035)',
+                }}
+              >
+                <div
+                  style={{
+                    aspectRatio: '1 / 1',
+                    background:
+                      'rgba(255,255,255,.04)',
+                  }}
+                >
+                  <img
+                    src={thumbnailUrl(item.ref)}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'contain',
+                      display: 'block',
+                    }}
+                  />
+                </div>
+
+                <div
+                  style={{
+                    padding: 10,
+                    display: 'grid',
+                    gap: 5,
+                  }}
+                >
+                  <strong
+                    style={{
+                      fontSize: 11,
+                    }}
+                  >
+                    {item.characterName}
+                  </strong>
+
+                  <span
+                    style={{
+                      color:
+                        '#aeb1ff',
+                      fontSize: 10,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {item.label}
+                  </span>
+
+                  <code
+                    style={{
+                      color:
+                        'rgba(255,255,255,.52)',
+                      fontSize: 9,
+                      overflowWrap:
+                        'anywhere',
+                    }}
+                  >
+                    {item.publicId}
+                  </code>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
       )}
 
       {result && (
