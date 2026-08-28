@@ -12,9 +12,19 @@ export interface CharTab {
   html: string;          // HTML 에디터 내용 (스크립트 불허 — 렌더 시 sanitize)
 }
 
+export interface CharacterOutfit {
+  id: string;                 // 衣装ID（例: default / formal / casual）
+  label: string;              // EDIT画面・切替UIに出す衣装名
+  fullImageId?: string;       // PC版・FULL BODY表示用の全身立ち絵
+  bustImageId?: string;       // スマホ通常表示用の腰上立ち絵（3:4前提）
+  bustCrop?: import("@/components/ui/CropEditor").CropValue; // 腰上画像の3:4表示位置
+  isDefault?: boolean;        // 初期表示衣装。trueは1件だけにする
+}
+
 export interface Character {
   id: string;
   name: string;          // 대표 이름 (전용 폰트 적용 대상)
+  enName?: string;        // CHARACTER詳細の英語表記
   sub: string;           // 한글명 · 소속 한 줄
   color: string;         // 대표 테마색 (말풍선·리스트 점)
   // 상세 페이지 테마 (v1.9 사용자 확정) — custom이면 대표 테마색으로 홈 팔레트 임시 전환 (4.18 방식)
@@ -34,6 +44,33 @@ export interface Character {
   arts?: string[];       // 아트 목록 (IndexedDB — 첫 장이 대표 풀 아트이자 썸네일 원본)
   artId?: string;        // (구) 단일 풀 아트
   artUrl?: string;       // (구) 풀 아트 URL
+      /** CHARACTERページで表示する3行の台詞 */
+  quote?: string;
+
+  /** キャラクターボイス表記（例：CV.かっこいい） */
+  cv?: string;
+
+  /** PC版CHARACTERページ専用の全身立ち絵 */
+  profileFullId?: string;
+
+  /** スマホ版CHARACTERページ専用の腰上立ち絵（旧互換。新規はoutfitsを使う） */
+  profileBustId?: string;
+
+  /**
+   * CHARACTERページの衣装一覧。
+   * - isDefault:true の衣装を必ず初期表示
+   * - isDefault が無い旧データでは先頭を初期表示として扱う
+   * - bustImageId はスマホ表示で 3:4 縦長前提
+   */
+  outfits?: CharacterOutfit[];
+
+  /** 立ち絵右下に重ねるキャラクターサイン */
+  signId?: string;
+
+  voices?: {
+  label: string;
+  audioId?: string;
+}[];
   fontId?: string;       // 전용 폰트 — 이름·타이틀 (5.1)
   /** 상세 페이지 큰 이름의 글씨 크기 px (v2.0) — 기본 38.
    *  이름 길이가 제각각이라 자동으로 줄이면 어중간해진다. 캐릭터마다 직접 정한다. */
@@ -55,6 +92,7 @@ export interface AuCharProfile {
   basicHtml?: string;
   arts?: string[];
   name?: string;
+  enName?: string;
   sub?: string;
   color?: string;
   themeMode?: 'default' | 'custom';
@@ -77,6 +115,7 @@ export function charWithAu(c: Character, auKey?: string | null): Character {
   return {
     ...c,
     ...(p.name !== undefined ? { name: p.name } : {}),
+    ...(p.enName !== undefined ? { enName: p.enName } : {}),
     ...(p.sub !== undefined ? { sub: p.sub } : {}),
     ...(p.color !== undefined ? { color: p.color } : {}),
     ...(p.themeMode !== undefined ? { themeMode: p.themeMode } : {}),
@@ -200,7 +239,85 @@ export interface Relation {
   qaEnabled?: boolean;           // base AU의 QUESTIONS 섹션 사용 여부 (구버전은 questions 존재로 판정)
 }
 
-export const CHAR_SEED: Character[] = [];
+export const CHAR_SEED: Character[] = [
+  {
+    id: 'shiki-hakray',
+    name: 'シキ・ハクレイ',
+    enName: 'Shiki Hakray',
+    sub: '',
+    color: '#8083D6',
+    themeMode: 'default',
+    colors: [],
+    specs: [
+      { label: 'Birthday', value: '8/2' },
+      { label: 'Age', value: '1歳' },
+      { label: 'Height', value: '186cm' },
+      { label: 'Weight', value: '100.021kg' },
+      { label: 'Hobby', value: '人間生活を謳歌すること' },
+    ],
+    tabs: [],
+    basicHtml:
+      'フレネシア第224代目王ソラスによって造られた人工生命体。<br />知の星であるフレネシアの知識を詰め込んだ存在であるが、人間生活はまだまだ初心者。<br />破天荒なソラスの手綱を握っている。',
+    quote:
+  '「シキ・ハクレイ。\nフレネシアの人間は、俺の事を『フレネシアの叡智』だと呼んだりするな。\n…ハクレイの姓について？ああ、これはソラスのファミリーネームだ。」',
+    cv: 'CV.かっこいい',
+    voices: [
+      { label: 'SAMPLE 01' },
+      { label: 'SAMPLE 02' },
+      { label: 'SAMPLE 03' },
+    ],
+    outfits: [
+      {
+        id: 'default',
+        label: 'DEFAULT',
+        isDefault: true,
+      },
+    ],
+    visibility: 'public',
+    thumbClass: '',
+    own: true,
+  },
+  {
+    id: 'solas-frenesia',
+    name: 'ソラス・フレネシア',
+    enName: 'Solas Frenesia',
+    sub: '',
+    color: '#8083D6',
+    themeMode: 'default',
+    colors: [],
+    specs: [
+      { label: 'Birthday', value: '8/6' },
+      { label: 'Age', value: '21歳' },
+      { label: 'Height', value: '192cm' },
+      { label: 'Weight', value: '71kg' },
+      {
+        label: 'Hobby',
+        value: '自身の論文を無断転載した人を訴訟すること',
+      },
+    ],
+    tabs: [],
+    basicHtml:
+      '知の星「フレネシア」の第224代目王。<br />基本穏やかで理性的な性格だが、外交時に皮肉を言われると数倍に言い返す幼稚さと頭の回転の速さを持ち合わせる。',
+    quote:
+  '「第224代目王、ソラス・フレネシア。\n……そんなに畏まらなくていい。フレネシアにおいて、王の権威はさほど強くないんだ。\n実際、誰も俺に『様』をつけない……。それはそれでどうなんだろうな？」',
+    cv: 'CV.かっこいい',
+    voices: [
+      { label: 'SAMPLE 01' },
+      { label: 'SAMPLE 02' },
+      { label: 'SAMPLE 03' },
+    ],
+    outfits: [
+      {
+        id: 'default',
+        label: 'DEFAULT',
+        isDefault: true,
+      },
+    ],
+    visibility: 'public',
+    thumbClass: '',
+    own: true,
+  },
+];
 
 export const REL_SEED: Relation[] = [];
 

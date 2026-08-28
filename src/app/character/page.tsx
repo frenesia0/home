@@ -1,183 +1,27 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useLocalList } from '@/lib/postStore';
 import { Character, CHAR_SEED } from '@/lib/charStore';
-import { SearchBar, FitText } from '@/components/ui/Kit';
-import { CroppedBlobImg } from '@/components/ui/CropEditor';
-import { PageTitle, EditableDesc } from '@/components/ui/PageText';
-import { useMainStore } from '@/lib/mainStore';
-import { useCardSort, mergeOrder } from '@/lib/cardSort';
+
+function isShiki(c: Character) {
+  const text = `${c.id} ${c.name} ${c.sub}`.toLowerCase();
+  return text.includes('shiki') || text.includes('シキ');
+}
 
 export default function CharacterPage() {
   const router = useRouter();
-  const { isAdmin } = useAuth();
-  const { editOn } = useMainStore();
+  const { user, isAdmin } = useAuth();
+  const [chars, , loaded] = useLocalList<Character>('ohome.chars.v1', CHAR_SEED);
 
-  const [chars, setChars] =
-    useLocalList<Character>(
-      'ohome.chars.v1',
-      CHAR_SEED
-    );
+  useEffect(() => {
+    if (!loaded) return;
+    const visible = chars.filter(c => c.own && (isAdmin || c.visibility === 'public' || (c.visibility === 'member' && !!user)));
+    const target = visible.find(isShiki) ?? visible[0];
+    if (target) router.replace(`/character/${encodeURIComponent(target.id)}`);
+  }, [chars, loaded, user, isAdmin, router]);
 
-  const [q, setQ] = useState('');
-
-  const visible = chars
-    .filter((c) => c.own)
-    .filter(
-      (c) =>
-        isAdmin ||
-        c.visibility === 'public'
-    )
-    .filter(
-      (c) =>
-        !q ||
-        c.name
-          .toLowerCase()
-          .includes(q.toLowerCase()) ||
-        c.sub.includes(q)
-    );
-
-  const sort = useCardSort(
-    visible,
-    (next) =>
-      setChars(
-        mergeOrder(chars, next)
-      ),
-    editOn && isAdmin
-  );
-
-  return (
-    <section className="page">
-      <div className="page-head">
-        <PageTitle>
-          CHARACTER
-        </PageTitle>
-
-        <EditableDesc
-          k="chars-desc"
-          def="frenesia profile"
-        />
-
-        <div className="head-actions">
-          <SearchBar
-            onSearch={setQ}
-          />
-
-          {isAdmin && (
-            <button
-              className="btn btn-dark"
-              onClick={() =>
-                router.push(
-                  '/character/new'
-                )
-              }
-            >
-              ＋ ADD CHARACTER
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="g5 chars-grid">
-        {visible.map((c, i) => {
-          const priv =
-            c.visibility ===
-            'private';
-
-          const sp = sort(i) as {
-            style?: React.CSSProperties;
-          };
-
-          return (
-            <div
-              key={c.id}
-              className="char-card"
-              {...sort(i)}
-              style={{
-                ...(priv
-                  ? {
-                      opacity: 0.45,
-                    }
-                  : undefined),
-                ...sp.style,
-              }}
-              onClick={() => {
-                if (!editOn) {
-                  router.push(
-                    `/character/${c.id}`
-                  );
-                }
-              }}
-            >
-              <div
-                className="thumb"
-                style={{
-                  position:
-                    'relative',
-                }}
-              >
-                <CroppedBlobImg
-                  fileRef={
-                    c.arts?.[0] ??
-                    c.thumbId
-                  }
-                  crop={
-                    c.thumbCrop
-                  }
-                  ph={
-                    c.thumbClass
-                  }
-                  label={
-                    priv
-                      ? '非公開'
-                      : '3:4'
-                  }
-                />
-              </div>
-
-              <div className="nm">
-                <b
-                  style={{
-                    minWidth: 0,
-                    flex: 1,
-                  }}
-                >
-                  <FitText>
-                    {c.name}
-                  </FitText>
-                </b>
-
-                <i
-                  style={{
-                    background:
-                      c.color,
-                  }}
-                />
-              </div>
-            </div>
-          );
-        })}
-
-        {visible.length === 0 && (
-          <p
-            style={{
-              gridColumn:
-                '1/-1',
-              textAlign:
-                'center',
-              color:
-                'var(--page-desc)',
-              fontSize: 13,
-              padding: 40,
-            }}
-          >
-            表示できるキャラクターがありません
-          </p>
-        )}
-      </div>
-    </section>
-  );
+  return <section className="page" style={{minHeight:240,display:'grid',placeItems:'center',color:'var(--faint)',fontSize:10,letterSpacing:'.14em'}}>{loaded ? 'CHARACTER' : 'LOADING...'}</section>;
 }

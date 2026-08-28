@@ -23,7 +23,7 @@ const NAV_ITEMS = [
   },
   {
     label: 'CHARACTER',
-    href: '/character',
+    href: '/character/shiki-hakray',
   },
   {
     label: 'GALLERY',
@@ -50,7 +50,7 @@ const MOBILE_MAIN_ITEMS = [
   },
   {
     label: 'CHARACTER',
-    href: '/character',
+    href: '/character/shiki-hakray',
   },
   {
     label: 'GALLERY',
@@ -95,6 +95,21 @@ export function TopBar() {
 
   const pathname =
     usePathname();
+
+  const isNavActive = (
+    href: string
+  ) => {
+    if (
+      href ===
+      '/character/shiki-hakray'
+    ) {
+      return pathname.startsWith(
+        '/character'
+      );
+    }
+
+    return pathname === href;
+  };
 
   const [
     menuOpen,
@@ -363,8 +378,9 @@ export function TopBar() {
                     item.href
                   }
                   className={
-                    pathname ===
-                    item.href
+                    isNavActive(
+                      item.href
+                    )
                       ? 'on'
                       : ''
                   }
@@ -498,8 +514,9 @@ export function TopBar() {
                       item.href
                     }
                     className={
-                      pathname ===
-                      item.href
+                      isNavActive(
+                        item.href
+                      )
                         ? 'on'
                         : ''
                     }
@@ -572,8 +589,9 @@ export function TopBar() {
                       item.href
                     }
                     className={
-                      pathname ===
-                      item.href
+                      isNavActive(
+                        item.href
+                      )
                         ? 'on'
                         : ''
                     }

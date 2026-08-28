@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { backend } from '@/lib/backend';
+import { useLocalList } from '@/lib/postStore';
+import { Character, CHAR_SEED } from '@/lib/charStore';
 import {
   fetchGalleryPosts,
   getGalleryImages,
@@ -59,6 +61,156 @@ function formatBytes(bytes?: number) {
  * 管理画面の一覧で原寸画像を読ませない。
  * Cloudinary側で軽い正方形サムネイルを生成して表示する。
  */
+
+function cloudinaryPublicIdFromRef(ref?: string): string | null {
+  if (!ref || !/^https?:\/\//.test(ref) || !ref.includes('/upload/')) {
+    return null;
+  }
+
+  try {
+    const url = new URL(ref);
+    const marker = '/upload/';
+    const index = url.pathname.indexOf(marker);
+
+    if (index < 0) return null;
+
+    let rest = url.pathname.slice(index + marker.length);
+
+    // Cloudinary URL:
+    // /upload/[transformations]/v1234567890/folder/public_id.png
+    const parts = rest.split('/').filter(Boolean);
+
+    const versionIndex = parts.findIndex(part => /^v\d+$/.test(part));
+    if (versionIndex >= 0) {
+      parts.splice(0, versionIndex + 1);
+    } else {
+      // version無しの場合、既知の変換指定らしき先頭要素だけ除外
+      while (
+        parts.length > 1 &&
+        /^(?:[a-z]+_[^/]+|f_[^/]+|q_[^/]+|c_[^/]+|w_\d+|h_\d+)(?:,|$)/.test(parts[0])
+      ) {
+        parts.shift();
+      }
+    }
+
+    if (parts.length === 0) return null;
+
+    const last = parts[parts.length - 1].replace(/\.[^.]+$/, '');
+    parts[parts.length - 1] = last;
+
+    return parts.join('/') || null;
+  } catch {
+    return null;
+  }
+}
+
+function collectCharacterPublicIds(chars: Character[]): string[] {
+  const ids = new Set<string>();
+
+  const addRef = (ref?: string) => {
+    const id = cloudinaryPublicIdFromRef(ref);
+    if (id) ids.add(id);
+  };
+
+  for (const char of chars) {
+    addRef(char.profileFullId);
+    addRef(char.profileBustId);
+    addRef(char.signId);
+    addRef(char.artId);
+    addRef(char.artUrl);
+    addRef(char.thumbId);
+
+    for (const ref of char.arts ?? []) {
+      addRef(ref);
+    }
+
+    for (const outfit of char.outfits ?? []) {
+      addRef(outfit.fullImageId);
+      addRef(outfit.bustImageId);
+    }
+
+    for (const voice of char.voices ?? []) {
+      // 現在は画像未使用判定なので audioId は対象外。
+      // 将来画像参照が増えたらここへ追加する。
+      void voice;
+    }
+  }
+
+  return [...ids];
+}
+
+
+type CharacterRefInfo = {
+  characterId: string;
+  characterName: string;
+  label: string;
+  ref: string;
+  publicId: string;
+};
+
+function collectCharacterRefInfo(chars: Character[]): CharacterRefInfo[] {
+  const out: CharacterRefInfo[] = [];
+
+  const add = (
+    char: Character,
+    label: string,
+    ref?: string
+  ) => {
+    if (!ref) return;
+    const publicId = cloudinaryPublicIdFromRef(ref);
+    if (!publicId) return;
+
+    out.push({
+      characterId: char.id,
+      characterName: char.name,
+      label,
+      ref,
+      publicId,
+    });
+  };
+
+  for (const char of chars) {
+    add(char, '旧・全身立ち絵', char.profileFullId);
+    add(char, '旧・腰上立ち絵', char.profileBustId);
+    add(char, 'サイン', char.signId);
+    add(char, '代表アート', char.artId);
+    add(char, '旧アートURL', char.artUrl);
+    add(char, 'サムネイル', char.thumbId);
+
+    (char.arts ?? []).forEach((ref, i) => {
+      add(char, `アート ${i + 1}`, ref);
+    });
+
+    (char.outfits ?? []).forEach((outfit, i) => {
+      const outfitName =
+        outfit.label?.trim() ||
+        `OUTFIT ${i + 1}`;
+
+      add(
+        char,
+        `${outfitName} / FULL`,
+        outfit.fullImageId
+      );
+
+      add(
+        char,
+        `${outfitName} / BUST`,
+        outfit.bustImageId
+      );
+    });
+  }
+
+  // 同じURLを旧互換フィールドとoutfits双方が参照している場合は1件にまとめる
+  const seen = new Set<string>();
+
+  return out.filter(item => {
+    const key = `${item.characterId}:${item.publicId}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function thumbnailUrl(url: string) {
   if (
     !url ||
@@ -146,6 +298,17 @@ export default function OrphanImagesPage() {
   const { isAdmin } =
     useAuth();
 
+  const [chars, , charsLoaded] =
+    useLocalList<Character>(
+      'ohome.chars.v1',
+      CHAR_SEED
+    );
+
+  const effectiveChars =
+    chars.length > 0
+      ? chars
+      : CHAR_SEED;
+
   const [loading, setLoading] =
     useState(false);
 
@@ -208,6 +371,15 @@ export default function OrphanImagesPage() {
       currentPage,
     ]);
 
+  const characterRefs =
+    useMemo(
+      () =>
+        collectCharacterRefInfo(
+          effectiveChars
+        ),
+      [effectiveChars]
+    );
+
   const selectedCount =
     selected.size;
 
@@ -250,10 +422,21 @@ export default function OrphanImagesPage() {
         const posts =
           await fetchGalleryPosts();
 
-        const usedPublicIds =
+        const galleryPublicIds =
           collectUsedPublicIds(
             posts
           );
+
+        const characterPublicIds =
+          collectCharacterPublicIds(
+            effectiveChars
+          );
+
+        const usedPublicIds =
+          [...new Set([
+            ...galleryPublicIds,
+            ...characterPublicIds,
+          ])];
 
         const token =
           await getAdminToken();
@@ -583,7 +766,7 @@ export default function OrphanImagesPage() {
               fontSize: 13,
             }}
           >
-            GALLERYから参照されていないCloudinary画像を確認・整理します。
+            GALLERY・CHARACTERから参照されていないCloudinary画像を確認・整理します。
           </p>
         </div>
 
@@ -633,7 +816,8 @@ export default function OrphanImagesPage() {
           onClick={scan}
           disabled={
             loading ||
-            deleting
+            deleting ||
+            !charsLoaded
           }
           style={{
             padding:
@@ -656,9 +840,11 @@ export default function OrphanImagesPage() {
                 : 1,
           }}
         >
-          {loading
-            ? '確認中...'
-            : '未使用画像を確認'}
+          {!charsLoaded
+            ? 'キャラクター情報を読込中...'
+            : loading
+              ? '確認中...'
+              : '未使用画像を確認'}
         </button>
 
         {result && (
@@ -787,6 +973,7 @@ export default function OrphanImagesPage() {
           {message}
         </p>
       )}
+
 
       {result && (
         <>
