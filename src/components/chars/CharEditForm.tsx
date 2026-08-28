@@ -3,7 +3,7 @@
 // モーダルではなく専用ページ。誤クリックで閉じない。タブ内容は専用編集画面に切り替えて作成する。
 // アートは複数枚対応 — 1枚目が代表フルアート兼、一覧サムネイル（3:4クロップ）の元画像 (6.1)
 import React, { useEffect, useState } from 'react';
-import { Character, CharTab, ColorChip, Visibility, CharGrant } from '@/lib/charStore';
+import { Character, CharacterOutfit, CharTab, ColorChip, Visibility, CharGrant } from '@/lib/charStore';
 import { GrantsEditor } from '@/components/chars/GrantsEditor';
 import { newId } from '@/lib/postStore';
 import { putBlob, getBlob, useBlobUrl } from '@/lib/blobStore';
@@ -23,12 +23,45 @@ import { Lightbox } from '@/components/ui/Lightbox';
 interface SpecRow { id: string; label: string; value: string }
 interface ColorRow extends ColorChip { id: string }
 interface ArtItem { id: string; ref?: string; url?: string; file?: File }
+interface OutfitItem extends CharacterOutfit {
+  fullFile?: File;
+  fullUrl?: string;
+  bustFile?: File;
+  bustUrl?: string;
+}
+
 
 function ArtThumb({ item, crop }: { item: ArtItem; crop?: CropValue }) {
   const loaded = useBlobUrl(item.ref);
   const src = item.url ?? loaded;
   if (!src) return <div className="ph" style={{ width: '100%', height: '100%' }} />;
   return <CropImg src={src} crop={crop} />;
+}
+
+function OutfitPreview({ refId, url, alt, bust = false }: {
+  refId?: string;
+  url?: string;
+  alt: string;
+  bust?: boolean;
+}) {
+  const loaded = useBlobUrl(refId);
+  const src = url ?? loaded;
+  if (!src) {
+    return <div className="ph" style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', fontSize: 10, color: 'var(--faint)' }}>NO IMAGE</div>;
+  }
+  return (
+    <img
+      src={src}
+      alt={alt}
+      draggable={false}
+      style={{
+        width: '100%',
+        height: '100%',
+        objectFit: bust ? 'cover' : 'contain',
+        display: 'block',
+      }}
+    />
+  );
 }
 
 export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }: {
@@ -66,6 +99,22 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
   const [arts, setArts] = useState<ArtItem[]>(() => {
     const refs = initial?.arts ?? (initial?.artId ? [initial.artId] : initial?.thumbId ? [initial.thumbId] : []);
     return refs.map(r => ({ id: newId(), ref: r }));
+  });
+  const [outfits, setOutfits] = useState<OutfitItem[]>(() => {
+    const fromInitial = initial?.outfits?.length
+      ? initial.outfits
+      : [{
+          id: 'default',
+          label: 'DEFAULT',
+          fullImageId: initial?.profileFullId,
+          bustImageId: initial?.profileBustId,
+          isDefault: true,
+        }];
+    const hasDefault = fromInitial.some(o => o.isDefault);
+    return fromInitial.map((o, i) => ({
+      ...o,
+      isDefault: hasDefault ? !!o.isDefault : i === 0,
+    }));
   });
   const [thumbCrop, setThumbCrop] = useState<CropValue | undefined>(initial?.thumbCrop);
   const [grants, setGrants] = useState<CharGrant[]>(initial?.grants ?? []); // 関連キャラクターの会員権限 (v1.9)
@@ -115,6 +164,21 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
       )
     );
 
+    const outfitIds = await Promise.all(
+      outfits.map(async (o) => ({
+        id: o.id,
+        label: o.label.trim() || 'OUTFIT',
+        fullImageId: o.fullFile ? await putBlob(o.fullFile) : o.fullImageId,
+        bustImageId: o.bustFile ? await putBlob(o.bustFile) : o.bustImageId,
+        isDefault: !!o.isDefault,
+      }))
+    );
+
+    // デフォルト衣装は必ず1件。念のため無い場合は先頭をデフォルトにする。
+    if (outfitIds.length > 0 && !outfitIds.some(o => o.isDefault)) {
+      outfitIds[0].isDefault = true;
+    }
+
     onSave({
       // 既存キャラクター編集では、今回のフォームで触っていない
       // CHARACTER専用項目（quote / voices / profileFullId / profileBustId 等）を
@@ -163,6 +227,12 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
       thumbId: artIds[0],
       thumbCrop,
       artId: artIds[0],
+
+      outfits: outfitIds,
+
+      // 旧表示コードとの互換用。デフォルト衣装を従来フィールドにも同期する。
+      profileFullId: outfitIds.find(o => o.isDefault)?.fullImageId,
+      profileBustId: outfitIds.find(o => o.isDefault)?.bustImageId,
 
       own:
         initial?.own ??
@@ -265,6 +335,145 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
           {...fileDrop(fl => addArts(fl))}>
           ＋ ADD ART {arts.length === 0 && '(1枚目登録時にサムネイル範囲を指定)'}
         </button>
+
+        {/* CHARACTER立ち絵・衣装 */}
+        {!auMode && (
+          <>
+            <div style={{ height: 1, background: 'var(--line)', margin: '10px 0 4px' }} />
+            <label className="k-label" style={{ margin: 0 }}>
+              CHARACTER 立ち絵・衣装
+              <span style={{ marginLeft: 8, fontWeight: 400, color: 'var(--faint)' }}>
+                — 腰上画像は3:4縦長で登録 · DEFAULTが必ず初期表示
+              </span>
+            </label>
+
+            <div style={{ display: 'grid', gap: 12 }}>
+              {outfits.map((o, i) => (
+                <div
+                  key={o.id}
+                  style={{
+                    border: '1px solid var(--line)',
+                    borderRadius: 10,
+                    padding: 12,
+                    display: 'grid',
+                    gap: 10,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <KInput
+                      placeholder="衣装名"
+                      value={o.label}
+                      style={{ ...rowInp, flex: 1 }}
+                      onChange={e => setOutfits(list => list.map(x => x.id === o.id ? { ...x, label: e.target.value } : x))}
+                    />
+                    <button
+                      type="button"
+                      className={o.isDefault ? 'btn btn-dark' : 'btn btn-ghost'}
+                      style={{ padding: '5px 10px', fontSize: 10, flexShrink: 0 }}
+                      onClick={() => setOutfits(list => list.map(x => ({ ...x, isDefault: x.id === o.id })))}
+                    >
+                      {o.isDefault ? 'DEFAULT' : 'SET DEFAULT'}
+                    </button>
+                    {!o.isDefault && outfits.length > 1 && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        style={{ padding: '5px 9px', fontSize: 10, flexShrink: 0 }}
+                        onClick={() => del.ask(
+                          `衣装「${o.label || 'OUTFIT'}」を削除しますか？`,
+                          () => setOutfits(list => list.filter(x => x.id !== o.id)),
+                          'キャラクター本体は削除されません。衣装データだけを削除します。'
+                        )}
+                      >
+                        衣装削除
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div style={{ display: 'grid', gap: 7 }}>
+                      <span className="hint" style={{ margin: 0 }}>PC / FULL BODY — 全身立ち絵</span>
+                      <div style={{ height: 220, border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden' }}>
+                        <OutfitPreview refId={o.fullImageId} url={o.fullUrl} alt={`${name} ${o.label} full body`} />
+                      </div>
+                      <input
+                        id={`outfitFull-${o.id}`}
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        onChange={e => {
+                          const f = e.target.files?.[0];
+                          if (!f) return;
+                          setOutfits(list => list.map(x => x.id === o.id ? {
+                            ...x,
+                            fullFile: f,
+                            fullUrl: URL.createObjectURL(f),
+                          } : x));
+                          e.target.value = '';
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        style={addBtn}
+                        onClick={() => document.getElementById(`outfitFull-${o.id}`)?.click()}
+                      >
+                        {o.fullImageId || o.fullFile ? 'CHANGE FULL BODY' : '＋ ADD FULL BODY'}
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'grid', gap: 7 }}>
+                      <span className="hint" style={{ margin: 0 }}>MOBILE — 腰上立ち絵（3:4）</span>
+                      <div style={{ width: '100%', maxWidth: 165, aspectRatio: '3 / 4', justifySelf: 'center', border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden' }}>
+                        <OutfitPreview refId={o.bustImageId} url={o.bustUrl} alt={`${name} ${o.label} bust`} bust />
+                      </div>
+                      <input
+                        id={`outfitBust-${o.id}`}
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        onChange={e => {
+                          const f = e.target.files?.[0];
+                          if (!f) return;
+                          setOutfits(list => list.map(x => x.id === o.id ? {
+                            ...x,
+                            bustFile: f,
+                            bustUrl: URL.createObjectURL(f),
+                          } : x));
+                          e.target.value = '';
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        style={addBtn}
+                        onClick={() => document.getElementById(`outfitBust-${o.id}`)?.click()}
+                      >
+                        {o.bustImageId || o.bustFile ? 'CHANGE 3:4 BUST' : '＋ ADD 3:4 BUST'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={addBtn}
+              onClick={() => setOutfits(list => [
+                ...list,
+                {
+                  id: newId(),
+                  label: `OUTFIT ${String(list.length + 1).padStart(2, '0')}`,
+                  isDefault: list.length === 0,
+                },
+              ])}
+            >
+              ＋ ADD OUTFIT
+            </button>
+          </>
+        )}
 
         {/* 基本情報 */}
         <label className="k-label" style={{ margin: 0 }}>基本情報</label>
