@@ -121,7 +121,7 @@ export const COLLECTION_OF: Record<string, string> = {
   'ohome.threads.v1': 'threads',
   'ohome.diary.v1': 'diary',
 'ohome.memo.v1': 'memos',
-'ohome.comm.v1': 'commissions',,
+'ohome.comm.v1': 'commissions',
   'ohome.commapply.v1': 'applicants',
   'ohome.moods.v1': 'moods',
 
