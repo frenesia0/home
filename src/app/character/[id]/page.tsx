@@ -406,7 +406,9 @@ function CharacterDetailInner() {
 
 .char-bottom-switch{margin-top:24px;display:flex;justify-content:center;align-items:center;gap:18px}.char-bottom-switch button{display:flex;align-items:baseline;gap:8px;color:var(--faint);font-size:10px;letter-spacing:.14em}.char-bottom-switch button.on{color:var(--text)}.char-bottom-switch small{font-size:8px;opacity:.55}.char-bottom-switch i{width:44px;height:1px;background:var(--line)}.au-back{margin-bottom:18px;color:var(--faint);font-size:10px}.au-empty{padding:60px 18px;text-align:center;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
         @media(max-width:900px){
-.character-page{padding-top:18px}
+        .character-page{
+  padding-top:18px !important;
+}
 .char-head{grid-template-columns:1fr auto}
 .char-switch{grid-column:1/-1;grid-row:2;justify-content:center;margin-top:10px}
 .char-admin{grid-column:2;grid-row:1}
