@@ -993,9 +993,9 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
           </div>
         </div>
         <div className="form-actions">
-          <button className="btn btn-onbk" onClick={onCancel} disabled={saving}>CANCEL</button>
+          <button className="btn btn-accent" onClick={onCancel} disabled={saving}>CANCEL</button>
           <button
-            className="btn btn-accent"
+            className="btn btn-onbk"
             onClick={save}
             disabled={saving}
             aria-busy={saving}
