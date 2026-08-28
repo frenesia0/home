@@ -9,7 +9,6 @@ import { newId } from '@/lib/postStore';
 import { getBlob, useBlobUrl } from '@/lib/blobStore';
 import { uploadImageToCloudinary } from '@/lib/cloudinaryUpload';
 import { backend } from '@/lib/backend';
-import { useFonts } from '@/lib/fontStore';
 import { KInput, KSelect, KStep } from '@/components/ui/Kit';
 import { RichEditor } from '@/components/ui/RichEditor';
 import { ColorField } from '@/components/ui/ColorField';
@@ -114,19 +113,17 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
   auMode?: boolean;                        // AU専用編集 (v1.9) — 公開範囲・会員権限はbase側で管理するため非表示
   existingIds?: string[];                  // ページURL重複チェック用 (v1.9 — 新規登録)
 }) {
-  const { fonts, familyOf } = useFonts();
   const toast = useToast();
   const isNew = !initial;
 
   const [name, setName] = useState(initial?.name ?? '');
+  const [enName, setEnName] = useState(initial?.enName ?? '');
   const [slug, setSlug] = useState('');   // ページURL /character/{slug} (v1.9 — 新規登録, 空欄なら自動)
   const [sub, setSub] = useState(initial?.sub ?? '');
   const [color, setColor] = useState(initial?.color ?? '#5d636d');
   const [themeMode, setThemeMode] = useState<'default' | 'custom'>(initial?.themeMode ?? 'default');
   const [visibility, setVisibility] = useState<Visibility>(initial?.visibility ?? 'public');
-  const [fontId, setFontId] = useState(initial?.fontId ?? 'serif');
   const [nameSize, setNameSize] = useState(initial?.nameSize ?? 38);   // 詳細ページの大きな名前サイズ (v2.0)
-  const [bodyFontId, setBodyFontId] = useState(initial?.bodyFontId ?? 'default');
   const [specs, setSpecs] = useState<SpecRow[]>(
     (
       initial?.specs ?? [
@@ -276,6 +273,7 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
         (slug || newId()),
 
       name: name.trim(),
+      enName: enName.trim() || undefined,
       sub: sub.trim(),
       color,
       themeMode,
@@ -304,9 +302,7 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
       cv,
       signId,
       visibility,
-      fontId,
       nameSize,
-      bodyFontId,
 
       thumbClass:
         initial?.thumbClass ??
@@ -943,8 +939,17 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
         <div className="panel widget" style={{ marginBottom: 14 }}>
           <h4>基本設定</h4>
           <div style={{ display: 'grid', gap: 9 }}>
-            <KInput placeholder="名前" value={name} onChange={e => setName(e.target.value)}
-              style={{ fontFamily: familyOf(fontId) }} />
+            <KInput
+              placeholder="名前"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              style={{ fontFamily: '"Yu Gothic","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif' }}
+            />
+            <KInput
+              placeholder="英語表記（例：Shiki Hakray）"
+              value={enName}
+              onChange={e => setEnName(e.target.value)}
+            />
             {/* ページURL (v1.9) — /character/{slug}。空欄なら自動・重複時は警告 */}
             {isNew && (
               <div>
@@ -977,23 +982,14 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
                   { value: 'private', label: '非公開' },
                 ]} />
             )}
-            <KSelect value={fontId} onChange={setFontId}
-              options={fonts.map(f => ({
-                value: f.id,
-                label: <span style={{ fontFamily: f.family }}>{f.name}</span>,
-              }))} />
-            <p className="hint" style={{ margin: 0 }}>名前フォント — 一覧・詳細の名前に適用</p>
+            <p className="hint" style={{ margin: 0 }}>
+              フォントは固定：名前＝ゴシック／本文＝スマートフォントUI
+            </p>
             {/* 名前の長さが異なるため自動縮小せず、キャラクターごとに指定する (v2.0) */}
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <span className="k-label" style={{ margin: 0, flex: 1 }}>詳細ページの名前サイズ</span>
               <KStep value={nameSize} onChange={setNameSize} min={14} max={72} step={1} suffix="px" />
             </div>
-            <KSelect value={bodyFontId} onChange={setBodyFontId}
-              options={fonts.map(f => ({
-                value: f.id,
-                label: <span style={{ fontFamily: f.family }}>{f.name}</span>,
-              }))} />
-            <p className="hint" style={{ margin: 0 }}>本文フォント — プロフィール情報・紹介文に適用</p>
           </div>
         </div>
         <div className="form-actions">
