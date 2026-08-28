@@ -55,7 +55,7 @@ function CharacterDetailInner() {
   const { user, isAdmin } = useAuth();
   const [chars, , loaded] = useLocalList<Character>('ohome.chars.v1', CHAR_SEED);
   const [rels] = useLocalList<Relation>('ohome.rels.v1', REL_SEED);
-  const { familyOf } = useFonts();
+  useFonts();
   const { setPageTheme } = useTheme();
   const [playingVoice, setPlayingVoice] = useState<number | null>(null);
   const [selectedOutfitId, setSelectedOutfitId] = useState<string>('');
@@ -159,7 +159,7 @@ function CharacterDetailInner() {
       )}
 
       <div className="char-hero" style={{ '--char-color': eff.color || '#8083D6' } as React.CSSProperties}>
-        <div className="char-copy" style={{ fontFamily: familyOf(eff.bodyFontId) }}>
+        <div className="char-copy">
           <div
             className="char-name"
             style={{ fontSize: eff.nameSize ?? 54 }}
@@ -246,11 +246,41 @@ function CharacterDetailInner() {
       </div>
 
       <style jsx>{`
-@font-face{font-family:"SmartFontUI";src:url("/fonts/smartfont-ui.otf") format("opentype");font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:"SmartFontUI";src:url("/fonts/03スマートフォントUI.otf") format("opentype");font-weight:400;font-style:normal;font-display:swap}
 
         .character-page{max-width:1240px;margin:0 auto;padding-top:30px;padding-bottom:70px;font-family:"SmartFontUI",-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif}.char-head{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;margin-bottom:14px}.char-head h1{margin:0;font-size:12px;letter-spacing:.18em;color:var(--faint)}.char-switch{display:flex;align-items:center;gap:10px;font-size:10px;letter-spacing:.14em}.char-switch button{padding:5px 2px;color:var(--faint);border-bottom:1px solid transparent}.char-switch button.on{color:var(--text);border-color:currentColor}.char-switch span{opacity:.25}.char-admin{justify-self:end;display:flex;gap:8px}.au-switch{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-bottom:10px}.au-switch button{padding:6px 10px;border:1px solid var(--line);border-radius:999px;color:var(--faint);font-size:9px}.au-switch button.on{color:var(--text);border-color:var(--accent)}.char-hero{display:grid;grid-template-columns:minmax(400px,.92fr) minmax(420px,1.08fr);min-height:min(760px,calc(100vh - 150px));overflow:hidden;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.char-copy{z-index:3;align-self:center;padding:52px 42px 48px 16px}.char-name{font-family:"Yu Gothic","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;font-weight:800;line-height:1.08;letter-spacing:.045em;overflow-wrap:anywhere;color:var(--char-color);text-shadow:0 1px 18px rgba(0,0,0,.24)}.char-sub{margin-top:8px;color:rgba(236,239,246,.78);font-size:12px;letter-spacing:.08em}.char-cv{margin-top:8px;color:rgba(242,244,249,.84);font-size:12px;font-weight:700;letter-spacing:.08em}.char-copy blockquote{margin:0}.quote-ribbons{display:grid;gap:7px;justify-items:start}
 .quote-ribbons span{display:inline-block;max-width:100%;padding:7px 12px;background:color-mix(in srgb,var(--char-color) 74%,#12141a);color:#fff;font-size:13.5px;line-height:1.65;font-weight:700;letter-spacing:.02em;box-shadow:6px 6px 0 rgba(0,0,0,.12)}
-.char-intro{margin-bottom:30px;color:rgba(248,249,252,.96);font-size:14px;line-height:2;font-weight:600}.profile-section,.voice-section{margin-top:28px}.profile-section h2,.voice-section h2{margin:0 0 14px;color:rgba(232,234,240,.82);font-size:10px;font-weight:600;letter-spacing:.18em}.profile-section dl{display:grid;grid-template-columns:112px 1fr;margin:0;border-top:1px solid var(--line)}.profile-section dt,.profile-section dd{min-height:38px;margin:0;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.28);font-size:12px;line-height:1.55}.profile-section dt{color:rgba(225,228,236,.86);letter-spacing:.08em;text-transform:uppercase;font-weight:700}.profile-section dd{color:rgba(248,249,252,.96);font-weight:600}.voice-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.voice-grid button{min-height:38px;padding:8px 10px;border:1px solid rgba(220,224,232,.28);border-radius:999px;color:rgba(225,228,235,.76);font-size:9px;letter-spacing:.06em}.voice-grid button span{margin-right:6px}.voice-grid button:disabled{opacity:.35;cursor:default}.voice-grid button.playing{border-color:var(--char-color);color:var(--text)}.gallery-link{width:100%;min-height:46px;margin-top:22px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(220,224,232,.28);border-bottom:1px solid rgba(220,224,232,.28);color:rgba(244,245,248,.9);font-size:10px;letter-spacing:.16em}.char-art{position:relative;min-width:0;min-height:700px;margin-bottom:52px}.char-glow{position:absolute;inset:12% 0 0 4%;background:radial-gradient(circle at 55% 42%,color-mix(in srgb,var(--char-color) 24%,transparent),transparent 58%);filter:blur(16px);opacity:.75}.char-art :global(.char-art-full){position:absolute;z-index:2;right:0;bottom:0;width:auto;height:min(108%,820px);max-width:100%;object-fit:contain;filter:drop-shadow(0 24px 34px rgba(0,0,0,.22))}.char-art :global(.char-art-bust){display:none}.char-art :global(.char-art-empty){position:absolute;inset:0;display:grid;place-items:center;color:var(--faint);font-size:10px;letter-spacing:.14em}.outfit-switch{position:absolute;z-index:5;top:calc(100% + 12px);left:0;right:0;display:flex;justify-content:center;gap:6px;max-width:none;overflow-x:auto;padding:4px 4px 12px}.outfit-switch button{white-space:nowrap;padding:7px 10px;border:1px solid var(--line);border-radius:999px;color:var(--faint);font-size:9px;letter-spacing:.08em;background:rgba(20,22,28,.72);backdrop-filter:blur(8px)}.outfit-switch button.on{color:var(--text);border-color:var(--char-color)}.outfit-switch small{margin-right:5px;opacity:.6}.mobile-full-toggle{display:none}
+.char-intro{margin-bottom:30px;color:rgba(248,249,252,.98);font-size:14.5px;line-height:2;font-weight:600}.profile-section,.voice-section{margin-top:28px}.profile-section h2,.voice-section h2{margin:0 0 14px;color:rgba(232,234,240,.82);font-size:10px;font-weight:600;letter-spacing:.18em}.profile-section dl{display:grid;grid-template-columns:112px 1fr;margin:0;border-top:1px solid var(--line)}.profile-section dt,.profile-section dd{min-height:38px;margin:0;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.28);font-size:12px;line-height:1.55}.profile-section dt{color:rgba(225,228,236,.86);letter-spacing:.08em;text-transform:uppercase;font-weight:700}.profile-section dd{color:rgba(248,249,252,.96);font-weight:600}.voice-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.voice-grid button{min-height:38px;padding:8px 10px;border:1px solid rgba(220,224,232,.28);border-radius:999px;color:rgba(225,228,235,.76);font-size:9px;letter-spacing:.06em}.voice-grid button span{margin-right:6px}.voice-grid button:disabled{opacity:.35;cursor:default}.voice-grid button.playing{border-color:var(--char-color);color:var(--text)}.gallery-link{width:100%;min-height:46px;margin-top:22px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(220,224,232,.28);border-bottom:1px solid rgba(220,224,232,.28);color:rgba(244,245,248,.9);font-size:10px;letter-spacing:.16em}.char-art{position:relative;min-width:0;min-height:720px;margin-bottom:52px;overflow:visible}.char-glow{position:absolute;inset:12% 0 0 4%;background:radial-gradient(circle at 55% 42%,color-mix(in srgb,var(--char-color) 24%,transparent),transparent 58%);filter:blur(16px);opacity:.75}.char-art :global(.char-art-full){position:absolute;z-index:2;right:0;bottom:0;width:auto;height:min(112%,860px);max-width:100%;object-fit:contain;filter:drop-shadow(0 24px 34px rgba(0,0,0,.22))}.char-art :global(.char-art-bust){display:none}.char-art :global(.char-art-empty){position:absolute;inset:0;display:grid;place-items:center;color:var(--faint);font-size:10px;letter-spacing:.14em}.outfit-switch{position:absolute;z-index:5;top:calc(100% + 12px);left:0;right:0;display:flex;justify-content:center;gap:6px;max-width:none;overflow-x:auto;padding:4px 4px 12px}.outfit-switch button{white-space:nowrap;padding:7px 10px;border:1px solid var(--line);border-radius:999px;color:var(--faint);font-size:9px;letter-spacing:.08em;background:rgba(20,22,28,.72);backdrop-filter:blur(8px)}.outfit-switch button.on{color:var(--text);border-color:var(--char-color)}.outfit-switch small{margin-right:5px;opacity:.6}.mobile-full-toggle{display:none}
+
+.quote-vertical{
+  position:absolute;
+  z-index:6;
+  top:38px;
+  right:10px;
+  margin:0;
+  padding:0;
+  display:flex;
+  flex-direction:row-reverse;
+  align-items:flex-start;
+  gap:7px;
+  pointer-events:none;
+}
+.quote-vertical span{
+  display:block;
+  writing-mode:vertical-rl;
+  text-orientation:upright;
+  white-space:nowrap;
+  padding:10px 7px;
+  background:color-mix(in srgb,var(--char-color) 78%,#151821);
+  color:#fff;
+  font-family:"Yu Gothic","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+  font-size:11px;
+  line-height:1.45;
+  font-weight:700;
+  letter-spacing:.025em;
+  box-shadow:5px 5px 0 rgba(0,0,0,.12);
+}
+
 .char-bottom-switch{margin-top:24px;display:flex;justify-content:center;align-items:center;gap:18px}.char-bottom-switch button{display:flex;align-items:baseline;gap:8px;color:var(--faint);font-size:10px;letter-spacing:.14em}.char-bottom-switch button.on{color:var(--text)}.char-bottom-switch small{font-size:8px;opacity:.55}.char-bottom-switch i{width:44px;height:1px;background:var(--line)}.au-back{margin-bottom:18px;color:var(--faint);font-size:10px}.au-empty{padding:60px 18px;text-align:center;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
         @media(max-width:900px){
 .character-page{padding-top:18px}
@@ -267,14 +297,14 @@ function CharacterDetailInner() {
 .mobile-full-toggle{display:grid;place-items:center;position:absolute;z-index:7;right:14px;bottom:14px;width:48px;height:48px;padding:0;border:1px solid rgba(255,255,255,.72);border-radius:50%;background:rgba(18,20,26,.78);color:#fff;font-size:25px;font-weight:400;line-height:1;backdrop-filter:blur(8px)}
 .outfit-switch{position:absolute;top:calc(100% + 12px);left:0;right:0;display:flex;justify-content:center;gap:7px;max-width:none;overflow-x:auto;padding:0 2px 10px}
 .outfit-switch button{flex:0 0 auto;padding:8px 11px;font-size:9px}
-.quote-vertical{top:28px;right:10px;gap:5px}
-.quote-vertical span{max-height:390px;padding:8px 5px;font-size:10.5px;line-height:1.55;letter-spacing:.02em}
-.char-art.is-mobile-full .quote-vertical{top:48px;right:14px}
+.quote-vertical{top:26px;right:8px;gap:5px}
+.quote-vertical span{padding:8px 5px;font-size:8.5px;line-height:1.35;letter-spacing:.015em}
+.char-art.is-mobile-full .quote-vertical{top:42px;right:12px}
+.char-art.is-mobile-full .quote-vertical span{font-size:9.5px;padding:9px 6px}
 .char-copy{order:2;padding:70px 2px 28px}
 .char-name{font-size:clamp(26px,8vw,34px)!important;letter-spacing:.035em}
 .char-cv{font-size:11px;margin-top:6px}
-.char-copy blockquote{margin-top:20px}.quote-vertical{position:absolute;z-index:6;top:70px;right:8px;margin:0;padding:0;display:flex;flex-direction:row-reverse;align-items:flex-start;gap:7px;pointer-events:none}
-.quote-vertical span{display:block;writing-mode:vertical-rl;text-orientation:upright;max-height:520px;padding:10px 7px;background:color-mix(in srgb,var(--char-color) 78%,#151821);color:#fff;font-size:12.5px;line-height:1.65;font-weight:700;letter-spacing:.04em;box-shadow:5px 5px 0 rgba(0,0,0,.12)}
+
 .quote-ribbons{display:grid;gap:7px;justify-items:start}
 .quote-ribbons span{display:inline-block;max-width:100%;padding:7px 12px;background:color-mix(in srgb,var(--char-color) 74%,#12141a);color:#fff;font-size:13.5px;line-height:1.65;font-weight:700;letter-spacing:.02em;box-shadow:6px 6px 0 rgba(0,0,0,.12)}
 .char-intro{font-size:14px;line-height:1.95}
