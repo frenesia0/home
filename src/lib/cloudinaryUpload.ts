@@ -13,13 +13,57 @@ type CloudinaryUploadResponse = {
   };
 };
 
+const CACHE_KEY = 'ohome.cloudinary.imageHash.v1';
+
 /**
- * Galleryで実績のある unsigned upload preset を使って
- * Cloudinaryへ画像をアップロードする共通関数。
+ * 同じ画像をSAVE/再試行で何度もCloudinaryへ送らないためのキャッシュ。
+ * - sent: 同一セッション内で進行中/完了済みPromiseを共有
+ * - localStorage: ページ移動後も同じブラウザなら再アップロードを避ける
  */
-export async function uploadImageToCloudinary(
-  file: File
-): Promise<CloudinaryImageUpload> {
+const sent = new Map<string, Promise<CloudinaryImageUpload>>();
+
+async function sha256(file: File): Promise<string | null> {
+  try {
+    const buf = await file.arrayBuffer();
+    const digest = await crypto.subtle.digest('SHA-256', buf);
+    return Array.from(new Uint8Array(digest))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+  } catch {
+    return null;
+  }
+}
+
+function readCache(): Record<string, CloudinaryImageUpload> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(CACHE_KEY);
+    return raw ? JSON.parse(raw) as Record<string, CloudinaryImageUpload> : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeCache(hash: string, value: CloudinaryImageUpload) {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = readCache();
+    current[hash] = value;
+
+    // 無限に増えないように直近200件程度に制限
+    const entries = Object.entries(current);
+    const trimmed = entries.slice(Math.max(0, entries.length - 200));
+
+    window.localStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify(Object.fromEntries(trimmed))
+    );
+  } catch {
+    // localStorageが使えなくてもアップロード自体は続行
+  }
+}
+
+async function uploadNew(file: File): Promise<CloudinaryImageUpload> {
   if (!file.type.startsWith('image/')) {
     throw new Error('画像ファイルを選択してください。');
   }
@@ -64,4 +108,41 @@ export async function uploadImageToCloudinary(
     url: result.secure_url,
     publicId: result.public_id,
   };
+}
+
+/**
+ * GalleryとCHARACTER共通のCloudinary画像アップロード。
+ * 同一ファイルはハッシュで判定し、同じブラウザからの重複アップロードを防ぐ。
+ */
+export async function uploadImageToCloudinary(
+  file: File
+): Promise<CloudinaryImageUpload> {
+  const hash = await sha256(file);
+
+  if (!hash) {
+    return uploadNew(file);
+  }
+
+  const cached = readCache()[hash];
+  if (cached?.url && cached?.publicId) {
+    return cached;
+  }
+
+  const inFlight = sent.get(hash);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const job = uploadNew(file)
+    .then(result => {
+      writeCache(hash, result);
+      return result;
+    })
+    .catch(err => {
+      sent.delete(hash);
+      throw err;
+    });
+
+  sent.set(hash, job);
+  return job;
 }
