@@ -974,33 +974,6 @@ export default function OrphanImagesPage() {
         </p>
       )}
 
-      {charsLoaded && characterRefs.length > 0 && (
-        <div
-          style={{
-            marginBottom: 22,
-            padding: '10px 14px',
-            border:
-              '1px solid rgba(128,131,214,.28)',
-            borderRadius: 10,
-            background:
-              'rgba(128,131,214,.05)',
-            color:
-              'rgba(255,255,255,.66)',
-            fontSize: 11,
-          }}
-        >
-          CHARACTER参照中：{characterRefs.length}件
-          <span
-            style={{
-              marginLeft: 8,
-              color:
-                'rgba(255,255,255,.42)',
-            }}
-          >
-            （削除候補から自動除外）
-          </span>
-        </div>
-      )}
 
       {result && (
         <>
