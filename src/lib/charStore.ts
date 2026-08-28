@@ -24,6 +24,7 @@ export interface CharacterOutfit {
 export interface Character {
   id: string;
   name: string;          // 대표 이름 (전용 폰트 적용 대상)
+  enName?: string;        // CHARACTER詳細の英語表記
   sub: string;           // 한글명 · 소속 한 줄
   color: string;         // 대표 테마색 (말풍선·리스트 점)
   // 상세 페이지 테마 (v1.9 사용자 확정) — custom이면 대표 테마색으로 홈 팔레트 임시 전환 (4.18 방식)
@@ -91,6 +92,7 @@ export interface AuCharProfile {
   basicHtml?: string;
   arts?: string[];
   name?: string;
+  enName?: string;
   sub?: string;
   color?: string;
   themeMode?: 'default' | 'custom';
@@ -113,6 +115,7 @@ export function charWithAu(c: Character, auKey?: string | null): Character {
   return {
     ...c,
     ...(p.name !== undefined ? { name: p.name } : {}),
+    ...(p.enName !== undefined ? { enName: p.enName } : {}),
     ...(p.sub !== undefined ? { sub: p.sub } : {}),
     ...(p.color !== undefined ? { color: p.color } : {}),
     ...(p.themeMode !== undefined ? { themeMode: p.themeMode } : {}),
@@ -240,6 +243,7 @@ export const CHAR_SEED: Character[] = [
   {
     id: 'shiki-hakray',
     name: 'シキ・ハクレイ',
+    enName: 'Shiki Hakray',
     sub: '',
     color: '#8083D6',
     themeMode: 'default',
@@ -276,6 +280,7 @@ export const CHAR_SEED: Character[] = [
   {
     id: 'solas-frenesia',
     name: 'ソラス・フレネシア',
+    enName: 'Solas Frenesia',
     sub: '',
     color: '#8083D6',
     themeMode: 'default',
