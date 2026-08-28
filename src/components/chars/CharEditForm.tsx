@@ -8,6 +8,7 @@ import { GrantsEditor } from '@/components/chars/GrantsEditor';
 import { newId } from '@/lib/postStore';
 import { getBlob, useBlobUrl } from '@/lib/blobStore';
 import { uploadImageToCloudinary } from '@/lib/cloudinaryUpload';
+import { backend } from '@/lib/backend';
 import { useFonts } from '@/lib/fontStore';
 import { KInput, KSelect, KStep } from '@/components/ui/Kit';
 import { RichEditor } from '@/components/ui/RichEditor';
@@ -66,9 +67,49 @@ function OutfitPreview({ refId, url, alt, bust = false }: {
   );
 }
 
+
+function cloudinaryPublicIdFromRef(ref?: string): string | null {
+  if (!ref || !/^https?:\/\//.test(ref) || !ref.includes('/upload/')) return null;
+  try {
+    const url = new URL(ref);
+    const marker = '/upload/';
+    const index = url.pathname.indexOf(marker);
+    if (index < 0) return null;
+    let rest = url.pathname.slice(index + marker.length);
+    rest = rest.replace(/^v\d+\//, '');
+    rest = rest.replace(/\.[^/.]+$/, '');
+    return decodeURIComponent(rest);
+  } catch {
+    return null;
+  }
+}
+
+async function permanentlyDeleteCloudinaryRefs(refs: string[]) {
+  const publicIds = [...new Set(refs.map(cloudinaryPublicIdFromRef).filter((x): x is string => !!x))];
+  if (publicIds.length === 0) return;
+
+  const be = backend();
+  const token = await be?.getIdToken?.();
+  if (!token) throw new Error('画像削除用の認証トークンを取得できませんでした。');
+
+  const response = await fetch('/api/cloudinary/delete', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ publicIds }),
+  });
+
+  const data = await response.json().catch(() => ({})) as { ok?: boolean; error?: string };
+  if (!response.ok || !data.ok) {
+    throw new Error(data.error ?? 'Cloudinary画像の完全削除に失敗しました。');
+  }
+}
+
 export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }: {
   initial: Character | null;               // null = 新規登録
-  onSave: (c: Character) => void;
+  onSave: (c: Character) => void | Promise<void>;
   onCancel: () => void;
   auMode?: boolean;                        // AU専用編集 (v1.9) — 公開範囲・会員権限はbase側で管理するため非表示
   existingIds?: string[];                  // ページURL重複チェック用 (v1.9 — 新規登録)
@@ -100,6 +141,7 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
   const [quote, setQuote] = useState(initial?.quote ?? '');
   const [cv, setCv] = useState(initial?.cv ?? '');
   const [saving, setSaving] = useState(false);
+  const [deleteQueue, setDeleteQueue] = useState<string[]>([]);
   const [outfitCropId, setOutfitCropId] = useState<string | null>(null);
   const [tabs, setTabs] = useState<CharTab[]>(initial?.tabs ?? []);
   const [arts, setArts] = useState<ArtItem[]>(() => {
@@ -145,6 +187,11 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
   const [lb, setLb] = useState<number | null>(null);   // アート サムネイルクリック → 原寸表示
   // 画面切替：メインフォーム／タブ専用編集画面
   const [view, setView] = useState<'main' | string>('main');
+
+  const queueCloudinaryDelete = (ref?: string) => {
+    if (!ref || !cloudinaryPublicIdFromRef(ref)) return;
+    setDeleteQueue(current => current.includes(ref) ? current : [...current, ref]);
+  };
 
   const addArts = (list: FileList | null) => {
     if (!list || list.length === 0) return;
@@ -208,7 +255,7 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
       outfitIds[0].isDefault = true;
     }
 
-    onSave({
+    await onSave({
       // 既存キャラクター編集では、今回のフォームで触っていない
       // CHARACTER専用項目（quote / voices / profileFullId / profileBustId 等）を
       // 絶対に消さない。
@@ -274,6 +321,11 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
           ? grants
           : undefined,
     });
+
+    if (deleteQueue.length > 0) {
+      await permanentlyDeleteCloudinaryRefs(deleteQueue);
+      setDeleteQueue([]);
+    }
   } catch (err) {
     console.error(
       'Character save failed:',
@@ -472,6 +524,7 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
                         onChange={e => {
                           const f = e.target.files?.[0];
                           if (!f) return;
+                          if (o.fullImageId) queueCloudinaryDelete(o.fullImageId);
                           setOutfits(list => list.map(x => x.id === o.id ? {
                             ...x,
                             fullFile: f,
@@ -496,13 +549,16 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
                             style={{ ...addBtn, color: '#c95d68' }}
                             onClick={() => del.ask(
                               'この全身立ち絵画像を削除しますか？',
-                              () => setOutfits(list => list.map(x => x.id === o.id ? {
-                                ...x,
-                                fullImageId: undefined,
-                                fullFile: undefined,
-                                fullUrl: undefined,
-                                ...(x.bustSeparate ? {} : { bustCrop: undefined }),
-                              } : x)),
+                              () => {
+                                if (o.fullImageId) queueCloudinaryDelete(o.fullImageId);
+                                setOutfits(list => list.map(x => x.id === o.id ? {
+                                  ...x,
+                                  fullImageId: undefined,
+                                  fullFile: undefined,
+                                  fullUrl: undefined,
+                                  ...(x.bustSeparate ? {} : { bustCrop: undefined }),
+                                } : x));
+                              },
                               '立ち絵データ自体は残ります。画像だけを外します。'
                             )}
                           >
@@ -519,13 +575,16 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
                         <button
                           type="button"
                           className={!o.bustSeparate ? 'on' : ''}
-                          onClick={() => setOutfits(list => list.map(x => x.id === o.id ? {
-                            ...x,
-                            bustSeparate: false,
-                            bustImageId: undefined,
-                            bustFile: undefined,
-                            bustUrl: undefined,
-                          } : x))}
+                          onClick={() => {
+                            if (o.bustImageId) queueCloudinaryDelete(o.bustImageId);
+                            setOutfits(list => list.map(x => x.id === o.id ? {
+                              ...x,
+                              bustSeparate: false,
+                              bustImageId: undefined,
+                              bustFile: undefined,
+                              bustUrl: undefined,
+                            } : x));
+                          }}
                         >
                           PC版と同じ画像
                         </button>
@@ -575,6 +634,7 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
                         onChange={e => {
                           const f = e.target.files?.[0];
                           if (!f) return;
+                          if (o.bustImageId) queueCloudinaryDelete(o.bustImageId);
                           setOutfits(list => list.map(x => x.id === o.id ? {
                             ...x,
                             bustSeparate: true,
@@ -615,13 +675,16 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
                             style={{ ...addBtn, color: '#c95d68' }}
                             onClick={() => del.ask(
                               'この3:4用画像を削除しますか？',
-                              () => setOutfits(list => list.map(x => x.id === o.id ? {
-                                ...x,
-                                bustImageId: undefined,
-                                bustFile: undefined,
-                                bustUrl: undefined,
-                                bustCrop: undefined,
-                              } : x)),
+                              () => {
+                                if (o.bustImageId) queueCloudinaryDelete(o.bustImageId);
+                                setOutfits(list => list.map(x => x.id === o.id ? {
+                                  ...x,
+                                  bustImageId: undefined,
+                                  bustFile: undefined,
+                                  bustUrl: undefined,
+                                  bustCrop: undefined,
+                                } : x));
+                              },
                               '全身立ち絵は削除されません。別画像だけを外します。'
                             )}
                           >
@@ -636,7 +699,6 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
                           : 'PC版の全身立ち絵を3:4に切り抜いて使用します'}
                       </span>
                     </div>
-                  </div>
                   </div>
                 </div>
               ))}
