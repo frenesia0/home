@@ -1256,6 +1256,31 @@ function CharacterDetailInner() {
   }
 }
 
+
+/* --- CHARACTER heading: match GALLERY --- */
+.char-head h1{
+  margin:0 0 8px !important;
+  color:#f5f5f5 !important;
+  font-family:var(--sans) !important;
+  font-size:32px !important;
+  font-weight:700 !important;
+  line-height:1 !important;
+  letter-spacing:.08em !important;
+}
+
+/* Mobile keeps the one-line CHARACTER / SHIKI-SOLAS / EDIT layout. */
+@media(max-width:900px){
+  .char-head h1{
+    margin:0 !important;
+    font-family:var(--sans) !important;
+    font-size:18px !important;
+    font-weight:700 !important;
+    line-height:1 !important;
+    letter-spacing:.08em !important;
+    white-space:nowrap !important;
+  }
+}
+
       `}</style>
     </section>
   );
