@@ -29,6 +29,7 @@ interface OutfitItem extends CharacterOutfit {
   fullUrl?: string;
   bustFile?: File;
   bustUrl?: string;
+  bustSeparate?: boolean;
 }
 
 
@@ -106,7 +107,7 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
     return refs.map(r => ({ id: newId(), ref: r }));
   });
   const [outfits, setOutfits] = useState<OutfitItem[]>(() => {
-    const fromInitial = initial?.outfits?.length
+    const raw = initial?.outfits?.length
       ? initial.outfits
       : [{
           id: 'default',
@@ -115,11 +116,28 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
           bustImageId: initial?.profileBustId,
           isDefault: true,
         }];
-    const hasDefault = fromInitial.some(o => o.isDefault);
-    return fromInitial.map((o, i) => ({
+
+    const hasDefault = raw.some(o => o.isDefault);
+    const normalized = raw.map((o, i) => ({
       ...o,
       isDefault: hasDefault ? !!o.isDefault : i === 0,
     }));
+
+    // 旧 profileFullId / profileBustId を DEFAULT立ち絵へ移し、
+    // 今後は立ち絵データ側を正として扱えるようにする。
+    return normalized.map(o => {
+      if (!o.isDefault) {
+        return { ...o, bustSeparate: !!o.bustImageId };
+      }
+      const fullImageId = o.fullImageId ?? initial?.profileFullId;
+      const bustImageId = o.bustImageId ?? initial?.profileBustId;
+      return {
+        ...o,
+        fullImageId,
+        bustImageId,
+        bustSeparate: !!bustImageId,
+      };
+    });
   });
   const [thumbCrop, setThumbCrop] = useState<CropValue | undefined>(initial?.thumbCrop);
   const [grants, setGrants] = useState<CharGrant[]>(initial?.grants ?? []); // 関連キャラクターの会員権限 (v1.9)
@@ -177,7 +195,9 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
         id: o.id,
         label: o.label.trim() || 'OUTFIT',
         fullImageId: o.fullFile ? (await uploadImageToCloudinary(o.fullFile)).url : o.fullImageId,
-        bustImageId: o.bustFile ? (await uploadImageToCloudinary(o.bustFile)).url : o.bustImageId,
+        bustImageId: o.bustSeparate
+          ? (o.bustFile ? (await uploadImageToCloudinary(o.bustFile)).url : o.bustImageId)
+          : undefined,
         bustCrop: o.bustCrop,
         isDefault: !!o.isDefault,
       }))
@@ -313,8 +333,9 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
   onClose: () => void;
   onApply: (crop: CropValue) => void;
 }) {
-  const loaded = useBlobUrl(item.bustImageId);
-  const src = item.bustUrl ?? loaded;
+  const sourceRef = item.bustSeparate ? item.bustImageId : item.fullImageId;
+  const loaded = useBlobUrl(sourceRef);
+  const src = item.bustSeparate ? (item.bustUrl ?? loaded) : (item.fullUrl ?? loaded);
   if (!src || !open) return null;
   return (
     <CropEditor
@@ -388,7 +409,7 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
           <>
             <div style={{ height: 1, background: 'var(--line)', margin: '10px 0 4px' }} />
             <label className="k-label" style={{ margin: 0 }}>
-              CHARACTER 立ち絵・衣装
+              CHARACTER 立ち絵
               <span style={{ marginLeft: 8, fontWeight: 400, color: 'var(--faint)' }}>
                 — 腰上画像は3:4縦長で登録 · DEFAULTが必ず初期表示
               </span>
@@ -408,7 +429,7 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <KInput
-                      placeholder="衣装名"
+                      placeholder="立ち絵名"
                       value={o.label}
                       style={{ ...rowInp, flex: 1 }}
                       onChange={e => setOutfits(list => list.map(x => x.id === o.id ? { ...x, label: e.target.value } : x))}
@@ -427,12 +448,12 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
                         className="btn btn-ghost"
                         style={{ padding: '5px 9px', fontSize: 10, flexShrink: 0 }}
                         onClick={() => del.ask(
-                          `衣装「${o.label || 'OUTFIT'}」を削除しますか？`,
+                          `立ち絵「${o.label || 'STANDING ART'}」を削除しますか？`,
                           () => setOutfits(list => list.filter(x => x.id !== o.id)),
-                          'キャラクター本体は削除されません。衣装データだけを削除します。'
+                          'キャラクター本体は削除されません。この立ち絵データだけを削除します。'
                         )}
                       >
-                        衣装削除
+                        立ち絵削除
                       </button>
                     )}
                   </div>
@@ -459,30 +480,93 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
                           e.target.value = '';
                         }}
                       />
-                      <button
-                        type="button"
-                        className="btn btn-ghost"
-                        style={addBtn}
-                        onClick={() => document.getElementById(`outfitFull-${o.id}`)?.click()}
-                      >
-                        {o.fullImageId || o.fullFile ? 'CHANGE FULL BODY' : '＋ ADD FULL BODY'}
-                      </button>
+                      <div style={{ display: 'flex', justifyContent: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          style={addBtn}
+                          onClick={() => document.getElementById(`outfitFull-${o.id}`)?.click()}
+                        >
+                          {o.fullImageId || o.fullFile ? 'CHANGE FULL BODY' : '＋ ADD FULL BODY'}
+                        </button>
+                        {(o.fullImageId || o.fullFile) && (
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            style={{ ...addBtn, color: '#c95d68' }}
+                            onClick={() => del.ask(
+                              'この全身立ち絵画像を削除しますか？',
+                              () => setOutfits(list => list.map(x => x.id === o.id ? {
+                                ...x,
+                                fullImageId: undefined,
+                                fullFile: undefined,
+                                fullUrl: undefined,
+                                ...(x.bustSeparate ? {} : { bustCrop: undefined }),
+                              } : x)),
+                              '立ち絵データ自体は残ります。画像だけを外します。'
+                            )}
+                          >
+                            画像削除
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div style={{ display: 'grid', gap: 7 }}>
-                      <span className="hint" style={{ margin: 0 }}>MOBILE — 腰上立ち絵（3:4）</span>
+                      <span className="hint" style={{ margin: 0 }}>MOBILE — 3:4表示</span>
+
+                      <div className="mini-seg" style={{ justifySelf: 'center' }}>
+                        <button
+                          type="button"
+                          className={!o.bustSeparate ? 'on' : ''}
+                          onClick={() => setOutfits(list => list.map(x => x.id === o.id ? {
+                            ...x,
+                            bustSeparate: false,
+                            bustImageId: undefined,
+                            bustFile: undefined,
+                            bustUrl: undefined,
+                          } : x))}
+                        >
+                          PC版と同じ画像
+                        </button>
+                        <button
+                          type="button"
+                          className={o.bustSeparate ? 'on' : ''}
+                          onClick={() => setOutfits(list => list.map(x => x.id === o.id ? {
+                            ...x,
+                            bustSeparate: true,
+                          } : x))}
+                        >
+                          別画像を使用
+                        </button>
+                      </div>
+
                       <div style={{ width: '100%', maxWidth: 165, aspectRatio: '3 / 4', justifySelf: 'center', border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
-                        {(o.bustUrl || o.bustImageId) ? (
-                          <OutfitBustPreview
-                            refId={o.bustImageId}
-                            url={o.bustUrl}
-                            crop={o.bustCrop}
-                            alt={`${name} ${o.label} bust`}
-                          />
+                        {o.bustSeparate ? (
+                          (o.bustUrl || o.bustImageId) ? (
+                            <OutfitBustPreview
+                              refId={o.bustImageId}
+                              url={o.bustUrl}
+                              crop={o.bustCrop}
+                              alt={`${name} ${o.label} bust`}
+                            />
+                          ) : (
+                            <div className="ph" style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', fontSize: 10, color: 'var(--faint)' }}>NO IMAGE</div>
+                          )
                         ) : (
-                          <div className="ph" style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', fontSize: 10, color: 'var(--faint)' }}>NO IMAGE</div>
+                          (o.fullUrl || o.fullImageId) ? (
+                            <OutfitBustPreview
+                              refId={o.fullImageId}
+                              url={o.fullUrl}
+                              crop={o.bustCrop}
+                              alt={`${name} ${o.label} mobile crop`}
+                            />
+                          ) : (
+                            <div className="ph" style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', fontSize: 10, color: 'var(--faint)' }}>PC画像を先に登録</div>
+                          )
                         )}
                       </div>
+
                       <input
                         id={`outfitBust-${o.id}`}
                         type="file"
@@ -493,31 +577,66 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
                           if (!f) return;
                           setOutfits(list => list.map(x => x.id === o.id ? {
                             ...x,
+                            bustSeparate: true,
                             bustFile: f,
                             bustUrl: URL.createObjectURL(f),
                           } : x));
                           e.target.value = '';
                         }}
                       />
-                      <button
-                        type="button"
-                        className="btn btn-ghost"
-                        style={addBtn}
-                        onClick={() => document.getElementById(`outfitBust-${o.id}`)?.click()}
-                      >
-                        {o.bustImageId || o.bustFile ? 'CHANGE 3:4 BUST' : '＋ ADD 3:4 BUST'}
-                      </button>
-                      {(o.bustImageId || o.bustFile) && (
-                        <button
-                          type="button"
-                          className="btn btn-ghost"
-                          style={addBtn}
-                          onClick={() => setOutfitCropId(o.id)}
-                        >
-                          ✂ 3:4 CROP
-                        </button>
-                      )}
+
+                      <div style={{ display: 'flex', justifyContent: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        {o.bustSeparate && (
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            style={addBtn}
+                            onClick={() => document.getElementById(`outfitBust-${o.id}`)?.click()}
+                          >
+                            {o.bustImageId || o.bustFile ? 'CHANGE 3:4 IMAGE' : '＋ ADD 3:4 IMAGE'}
+                          </button>
+                        )}
+
+                        {((o.bustSeparate && (o.bustImageId || o.bustFile)) || (!o.bustSeparate && (o.fullImageId || o.fullFile))) && (
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            style={addBtn}
+                            onClick={() => setOutfitCropId(o.id)}
+                          >
+                            ✂ 3:4 CROP
+                          </button>
+                        )}
+
+                        {o.bustSeparate && (o.bustImageId || o.bustFile) && (
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            style={{ ...addBtn, color: '#c95d68' }}
+                            onClick={() => del.ask(
+                              'この3:4用画像を削除しますか？',
+                              () => setOutfits(list => list.map(x => x.id === o.id ? {
+                                ...x,
+                                bustImageId: undefined,
+                                bustFile: undefined,
+                                bustUrl: undefined,
+                                bustCrop: undefined,
+                              } : x)),
+                              '全身立ち絵は削除されません。別画像だけを外します。'
+                            )}
+                          >
+                            画像削除
+                          </button>
+                        )}
+                      </div>
+
+                      <span className="hint" style={{ margin: 0, textAlign: 'center' }}>
+                        {o.bustSeparate
+                          ? '別画像を3:4で使用します'
+                          : 'PC版の全身立ち絵を3:4に切り抜いて使用します'}
+                      </span>
                     </div>
+                  </div>
                   </div>
                 </div>
               ))}
@@ -531,12 +650,12 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
                 ...list,
                 {
                   id: newId(),
-                  label: `OUTFIT ${String(list.length + 1).padStart(2, '0')}`,
+                  label: `STANDING ART ${String(list.length + 1).padStart(2, '0')}`,
                   isDefault: list.length === 0,
                 },
               ])}
             >
-              ＋ ADD OUTFIT
+              ＋ ADD STANDING ART
             </button>
           </>
         )}
@@ -707,9 +826,15 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
           </div>
         </div>
         <div className="form-actions">
-          <button className="btn btn-onbk" onClick={onCancel}>CANCEL</button>
-          <button className="btn btn-accent" onClick={save}>
-            {isNew ? 'ADD' : 'SAVE'}
+          <button className="btn btn-onbk" onClick={onCancel} disabled={saving}>CANCEL</button>
+          <button
+            className="btn btn-accent"
+            onClick={save}
+            disabled={saving}
+            aria-busy={saving}
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, minWidth: 112 }}
+          >
+            {saving ? <><span className="save-spinner" />保存中…</> : (isNew ? 'ADD' : 'SAVE')}
           </button>
         </div>
       </div>
@@ -745,6 +870,7 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
           width:12px;height:12px;border:2px solid currentColor;border-right-color:transparent;
           border-radius:50%;display:inline-block;animation:spin .7s linear infinite
         }
+        .form-actions button:disabled{opacity:.62;cursor:wait}
         @keyframes spin{to{transform:rotate(360deg)}}
       `}</style>
       {del.element}
