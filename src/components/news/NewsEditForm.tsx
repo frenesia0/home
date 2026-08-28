@@ -81,6 +81,7 @@ export default function NewsEditForm({
     <section className="news-edit-form">
       <div className="news-field">
         <label htmlFor="news-title">TITLE</label>
+
         <input
           id="news-title"
           type="text"
@@ -94,6 +95,7 @@ export default function NewsEditForm({
       <div className="news-meta-grid">
         <div className="news-field">
           <label htmlFor="news-date">DATE</label>
+
           <input
             id="news-date"
             type="date"
@@ -105,14 +107,20 @@ export default function NewsEditForm({
 
         <div className="news-field">
           <label htmlFor="news-tag">TAG</label>
+
           <select
             id="news-tag"
             value={tag}
-            onChange={e => setTag(e.target.value as NewsTag)}
+            onChange={e =>
+              setTag(e.target.value as NewsTag)
+            }
             disabled={saving}
           >
             {NEWS_TAGS.map(item => (
-              <option key={item.value} value={item.value}>
+              <option
+                key={item.value}
+                value={item.value}
+              >
                 {item.label}
               </option>
             ))}
@@ -193,12 +201,49 @@ export default function NewsEditForm({
 
         .news-meta-grid {
           display: grid;
-          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+          grid-template-columns:
+            minmax(0, 1fr)
+            minmax(0, 1fr);
           gap: 18px;
         }
 
         .news-body-field {
           gap: 10px;
+        }
+
+        .news-body-field :global(.re-wrap) {
+          border-color:
+            rgba(255, 255, 255, 0.18) !important;
+          background: #222730 !important;
+        }
+
+        .news-body-field :global(.re-toolbar) {
+          border-color:
+            rgba(255, 255, 255, 0.14) !important;
+          background: #1b1f27 !important;
+        }
+
+        .news-body-field :global(.re-body) {
+          background: #222730 !important;
+        }
+
+        .news-body-field :global(.re-content) {
+          min-height: 260px;
+          color: #f5f5f5 !important;
+          background: #222730 !important;
+        }
+
+        .news-body-field :global(.re-content p),
+        .news-body-field :global(.re-content h2),
+        .news-body-field :global(.re-content h3),
+        .news-body-field :global(.re-content li),
+        .news-body-field :global(.re-content blockquote) {
+          color: #f5f5f5 !important;
+        }
+
+        .news-body-field :global(.re-ph) {
+          color:
+            rgba(255, 255, 255, 0.35) !important;
         }
 
         .news-actions {
@@ -225,9 +270,11 @@ export default function NewsEditForm({
         }
 
         .draft-button {
-          border: 1px solid rgba(255, 255, 255, 0.3);
+          border: 1px solid
+            rgba(255, 255, 255, 0.3);
           background: transparent;
-          color: rgba(255, 255, 255, 0.82);
+          color:
+            rgba(255, 255, 255, 0.82);
         }
 
         .publish-button {
