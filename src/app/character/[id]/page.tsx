@@ -338,7 +338,7 @@ function CharacterDetailInner() {
       <style jsx>{`
 @font-face{font-family:"SmartFontUI";src:url("/fonts/03スマートフォントUI.otf") format("opentype");font-weight:400;font-style:normal;font-display:swap}
 
-        .character-page{max-width:1240px;margin:0 auto;padding-top:30px;padding-bottom:70px;font-family:"SmartFontUI",-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif}.char-head{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;margin-bottom:14px}.char-head h1{margin:0;font-size:12px;letter-spacing:.18em;color:var(--faint)}.char-switch{display:flex;align-items:center;gap:12px;font-size:11px;letter-spacing:.14em}.char-switch button{padding:7px 4px;color:rgba(245,247,252,.72);border-bottom:2px solid transparent;font-weight:700;opacity:1}.char-switch button:hover{color:#fff}.char-switch button.on{color:var(--char-color)!important;border-color:var(--char-color)!important;text-shadow:0 0 14px color-mix(in srgb,var(--char-color) 44%,transparent)}.char-switch span{opacity:.5;color:rgba(255,255,255,.62)}.char-admin{justify-self:end;display:flex;gap:8px}.au-switch{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-bottom:10px}.au-switch button{padding:6px 10px;border:1px solid var(--line);border-radius:999px;color:var(--faint);font-size:9px}.au-switch button.on{color:var(--text);border-color:var(--accent)}.char-hero{display:grid;grid-template-columns:minmax(420px,.96fr) minmax(420px,1.04fr);min-height:min(760px,calc(100vh - 150px));overflow:visible;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.char-copy{z-index:3;align-self:start;padding:40px 50px 48px 16px}.char-name{font-family:"Yu Gothic","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;font-weight:800;line-height:1.08;letter-spacing:.045em;overflow-wrap:anywhere;color:var(--char-color);text-shadow:0 1px 18px rgba(0,0,0,.24)}.char-sub{margin-top:12px;color:rgba(236,239,246,.78);font-size:12.5px;letter-spacing:.08em}.char-cv{margin-top:10px;color:rgba(242,244,249,.9);font-size:12.5px;font-weight:700;letter-spacing:.08em}.char-name-rule{position:relative;height:18px;margin:8px 0 24px;border-top:1px solid rgba(255,255,255,.42)}.char-name-rule span{position:absolute;right:0;top:-14px;padding-left:10px;background:#1d2027;color:#fff;font-family:Georgia,"Times New Roman",serif;font-size:11px;font-style:italic;letter-spacing:.025em}.char-copy blockquote{margin:0}.quote-ribbons{display:grid;gap:7px;justify-items:start}
+        .character-page{max-width:1240px;margin:0 auto;padding-top:30px;padding-bottom:70px;font-family:"SmartFontUI",-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif}.char-head{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;margin-bottom:14px}.char-head h1{margin:0;font-size:12px;letter-spacing:.18em;color:var(--faint)}.char-switch{display:flex;align-items:center;gap:12px;font-size:11px;letter-spacing:.14em}.char-switch button{padding:7px 4px;color:rgba(245,247,252,.72);border-bottom:2px solid transparent;font-weight:700;opacity:1}.char-switch button:hover{color:#fff}.char-switch button.on{color:var(--char-color)!important;border-color:var(--char-color)!important;text-shadow:0 0 14px color-mix(in srgb,var(--char-color) 44%,transparent)}.char-switch span{opacity:.5;color:rgba(255,255,255,.62)}.char-admin{justify-self:end;display:flex;gap:8px}.au-switch{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-bottom:10px}.au-switch button{padding:6px 10px;border:1px solid var(--line);border-radius:999px;color:var(--faint);font-size:9px}.au-switch button.on{color:var(--text);border-color:var(--accent)}.char-hero{display:grid;grid-template-columns:minmax(420px,.96fr) minmax(420px,1.04fr);min-height:min(760px,calc(100vh - 150px));overflow:visible;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.char-copy{z-index:3;align-self:start;padding:40px 50px 48px 16px}.char-name{font-family:"Yu Gothic","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;font-weight:800;line-height:1.08;letter-spacing:.045em;overflow-wrap:anywhere;color:var(--char-color);text-shadow:0 1px 18px rgba(0,0,0,.24)}.char-sub{margin-top:12px;color:rgba(236,239,246,.78);font-size:12.5px;letter-spacing:.08em}.char-cv{margin-top:10px;color:rgba(242,244,249,.9);font-size:12.5px;font-weight:700;letter-spacing:.08em}.char-name-rule{position:relative;height:20px;margin:10px 0 24px;border-top:1px solid rgba(255,255,255,.42)}.char-name-rule span{position:absolute;right:0;top:-16px;padding:0;background:transparent;color:#fff;font-family:"SmartFontUI","03SmartFontUI","03スマートフォントUI","Yu Gothic",sans-serif;font-size:13.5px;font-style:normal;font-weight:700;letter-spacing:.04em;text-shadow:0 1px 3px rgba(0,0,0,.55)}.char-copy blockquote{margin:0}.quote-ribbons{display:grid;gap:7px;justify-items:start}
 .quote-ribbons span{display:inline-block;max-width:100%;padding:7px 12px;background:color-mix(in srgb,var(--char-color) 74%,#12141a);color:#fff;font-size:13.5px;line-height:1.65;font-weight:700;letter-spacing:.02em;box-shadow:6px 6px 0 rgba(0,0,0,.12)}
 .char-intro{margin-top:24px;margin-bottom:38px;color:rgba(248,249,252,.98);font-size:15px;line-height:2.08;font-weight:600}.profile-section,.voice-section{margin-top:30px}.profile-section h2,.voice-section h2{margin:0 0 12px;color:rgba(232,234,240,.86);font-size:10.5px;font-weight:700;letter-spacing:.2em}.profile-section dl{display:grid;grid-template-columns:126px 1fr;margin:0;border-top:1px solid rgba(255,255,255,.42);border-bottom:1px solid rgba(255,255,255,.16)}.profile-section dt,.profile-section dd{min-height:44px;margin:0;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.18);line-height:1.45}.profile-section dt{position:relative;padding-left:12px;color:rgba(215,219,231,.74);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:700}.profile-section dt::before{content:"";position:absolute;left:0;top:14px;width:3px;height:15px;background:var(--char-color);border-radius:999px}.profile-section dd{color:rgba(250,250,252,.98);font-size:15.5px;font-weight:700;letter-spacing:.015em}.profile-section dt:nth-last-of-type(1),.profile-section dd:nth-last-of-type(1){border-bottom:0}.voice-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.voice-grid button{min-height:38px;padding:8px 10px;border:1px solid rgba(220,224,232,.28);border-radius:999px;color:rgba(225,228,235,.76);font-size:9px;letter-spacing:.06em}.voice-grid button span{margin-right:6px}.voice-grid button:disabled{opacity:.35;cursor:default}.voice-grid button.playing{border-color:var(--char-color);color:var(--text)}.gallery-link{width:100%;min-height:46px;margin-top:22px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(220,224,232,.28);border-bottom:1px solid rgba(220,224,232,.28);color:rgba(244,245,248,.9);font-size:10px;letter-spacing:.16em}.char-art{position:relative;min-width:0;min-height:720px;margin-bottom:52px;overflow:visible;padding-top:18px}.char-glow{position:absolute;inset:12% 0 0 4%;background:radial-gradient(circle at 55% 42%,color-mix(in srgb,var(--char-color) 24%,transparent),transparent 58%);filter:blur(16px);opacity:.75}.char-art :global(.char-art-full){position:absolute;z-index:2;right:8px;bottom:0;width:auto;height:min(102%,775px);max-width:100%;object-fit:contain;filter:drop-shadow(0 24px 34px rgba(0,0,0,.22))}.char-art :global(.char-art-bust){display:none}
 :global(.char-sign){
@@ -1011,6 +1011,108 @@ function CharacterDetailInner() {
     bottom:auto !important;
     color:#fff !important;
     background:#171a20 !important;
+  }
+}
+
+
+/* --- final header / signature / English-line polish --- */
+
+/* PC: push the signature farther right and make it larger. */
+@media(min-width:901px){
+  :global(.char-sign){
+    right:-31% !important;
+    bottom:56px !important;
+    width:clamp(780px,112%,1200px) !important;
+    max-height:430px !important;
+  }
+}
+
+/* Mobile: CHARACTER / SHIKI-SOLAS / EDIT all on one line. */
+@media(max-width:900px){
+  .char-head{
+    display:grid !important;
+    grid-template-columns:auto 1fr auto !important;
+    align-items:center !important;
+    gap:8px !important;
+    min-height:52px !important;
+    padding:0 !important;
+  }
+
+  .char-head h1{
+    margin:0 !important;
+    white-space:nowrap !important;
+    font-size:10px !important;
+    letter-spacing:.12em !important;
+  }
+
+  .char-switch{
+    justify-self:center !important;
+    min-width:0 !important;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    gap:8px !important;
+    font-size:10px !important;
+    white-space:nowrap !important;
+  }
+
+  .char-switch button{
+    padding:5px 2px !important;
+    white-space:nowrap !important;
+  }
+
+  .char-admin{
+    justify-self:end !important;
+  }
+
+  .char-admin .btn{
+    padding:7px 10px !important;
+    font-size:10px !important;
+    white-space:nowrap !important;
+  }
+
+  /* Nearly edge-to-edge signature, lower than before but still clear of expand button. */
+  :global(.char-sign){
+    left:-4% !important;
+    right:auto !important;
+    bottom:4.2% !important;
+    width:112% !important;
+    max-width:none !important;
+    max-height:255px !important;
+    transform:rotate(-5deg) !important;
+  }
+
+  .char-art.is-mobile-full :global(.char-sign){
+    left:-4% !important;
+    right:auto !important;
+    bottom:3.8% !important;
+    width:112% !important;
+  }
+
+  /* English label sits directly above the line, with no rectangle behind it. */
+  .char-name-rule{
+    position:relative !important;
+    height:20px !important;
+    margin-top:11px !important;
+    margin-bottom:18px !important;
+    border-top:1px solid rgba(255,255,255,.42) !important;
+    border-bottom:0 !important;
+  }
+
+  .char-name-rule span{
+    position:absolute !important;
+    right:0 !important;
+    top:-15px !important;
+    bottom:auto !important;
+    padding:0 !important;
+    background:transparent !important;
+    color:#fff !important;
+    font-family:"SmartFontUI","03SmartFontUI","03スマートフォントUI","Yu Gothic",sans-serif !important;
+    font-size:13px !important;
+    font-style:normal !important;
+    font-weight:700 !important;
+    letter-spacing:.04em !important;
+    text-shadow:0 1px 3px rgba(0,0,0,.55) !important;
   }
 }
 
