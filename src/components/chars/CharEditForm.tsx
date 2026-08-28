@@ -140,6 +140,9 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
   const [basicHtml, setBasicHtml] = useState(initial?.basicHtml ?? '');
   const [quote, setQuote] = useState(initial?.quote ?? '');
   const [cv, setCv] = useState(initial?.cv ?? '');
+  const [signFile, setSignFile] = useState<File | undefined>();
+  const [signUrl, setSignUrl] = useState<string | undefined>();
+  const [signRemoved, setSignRemoved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteQueue, setDeleteQueue] = useState<string[]>([]);
   const [outfitCropId, setOutfitCropId] = useState<string | null>(null);
@@ -250,6 +253,13 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
       }))
     );
 
+    const signId = signRemoved
+      ? undefined
+      : signFile
+        ? (await uploadImageToCloudinary(signFile)).url
+        : initial?.signId;
+
+
     // デフォルト衣装は必ず1件。念のため無い場合は先頭をデフォルトにする。
     if (outfitIds.length > 0 && !outfitIds.some(o => o.isDefault)) {
       outfitIds[0].isDefault = true;
@@ -292,6 +302,7 @@ export function CharEditForm({ initial, onSave, onCancel, auMode, existingIds }:
       basicHtml,
       quote,
       cv,
+      signId,
       visibility,
       fontId,
       nameSize,
@@ -773,13 +784,18 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
           style={rowInp}
         />
 
-        {/* CHARACTER台詞 — 改行をそのまま保存 */}
-        <label className="k-label" style={{ margin: 0 }}>CHARACTERの台詞（3行）</label>
+        {/* CHARACTER帯テキスト — 1行 = 帯1本 */}
+        <label className="k-label" style={{ margin: 0 }}>
+          CHARACTER 帯テキスト
+          <span style={{ marginLeft: 8, fontWeight: 400, color: 'var(--faint)' }}>
+            — 改行するたびに帯が1本増えます
+          </span>
+        </label>
         <textarea
           value={quote}
           onChange={e => setQuote(e.target.value)}
           rows={5}
-          placeholder="「台詞を3行で入力」"
+          placeholder={"例：\nシキ・ハクレイ。\nフレネシアの叡智。"}
           style={{
             width: '100%',
             resize: 'vertical',
@@ -794,6 +810,99 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
             boxSizing: 'border-box',
           }}
         />
+
+        {/* サイン画像 */}
+        <label className="k-label" style={{ margin: 0 }}>
+          サイン
+          <span style={{ marginLeft: 8, fontWeight: 400, color: 'var(--faint)' }}>
+            — CHARACTER詳細で立ち絵の上に重ねて表示
+          </span>
+        </label>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '180px 1fr',
+          gap: 12,
+          alignItems: 'center',
+          border: '1px solid var(--line)',
+          borderRadius: 10,
+          padding: 12,
+        }}>
+          <div style={{
+            width: 180,
+            height: 96,
+            border: '1px solid var(--line)',
+            borderRadius: 8,
+            overflow: 'hidden',
+            position: 'relative',
+            display: 'grid',
+            placeItems: 'center',
+          }}>
+            {!signRemoved && (signUrl || initial?.signId) ? (
+              <OutfitPreview
+                refId={signRemoved ? undefined : initial?.signId}
+                url={signUrl}
+                alt={`${name} signature`}
+              />
+            ) : (
+              <div className="ph" style={{
+                width: '100%',
+                height: '100%',
+                display: 'grid',
+                placeItems: 'center',
+                fontSize: 10,
+                color: 'var(--faint)',
+              }}>
+                NO SIGN
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'grid', gap: 8, justifyItems: 'start' }}>
+            <input
+              id="characterSignFile"
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={e => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                if (initial?.signId && !signRemoved) queueCloudinaryDelete(initial.signId);
+                setSignFile(f);
+                setSignUrl(URL.createObjectURL(f));
+                setSignRemoved(false);
+                e.target.value = '';
+              }}
+            />
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={addBtn}
+              onClick={() => document.getElementById('characterSignFile')?.click()}
+            >
+              {!signRemoved && (signUrl || initial?.signId) ? 'CHANGE SIGN' : '＋ ADD SIGN'}
+            </button>
+
+            {!signRemoved && (signUrl || initial?.signId) && (
+              <button
+                type="button"
+                className="btn btn-ghost"
+                style={{ ...addBtn, color: '#c95d68' }}
+                onClick={() => del.ask(
+                  'サイン画像を削除しますか？',
+                  () => {
+                    if (initial?.signId) queueCloudinaryDelete(initial.signId);
+                    setSignFile(undefined);
+                    setSignUrl(undefined);
+                    setSignRemoved(true);
+                  },
+                  'SAVEするまではCloudinary原本は削除されません。'
+                )}
+              >
+                画像削除
+              </button>
+            )}
+          </div>
+        </div>
 
         {/* 基本プロフィール本文 — リッチエディタ */}
         <label className="k-label" style={{ margin: 0 }}>基本プロフィール本文</label>
