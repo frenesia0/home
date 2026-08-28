@@ -1050,7 +1050,6 @@ function OutfitBustCrop({ item, open, onClose, onApply }: {
             disabled={saving}
             style={{
               width: '100%',
-              width: '100%',
               minWidth: 112,
               minHeight: 42,
               padding: '10px 14px',
