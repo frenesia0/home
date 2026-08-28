@@ -1216,6 +1216,44 @@ function CharacterDetailInner() {
   }
 }
 
+@media(max-width:900px){
+  .char-head{
+    display:flex !important;
+    flex-wrap:nowrap !important;
+    align-items:center !important;
+    gap:8px !important;
+    width:100% !important;
+    min-width:0 !important;
+  }
+
+  .char-head h1{
+    flex:0 0 auto !important;
+    white-space:nowrap !important;
+  }
+
+  .char-switch{
+    flex:1 1 auto !important;
+    min-width:0 !important;
+    display:flex !important;
+    flex-wrap:nowrap !important;
+    align-items:center !important;
+    justify-content:center !important;
+    gap:6px !important;
+    white-space:nowrap !important;
+  }
+
+  .char-switch button,
+  .char-switch span{
+    flex:0 0 auto !important;
+    white-space:nowrap !important;
+  }
+
+  .char-admin{
+    flex:0 0 auto !important;
+    margin-left:auto !important;
+  }
+}
+
       `}</style>
     </section>
   );
