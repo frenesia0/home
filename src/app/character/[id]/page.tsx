@@ -222,14 +222,17 @@ function CharacterDetailInner() {
           <div className="char-glow" />
           {displayQuote && (
             <blockquote className="quote-vertical" aria-label="キャラクター台詞">
-              {displayQuote.split(/\n+/).filter(Boolean).map((line, i) => (
-                <span
-                  key={`${line}-${i}`}
-                  className={line.length > 28 ? 'is-long' : ''}
-                >
-                  {line}
-                </span>
-              ))}
+              {displayQuote.split(/\n+/).filter(Boolean).map((line, i) => {
+                const verticalLine = line.replace(/(?:…{2,}|\.{3,})/g, '︙');
+                return (
+                  <span
+                    key={`${line}-${i}`}
+                    className={line.length > 28 ? 'is-long' : ''}
+                  >
+                    {verticalLine}
+                  </span>
+                );
+              })}
             </blockquote>
           )}
           <ProfileArt fullRef={fullRef} bustRef={bustRef} bustCrop={bustCrop} alt={eff.name} mobileFull={mobileFull} />
@@ -375,7 +378,98 @@ function CharacterDetailInner() {
 .voice-grid button span{margin-right:3px}
 .char-bottom-switch{margin-top:18px}
 }
-      `}</style>
+      `}
+/* --- CHARACTER final visibility fixes --- */
+.outfit-pill.is-active{
+  background:color-mix(in srgb,var(--char-color) 30%,#262b34) !important;
+  border-color:var(--char-color) !important;
+  color:#fff !important;
+  opacity:1 !important;
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--char-color) 48%,transparent),
+             0 0 16px color-mix(in srgb,var(--char-color) 18%,transparent) !important;
+}
+
+@media(max-width:900px){
+  .char-art{
+    position:relative !important;
+    min-height:clamp(620px,118vw,860px) !important;
+    overflow:hidden !important;
+  }
+
+  .char-art :global(.char-art-full),
+  .char-art :global(.char-art-bust){
+    position:absolute !important;
+    inset:0 !important;
+    width:100% !important;
+    height:100% !important;
+  }
+  .char-art :global(.char-art-full > *),
+  .char-art :global(.char-art-bust > *){
+    width:100% !important;
+    height:100% !important;
+  }
+
+  /* normal mobile = 3:4 bust */
+  .char-art :global(.char-art-bust){
+    display:block !important;
+    z-index:2 !important;
+  }
+  .char-art :global(.char-art-full){
+    display:none !important;
+    z-index:2 !important;
+  }
+
+  /* expand button = full body */
+  .char-art.is-mobile-full :global(.char-art-bust){
+    display:none !important;
+  }
+  .char-art.is-mobile-full :global(.char-art-full){
+    display:block !important;
+  }
+
+  .char-art :global(.char-art-bust img),
+  .char-art :global(.char-art-full img){
+    display:block !important;
+    width:100% !important;
+    height:100% !important;
+    object-fit:contain !important;
+    object-position:center bottom !important;
+    opacity:1 !important;
+    visibility:visible !important;
+  }
+
+  /* signature: above art, small, fully inside bottom-right */
+  .char-sign{
+    z-index:8 !important;
+    right:7% !important;
+    bottom:7% !important;
+    width:clamp(68px,20vw,104px) !important;
+    max-height:72px !important;
+    transform:rotate(-8deg) !important;
+    transform-origin:center !important;
+  }
+  .char-art.is-mobile-full .char-sign{
+    right:7% !important;
+    bottom:7% !important;
+    width:clamp(74px,21vw,112px) !important;
+  }
+
+  /* ribbon: moderate size; dedicated ︙ glyph stays vertical */
+  .quote-vertical span{
+    padding:7px 4px 8px !important;
+    font-size:12px !important;
+    line-height:1.1 !important;
+    letter-spacing:.01em !important;
+    text-orientation:mixed !important;
+  }
+  .quote-vertical span.is-long{
+    padding:7px 4px !important;
+    font-size:10px !important;
+    line-height:1.12 !important;
+  }
+}
+
+</style>
     </section>
   );
 }
