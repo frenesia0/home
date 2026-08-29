@@ -27,7 +27,7 @@ export default function NewsEditPage() {
   const [saving, setSaving] = useState(false);
 
   const article = articles.find(
-    item => item.id === id
+    item => item.id === id || item.slug === id
   );
 
   if (!loaded) {
@@ -36,7 +36,6 @@ export default function NewsEditPage() {
         <div className="news-message">
           LOADING...
         </div>
-
         <style jsx>{styles}</style>
       </main>
     );
@@ -48,7 +47,6 @@ export default function NewsEditPage() {
         <div className="news-message">
           このページは管理者専用です。
         </div>
-
         <style jsx>{styles}</style>
       </main>
     );
@@ -64,15 +62,16 @@ export default function NewsEditPage() {
         >
           ← NEWS
         </button>
-
         <div className="news-message">
           記事が見つかりません。
         </div>
-
         <style jsx>{styles}</style>
       </main>
     );
   }
+
+  const articleRoute =
+    article.slug ?? article.id;
 
   const handleSubmit = async (
     value: NewsFormValue,
@@ -87,6 +86,8 @@ export default function NewsEditPage() {
         ...article,
         title: value.title,
         date: value.date,
+        calendar: value.calendar,
+        calendarDate: value.calendarDate,
         tag: value.tag,
         bodyHtml: value.bodyHtml,
         status,
@@ -106,7 +107,7 @@ export default function NewsEditPage() {
       );
 
       router.push(
-        `/news/${encodeURIComponent(article.id)}`
+        `/news/${encodeURIComponent(articleRoute)}`
       );
     } finally {
       setSaving(false);
@@ -121,7 +122,7 @@ export default function NewsEditPage() {
           className="back-button"
           onClick={() =>
             router.push(
-              `/news/${encodeURIComponent(article.id)}`
+              `/news/${encodeURIComponent(articleRoute)}`
             )
           }
         >
@@ -142,7 +143,7 @@ export default function NewsEditPage() {
             }
           >
             {article.status === 'draft'
-              ? 'DRAFT'
+              ? 'PRIVATE'
               : 'PUBLISHED'}
           </span>
         </div>
@@ -152,11 +153,14 @@ export default function NewsEditPage() {
         initialValue={{
           title: article.title,
           date: article.date,
+          calendar: article.calendar,
+          calendarDate: article.calendarDate,
           tag: article.tag,
           bodyHtml: article.bodyHtml,
         }}
         onSubmit={handleSubmit}
         saving={saving}
+        currentStatus={article.status}
       />
 
       <style jsx>{styles}</style>
