@@ -12,6 +12,7 @@ import {
   NewsTag,
   formatNewsCalendarDate,
   frenesiaYearToGalactic,
+  SHIKI_COMPLETION_DATE,
   galacticYearToFrenesia,
   getDaysSinceShikiCompletion,
   getFrenesiaDisplayForGalacticDate,
@@ -82,6 +83,33 @@ function hasBodyContent(html: string) {
     .replace(/<[^>]*>/g, '')
     .replace(/&nbsp;/g, ' ')
     .trim().length > 0;
+}
+
+function getShikiAgeAtFrenesiaDate(
+  date: NewsCalendarDate
+) {
+  let age =
+    date.year - SHIKI_COMPLETION_DATE.year;
+
+  if (
+    date.month < SHIKI_COMPLETION_DATE.month ||
+    (
+      date.month === SHIKI_COMPLETION_DATE.month &&
+      date.day < SHIKI_COMPLETION_DATE.day
+    )
+  ) {
+    age -= 1;
+  }
+
+  return Math.max(0, age);
+}
+
+function isDefinitelyAfterFrenesiaFall(
+  date: NewsCalendarDate
+) {
+  // 滅亡日はまだ1100年の具体的な月日が未確定。
+  // そのため現時点では1101年以降を確実な「滅亡後」と判定する。
+  return date.year > 1100;
 }
 
 function isValidCalendarDate(
@@ -228,6 +256,22 @@ export default function NewsEditForm({
     if (!frenesiaEquivalent) return null;
 
     return getSolasAgeAtFrenesiaDate(
+      frenesiaEquivalent
+    );
+  }, [frenesiaEquivalent]);
+
+  const shikiAge = useMemo(() => {
+    if (!frenesiaEquivalent) return null;
+
+    return getShikiAgeAtFrenesiaDate(
+      frenesiaEquivalent
+    );
+  }, [frenesiaEquivalent]);
+
+  const isAfterFrenesiaFall = useMemo(() => {
+    if (!frenesiaEquivalent) return false;
+
+    return isDefinitelyAfterFrenesiaFall(
       frenesiaEquivalent
     );
   }, [frenesiaEquivalent]);
@@ -537,11 +581,17 @@ export default function NewsEditForm({
 
         {calendar !== 'western' && (
           <div className="calendar-facts">
-            {solasAge !== null && (
-              <span>
-                ソラス {solasAge}歳
-              </span>
-            )}
+            {isAfterFrenesiaFall
+              ? shikiAge !== null && (
+                  <span>
+                    シキ {shikiAge}歳
+                  </span>
+                )
+              : solasAge !== null && (
+                  <span>
+                    ソラス {solasAge}歳
+                  </span>
+                )}
 
             {shikiDays !== null && (
               <span>
