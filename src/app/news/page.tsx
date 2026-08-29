@@ -17,14 +17,20 @@ type Filter = 'all' | NewsTag;
 export default function NewsPage() {
   const router = useRouter();
   const { isAdmin } = useAuth();
+
   const [articles, , loaded] = useLocalList<NewsArticle>(
     'ohome.news.v1',
     NEWS_SEED
   );
 
   const [filter, setFilter] = useState<Filter>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const visibleArticles = useMemo(() => {
+    const normalizedQuery = searchQuery
+      .trim()
+      .toLocaleLowerCase('ja');
+
     return articles
       .filter(article => {
         // 一般閲覧者には公開記事だけ見せる
@@ -37,26 +43,48 @@ export default function NewsPage() {
           return false;
         }
 
+        // タイトル＋本文の単語検索
+        if (normalizedQuery) {
+          const searchableText = [
+            article.title,
+            htmlToSearchText(article.bodyHtml),
+          ]
+            .join(' ')
+            .toLocaleLowerCase('ja');
+
+          if (!searchableText.includes(normalizedQuery)) {
+            return false;
+          }
+        }
+
         return true;
       })
       .sort((a, b) => {
         const dateDiff =
-          new Date(b.date).getTime() - new Date(a.date).getTime();
+          new Date(b.date).getTime() -
+          new Date(a.date).getTime();
 
-        if (dateDiff !== 0) return dateDiff;
+        if (dateDiff !== 0) {
+          return dateDiff;
+        }
 
         return (
           new Date(b.updatedAt).getTime() -
           new Date(a.updatedAt).getTime()
         );
       });
-  }, [articles, filter, isAdmin]);
+  }, [articles, filter, isAdmin, searchQuery]);
+
+  const hasSearchQuery = searchQuery.trim().length > 0;
 
   return (
     <main className="news-page">
       <header className="news-header">
         <div>
-          <p className="news-kicker">FRENESIA ARCHIVE</p>
+          <p className="news-kicker">
+            FRENESIA ARCHIVE
+          </p>
+
           <h1>NEWS</h1>
         </div>
 
@@ -71,7 +99,40 @@ export default function NewsPage() {
         )}
       </header>
 
-      <nav className="news-filters" aria-label="NEWS TAG FILTER">
+      <div className="news-search">
+        <span
+          className="search-icon"
+          aria-hidden="true"
+        >
+          ⌕
+        </span>
+
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={event =>
+            setSearchQuery(event.target.value)
+          }
+          placeholder="SEARCH ARTICLES"
+          aria-label="NEWSの記事を検索"
+        />
+
+        {hasSearchQuery && (
+          <button
+            type="button"
+            className="search-clear"
+            onClick={() => setSearchQuery('')}
+            aria-label="検索をクリア"
+          >
+            ×
+          </button>
+        )}
+      </div>
+
+      <nav
+        className="news-filters"
+        aria-label="NEWS TAG FILTER"
+      >
         <button
           type="button"
           className={filter === 'all' ? 'active' : ''}
@@ -84,7 +145,9 @@ export default function NewsPage() {
           <button
             key={tag.value}
             type="button"
-            className={filter === tag.value ? 'active' : ''}
+            className={
+              filter === tag.value ? 'active' : ''
+            }
             onClick={() => setFilter(tag.value)}
           >
             {tag.label}
@@ -93,9 +156,15 @@ export default function NewsPage() {
       </nav>
 
       {!loaded ? (
-        <div className="news-message">LOADING...</div>
+        <div className="news-message">
+          LOADING...
+        </div>
       ) : visibleArticles.length === 0 ? (
-        <div className="news-message">NO NEWS</div>
+        <div className="news-message">
+          {hasSearchQuery
+            ? 'NO RESULTS'
+            : 'NO NEWS'}
+        </div>
       ) : (
         <section className="news-list">
           {visibleArticles.map(article => (
@@ -104,22 +173,35 @@ export default function NewsPage() {
               type="button"
               className="news-row"
               onClick={() =>
-                router.push(`/news/${encodeURIComponent(article.id)}`)
+                router.push(
+                  `/news/${encodeURIComponent(
+                    article.id
+                  )}`
+                )
               }
             >
-              <time>{formatDate(article.date)}</time>
+              <time>
+                {formatDate(article.date)}
+              </time>
 
               <span className="news-tag">
                 {newsTagLabel(article.tag)}
               </span>
 
-              <span className="news-title">{article.title}</span>
+              <span className="news-title">
+                {article.title}
+              </span>
 
-              {isAdmin && article.status === 'draft' && (
-                <span className="draft-badge">DRAFT</span>
-              )}
+              {isAdmin &&
+                article.status === 'draft' && (
+                  <span className="draft-badge">
+                    DRAFT
+                  </span>
+                )}
 
-              <span className="news-arrow">→</span>
+              <span className="news-arrow">
+                →
+              </span>
             </button>
           ))}
         </section>
@@ -139,7 +221,8 @@ export default function NewsPage() {
           justify-content: space-between;
           gap: 24px;
           padding-bottom: 24px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+          border-bottom: 1px solid
+            rgba(255, 255, 255, 0.2);
         }
 
         .news-kicker {
@@ -160,7 +243,8 @@ export default function NewsPage() {
           flex: 0 0 auto;
           min-width: 86px;
           padding: 10px 18px;
-          border: 1px solid rgba(255, 255, 255, 0.7);
+          border: 1px solid
+            rgba(255, 255, 255, 0.7);
           border-radius: 999px;
           background: #f5f5f5;
           color: #17191f;
@@ -170,12 +254,93 @@ export default function NewsPage() {
           cursor: pointer;
         }
 
+        .news-search {
+          position: relative;
+          display: flex;
+          align-items: center;
+          margin-top: 22px;
+          border: 1px solid
+            rgba(255, 255, 255, 0.16);
+          border-radius: 8px;
+          background: rgba(
+            255,
+            255,
+            255,
+            0.025
+          );
+          transition:
+            border-color 0.18s ease,
+            background 0.18s ease;
+        }
+
+        .news-search:focus-within {
+          border-color: rgba(
+            170,
+            174,
+            242,
+            0.75
+          );
+          background: rgba(
+            128,
+            131,
+            214,
+            0.06
+          );
+        }
+
+        .search-icon {
+          flex: 0 0 auto;
+          padding-left: 14px;
+          color: rgba(255, 255, 255, 0.4);
+          font-size: 17px;
+          line-height: 1;
+          pointer-events: none;
+        }
+
+        .news-search input {
+          width: 100%;
+          min-width: 0;
+          padding: 12px 14px;
+          border: 0;
+          outline: 0;
+          background: transparent;
+          color: #f5f5f5;
+          font: inherit;
+          font-size: 11px;
+          letter-spacing: 0.08em;
+        }
+
+        .news-search input::placeholder {
+          color: rgba(255, 255, 255, 0.3);
+        }
+
+        .news-search input::-webkit-search-cancel-button {
+          display: none;
+        }
+
+        .search-clear {
+          flex: 0 0 auto;
+          width: 40px;
+          align-self: stretch;
+          border: 0;
+          background: transparent;
+          color: rgba(255, 255, 255, 0.42);
+          font-size: 18px;
+          cursor: pointer;
+          transition: color 0.18s ease;
+        }
+
+        .search-clear:hover {
+          color: #aaaef2;
+        }
+
         .news-filters {
           display: flex;
           gap: 8px;
-          padding: 22px 0;
+          padding: 16px 0 22px;
           overflow-x: auto;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          border-bottom: 1px solid
+            rgba(255, 255, 255, 0.1);
           scrollbar-width: none;
         }
 
@@ -186,9 +351,15 @@ export default function NewsPage() {
         .news-filters button {
           flex: 0 0 auto;
           padding: 7px 12px;
-          border: 1px solid rgba(255, 255, 255, 0.16);
+          border: 1px solid
+            rgba(255, 255, 255, 0.16);
           border-radius: 999px;
-          background: rgba(255, 255, 255, 0.025);
+          background: rgba(
+            255,
+            255,
+            255,
+            0.025
+          );
           color: rgba(255, 255, 255, 0.56);
           font-size: 9px;
           font-weight: 700;
@@ -198,23 +369,32 @@ export default function NewsPage() {
 
         .news-filters button.active {
           border-color: #8083d6;
-          background: rgba(128, 131, 214, 0.15);
+          background: rgba(
+            128,
+            131,
+            214,
+            0.15
+          );
           color: #fff;
         }
 
         .news-list {
-          border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+          border-bottom: 1px solid
+            rgba(255, 255, 255, 0.16);
         }
 
         .news-row {
           width: 100%;
           min-height: 70px;
           display: grid;
-          grid-template-columns: 105px 120px minmax(0, 1fr) auto 24px;
+          grid-template-columns:
+            105px 120px minmax(0, 1fr)
+            auto 24px;
           align-items: center;
           gap: 16px;
           padding: 14px 4px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.11);
+          border-bottom: 1px solid
+            rgba(255, 255, 255, 0.11);
           background: transparent;
           color: inherit;
           text-align: left;
@@ -231,7 +411,12 @@ export default function NewsPage() {
         .news-row:hover {
           padding-left: 12px;
           padding-right: 12px;
-          background: rgba(255, 255, 255, 0.035);
+          background: rgba(
+            255,
+            255,
+            255,
+            0.035
+          );
         }
 
         time {
@@ -260,7 +445,8 @@ export default function NewsPage() {
 
         .draft-badge {
           padding: 4px 7px;
-          border: 1px solid rgba(128, 131, 214, 0.5);
+          border: 1px solid
+            rgba(128, 131, 214, 0.5);
           border-radius: 4px;
           color: #aaaef2;
           font-size: 8px;
@@ -280,7 +466,8 @@ export default function NewsPage() {
 
         .news-message {
           padding: 80px 0;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+          border-bottom: 1px solid
+            rgba(255, 255, 255, 0.14);
           color: rgba(255, 255, 255, 0.35);
           font-size: 10px;
           letter-spacing: 0.16em;
@@ -301,13 +488,24 @@ export default function NewsPage() {
             padding: 9px 13px;
           }
 
+          .news-search {
+            margin-top: 18px;
+          }
+
+          .news-search input {
+            padding-top: 11px;
+            padding-bottom: 11px;
+            font-size: 10px;
+          }
+
           .news-filters {
             margin-right: -18px;
             padding-right: 18px;
           }
 
           .news-row {
-            grid-template-columns: 76px minmax(0, 1fr) auto;
+            grid-template-columns:
+              76px minmax(0, 1fr) auto;
             gap: 8px 12px;
             min-height: 78px;
             padding: 13px 2px;
@@ -348,6 +546,21 @@ export default function NewsPage() {
   );
 }
 
+function htmlToSearchText(html: string) {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function formatDate(value: string) {
   const date = new Date(value);
 
@@ -356,8 +569,12 @@ function formatDate(value: string) {
   }
 
   const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(
+    date.getMonth() + 1
+  ).padStart(2, '0');
+  const day = String(
+    date.getDate()
+  ).padStart(2, '0');
 
   return `${year}.${month}.${day}`;
 }
