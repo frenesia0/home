@@ -400,7 +400,7 @@ export default function NewsPage() {
           min-height: 70px;
           display: grid;
           grid-template-columns:
-            105px 120px minmax(0, 1fr)
+            140px 120px minmax(0, 1fr)
             auto 24px;
           align-items: center;
           gap: 16px;
@@ -432,9 +432,10 @@ export default function NewsPage() {
         }
 
         time {
-          color: rgba(255, 255, 255, 0.48);
-          font-size: 10px;
-          letter-spacing: 0.1em;
+          color: rgba(255, 255, 255, 0.58);
+          font-size: 12px;
+          font-weight: 600;
+          letter-spacing: 0.08em;
         }
 
         .news-tag {
@@ -517,7 +518,7 @@ export default function NewsPage() {
 
           .news-row {
             grid-template-columns:
-              76px minmax(0, 1fr) auto;
+              104px minmax(0, 1fr) auto;
             gap: 8px 12px;
             min-height: 78px;
             padding: 13px 2px;
@@ -608,6 +609,23 @@ function formatArticleDate(article: NewsArticle) {
   }
 
   if (article.calendar === 'galactic') {
+    return `G${parts.year}.${month}.${day}`;
+  }
+
+  // 暦対応前の記事・暦情報をまだ保存していない記事への暫定互換。
+  // SHIKI / SOLASで西暦としては不自然に小さい年は
+  // フレネシア暦として表示する。
+  if (
+    !article.calendar &&
+    (article.tag === 'shiki' ||
+      article.tag === 'solas') &&
+    parts.year < 2000
+  ) {
+    return `F${parts.year}.${month}.${day}`;
+  }
+
+  // 銀河暦は桁数で判別できるので、旧データでもG表示できる。
+  if (!article.calendar && parts.year >= 100000) {
     return `G${parts.year}.${month}.${day}`;
   }
 
