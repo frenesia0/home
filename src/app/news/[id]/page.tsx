@@ -24,7 +24,12 @@ export default function NewsDetailPage() {
   const article = articles.find(item => item.id === id);
 
   const safeBodyHtml = useMemo(
-    () => article ? sanitizeHtml(article.bodyHtml) : '',
+    () =>
+      article
+        ? optimizeNewsBodyImages(
+            sanitizeHtml(article.bodyHtml)
+          )
+        : '',
     [article]
   );
 
@@ -126,6 +131,31 @@ export default function NewsDetailPage() {
 
       <style jsx global>{styles}</style>
     </main>
+  );
+}
+
+function optimizeCloudinaryImageUrl(url: string) {
+  if (!url.includes('/upload/')) return url;
+
+  if (
+    url.includes(
+      '/upload/f_auto,q_auto:good,c_limit,w_1440/'
+    )
+  ) {
+    return url;
+  }
+
+  return url.replace(
+    '/upload/',
+    '/upload/f_auto,q_auto:good,c_limit,w_1440/'
+  );
+}
+
+function optimizeNewsBodyImages(html: string) {
+  return html.replace(
+    /(<img\b[^>]*\bsrc=["'])([^"']+)(["'][^>]*>)/gi,
+    (_, before: string, src: string, after: string) =>
+      `${before}${optimizeCloudinaryImageUrl(src)}${after}`
   );
 }
 
