@@ -9,6 +9,7 @@ import {
   NEWS_TAGS,
   NewsArticle,
   NewsTag,
+  frenesiaYearToGalactic,
   newsTagLabel,
 } from '@/lib/newsStore';
 
@@ -60,17 +61,28 @@ export default function NewsPage() {
         return true;
       })
       .sort((a, b) => {
+        // ALLは「サイト上で最後に更新された順」。
+        // 作中年代の大きさには左右されない。
+        if (filter === 'all') {
+          return (
+            getUpdateTime(b) -
+            getUpdateTime(a)
+          );
+        }
+
+        // タグ絞り込み時は、そのタグ内の作中日付順。
+        // フレネシア暦と銀河暦は同じ時系列へ正規化する。
         const dateDiff =
-          new Date(b.date).getTime() -
-          new Date(a.date).getTime();
+          getArticleSortValue(b) -
+          getArticleSortValue(a);
 
         if (dateDiff !== 0) {
           return dateDiff;
         }
 
         return (
-          new Date(b.updatedAt).getTime() -
-          new Date(a.updatedAt).getTime()
+          getUpdateTime(b) -
+          getUpdateTime(a)
         );
       });
   }, [articles, filter, isAdmin, searchQuery]);
@@ -181,7 +193,7 @@ export default function NewsPage() {
               }
             >
               <time>
-                {formatDate(article.date)}
+                {formatArticleDate(article)}
               </time>
 
               <span className="news-tag">
@@ -561,20 +573,84 @@ function htmlToSearchText(html: string) {
     .trim();
 }
 
-function formatDate(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value.replaceAll('-', '.');
+function parseArticleDate(article: NewsArticle) {
+  if (article.calendarDate) {
+    return article.calendarDate;
   }
 
-  const year = date.getFullYear();
-  const month = String(
-    date.getMonth() + 1
-  ).padStart(2, '0');
-  const day = String(
-    date.getDate()
-  ).padStart(2, '0');
+  const match = article.date.match(
+    /^(-?\d+)-(\d{1,2})-(\d{1,2})$/
+  );
 
-  return `${year}.${month}.${day}`;
+  if (!match) {
+    return null;
+  }
+
+  return {
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3]),
+  };
+}
+
+function formatArticleDate(article: NewsArticle) {
+  const parts = parseArticleDate(article);
+
+  if (!parts) {
+    return article.date.replaceAll('-', '.');
+  }
+
+  const month = String(parts.month).padStart(2, '0');
+  const day = String(parts.day).padStart(2, '0');
+
+  if (article.calendar === 'frenesia') {
+    return `F${parts.year}.${month}.${day}`;
+  }
+
+  if (article.calendar === 'galactic') {
+    return `G${parts.year}.${month}.${day}`;
+  }
+
+  return `${parts.year}.${month}.${day}`;
+}
+
+function getArticleSortValue(article: NewsArticle) {
+  const parts = parseArticleDate(article);
+
+  if (!parts) {
+    return 0;
+  }
+
+  let normalizedYear = parts.year;
+
+  if (article.calendar === 'frenesia') {
+    normalizedYear =
+      frenesiaYearToGalactic(parts.year);
+  }
+
+  return (
+    normalizedYear * 10000 +
+    parts.month * 100 +
+    parts.day
+  );
+}
+
+function getUpdateTime(article: NewsArticle) {
+  const updated = new Date(
+    article.updatedAt
+  ).getTime();
+
+  if (!Number.isNaN(updated)) {
+    return updated;
+  }
+
+  const created = new Date(
+    article.createdAt
+  ).getTime();
+
+  if (!Number.isNaN(created)) {
+    return created;
+  }
+
+  return 0;
 }
