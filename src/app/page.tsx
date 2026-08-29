@@ -19,6 +19,11 @@ import {
   type GalleryPost,
 } from '@/lib/galleryData';
 import { CropImg } from '@/components/ui/CropEditor';
+import { useLocalList } from '@/lib/postStore';
+import {
+  NEWS_SEED,
+  type NewsArticle,
+} from '@/lib/newsStore';
 
 function optimizeHomeVisualUrl(url: string) {
   if (!url.includes('/upload/')) return url;
@@ -45,6 +50,10 @@ export default function MainPage() {
   const [homePosts, setHomePosts] = useState<GalleryPost[]>([]);
   const [homeVisualId, setHomeVisualId] = useState<string | null>(null);
   const [homeVisualLoaded, setHomeVisualLoaded] = useState(false);
+  const [newsArticles] = useLocalList<NewsArticle>(
+    'ohome.news.v1',
+    NEWS_SEED
+  );
 
   useEffect(() => {
     let alive = true;
@@ -156,7 +165,24 @@ export default function MainPage() {
       ? homeVisualPost.id
       : null;
 
-  const recentPosts = [...homePosts]
+  const recentUpdates = [
+    ...homePosts.map(post => ({
+      id: `gallery:${post.id}`,
+      date: post.date,
+      label: getGalleryTags(post).includes('song-parody')
+        ? 'SONG PARODY UPDATE'
+        : 'GALLERY UPDATE',
+      href: `/gallery/${encodeURIComponent(post.id)}`,
+    })),
+    ...newsArticles
+      .filter(article => article.status === 'published')
+      .map(article => ({
+        id: `news:${article.id}`,
+        date: article.date,
+        label: `NEWS · ${article.title}`,
+        href: `/news/${encodeURIComponent(article.id)}`,
+      })),
+  ]
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 3);
 
@@ -317,31 +343,23 @@ export default function MainPage() {
               <span>RECENT UPDATE</span>
               <button
                 type="button"
-                onClick={() => router.push('/gallery')}
+                onClick={() => router.push('/news')}
               >
-                GALLERY ›
+                NEWS ›
               </button>
             </div>
 
             <div className="home-news-list">
-              {recentPosts.length > 0 ? (
-                recentPosts.map(post => (
+              {recentUpdates.length > 0 ? (
+                recentUpdates.map(update => (
                   <button
-                    key={post.id}
+                    key={update.id}
                     type="button"
                     className="home-news-row"
-                    onClick={() =>
-                      router.push(
-                        `/gallery/${encodeURIComponent(post.id)}`
-                      )
-                    }
+                    onClick={() => router.push(update.href)}
                   >
-                    <time>{post.date.replaceAll('-', '.')}</time>
-                    <span>
-                      {getGalleryTags(post).includes('song-parody')
-                        ? 'SONG PARODY UPDATE'
-                        : 'GALLERY UPDATE'}
-                    </span>
+                    <time>{update.date.replaceAll('-', '.')}</time>
+                    <span>{update.label}</span>
                   </button>
                 ))
               ) : (
