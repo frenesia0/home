@@ -32,6 +32,7 @@ export default function NewNewsPage() {
     );
 
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
   if (!loaded) {
     return (
@@ -52,6 +53,19 @@ export default function NewNewsPage() {
       </main>
     );
   }
+
+  const handleBack = () => {
+    if (
+      dirty &&
+      !window.confirm(
+        '編集中のデータがあります。変更内容を破棄しますか？'
+      )
+    ) {
+      return;
+    }
+
+    router.push('/news');
+  };
 
   const handleSubmit = async (
     value: NewsFormValue,
@@ -84,7 +98,7 @@ export default function NewNewsPage() {
         createdAt: now,
         updatedAt: now,
 
-        // 下書きはFirestore側でも非公開
+        // 下書き・非公開記事は一般ユーザーには見せない
         visibility:
           status === 'published'
             ? 'public'
@@ -110,9 +124,7 @@ export default function NewNewsPage() {
         <button
           type="button"
           className="back-button"
-          onClick={() =>
-            router.push('/news')
-          }
+          onClick={handleBack}
         >
           ← NEWS
         </button>
@@ -126,6 +138,8 @@ export default function NewNewsPage() {
       <NewsEditForm
         onSubmit={handleSubmit}
         saving={saving}
+        mode="new"
+        onDirtyChange={setDirty}
       />
 
       <style jsx>{`
