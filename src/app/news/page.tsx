@@ -469,7 +469,30 @@ export default function NewsPage() {
           letter-spacing: 0.12em;
         }
 
-        .news-arrow {
+      
+  .draft-badge .lock-icon {
+    position: relative;
+    display: inline-block;
+    width: 8px;
+    height: 6px;
+    border: 1px solid currentColor;
+    border-radius: 2px;
+  }
+
+  .draft-badge .lock-icon::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: 4px;
+    width: 4px;
+    height: 4px;
+    border: 1px solid currentColor;
+    border-bottom: 0;
+    border-radius: 4px 4px 0 0;
+    transform: translateX(-50%);
+  }
+
+  .news-arrow {
           grid-column: 5;
           justify-self: end;
           color: rgba(255, 255, 255, 0.36);
@@ -554,7 +577,30 @@ export default function NewsPage() {
             grid-row: 1;
           }
 
-          .news-arrow {
+        
+  .draft-badge .lock-icon {
+    position: relative;
+    display: inline-block;
+    width: 8px;
+    height: 6px;
+    border: 1px solid currentColor;
+    border-radius: 2px;
+  }
+
+  .draft-badge .lock-icon::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: 4px;
+    width: 4px;
+    height: 4px;
+    border: 1px solid currentColor;
+    border-bottom: 0;
+    border-radius: 4px 4px 0 0;
+    transform: translateX(-50%);
+  }
+
+  .news-arrow {
             grid-column: 3;
             grid-row: 2;
             justify-self: end;
