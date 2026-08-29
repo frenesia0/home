@@ -39,7 +39,6 @@ export default function NewsDetailPage() {
     return (
       <main className="news-detail-page">
         <div className="news-message">LOADING...</div>
-
         <style jsx global>{styles}</style>
       </main>
     );
@@ -55,11 +54,9 @@ export default function NewsDetailPage() {
         >
           ← NEWS
         </button>
-
         <div className="news-message">
           記事が見つかりません。
         </div>
-
         <style jsx global>{styles}</style>
       </main>
     );
@@ -75,11 +72,9 @@ export default function NewsDetailPage() {
         >
           ← NEWS
         </button>
-
         <div className="news-message">
           この記事は公開されていません。
         </div>
-
         <style jsx global>{styles}</style>
       </main>
     );
@@ -87,13 +82,29 @@ export default function NewsDetailPage() {
 
   return (
     <main className="news-detail-page">
-      <button
-        type="button"
-        className="back-button"
-        onClick={() => router.push('/news')}
-      >
-        ← NEWS
-      </button>
+      <div className="top-actions">
+        <button
+          type="button"
+          className="back-button"
+          onClick={() => router.push('/news')}
+        >
+          ← NEWS
+        </button>
+
+        {isAdmin && (
+          <button
+            type="button"
+            className="edit-button"
+            onClick={() =>
+              router.push(
+                `/news/${encodeURIComponent(article.id)}/edit`
+              )
+            }
+          >
+            EDIT
+          </button>
+        )}
+      </div>
 
       <article>
         <header className="article-header">
@@ -105,9 +116,7 @@ export default function NewsDetailPage() {
             </span>
 
             {isAdmin && article.status === 'draft' && (
-              <span className="draft-badge">
-                DRAFT
-              </span>
+              <span className="draft-badge">DRAFT</span>
             )}
           </div>
 
@@ -162,7 +171,9 @@ function optimizeNewsBodyImages(html: string) {
 }
 
 function formatArticleDate(article: NewsArticle) {
-  const parts = article.calendarDate ?? parseLegacyDate(article.date);
+  const parts =
+    article.calendarDate ??
+    parseLegacyDate(article.date);
 
   if (!parts) {
     return article.date.replaceAll('-', '.');
@@ -200,9 +211,7 @@ function parseLegacyDate(value: string) {
     /^(-?\d+)-(\d{1,2})-(\d{1,2})$/
   );
 
-  if (!match) {
-    return null;
-  }
+  if (!match) return null;
 
   return {
     year: Number(match[1]),
@@ -219,19 +228,42 @@ const styles = `
     color: #f5f5f5;
   }
 
-  .news-detail-page .back-button {
+  .news-detail-page .top-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
     margin-bottom: 38px;
+  }
+
+  .news-detail-page .back-button,
+  .news-detail-page .edit-button {
     padding: 0;
     border: 0;
     background: transparent;
-    color: rgba(255, 255, 255, 0.5);
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.12em;
     cursor: pointer;
   }
 
+  .news-detail-page .back-button {
+    color: rgba(255, 255, 255, 0.5);
+  }
+
   .news-detail-page .back-button:hover {
+    color: #fff;
+  }
+
+  .news-detail-page .edit-button {
+    padding: 8px 14px;
+    border: 1px solid rgba(170, 174, 242, 0.55);
+    border-radius: 999px;
+    color: #aaaef2;
+  }
+
+  .news-detail-page .edit-button:hover {
+    border-color: #aaaef2;
     color: #fff;
   }
 
@@ -373,7 +405,7 @@ const styles = `
       padding: 40px 18px 80px;
     }
 
-    .news-detail-page .back-button {
+    .news-detail-page .top-actions {
       margin-bottom: 30px;
     }
 
