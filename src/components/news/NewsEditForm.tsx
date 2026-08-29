@@ -37,6 +37,7 @@ type NewsEditFormProps = {
   ) => void | Promise<void>;
   saving?: boolean;
   currentStatus?: NewsStatus;
+  mode?: 'new' | 'edit';
 };
 
 function todayParts(): NewsCalendarDate {
@@ -162,6 +163,7 @@ export default function NewsEditForm({
   onSubmit,
   saving = false,
   currentStatus = 'draft',
+  mode = 'new',
 }: NewsEditFormProps) {
   const initialTag =
     initialValue?.tag ?? 'news';
@@ -625,39 +627,78 @@ export default function NewsEditForm({
       </div>
 
       <div className="news-actions">
-        <button
-          type="button"
-          className="draft-button"
-          disabled={saving}
-          onClick={() => save(currentStatus)}
-        >
-          {saving
-            ? 'SAVING...'
-            : 'SAVE'}
-        </button>
+        {mode === 'new' ? (
+          <>
+            <button
+              type="button"
+              className="publish-button"
+              disabled={saving}
+              onClick={() => save('published')}
+            >
+              {saving
+                ? 'SAVING...'
+                : 'PUBLISH'}
+            </button>
 
-        {currentStatus === 'draft' ? (
-          <button
-            type="button"
-            className="publish-button"
-            disabled={saving}
-            onClick={() => save('published')}
-          >
-            {saving
-              ? 'SAVING...'
-              : 'PUBLISH'}
-          </button>
+            <button
+              type="button"
+              className="draft-button"
+              disabled={saving}
+              onClick={() => save('draft')}
+            >
+              {saving
+                ? 'SAVING...'
+                : 'SAVE AS PRIVATE 🔒'}
+            </button>
+          </>
+        ) : currentStatus === 'published' ? (
+          <>
+            <button
+              type="button"
+              className="publish-button"
+              disabled={saving}
+              onClick={() => save('draft')}
+            >
+              {saving
+                ? 'SAVING...'
+                : 'MAKE PRIVATE 🔒'}
+            </button>
+
+            <button
+              type="button"
+              className="draft-button"
+              disabled={saving}
+              onClick={() => save('published')}
+            >
+              {saving
+                ? 'SAVING...'
+                : 'SAVE'}
+            </button>
+          </>
         ) : (
-          <button
-            type="button"
-            className="publish-button"
-            disabled={saving}
-            onClick={() => save('draft')}
-          >
-            {saving
-              ? 'SAVING...'
-              : 'MAKE PRIVATE'}
-          </button>
+          <>
+            <button
+              type="button"
+              className="publish-button"
+              disabled={saving}
+              onClick={() => save('published')}
+            >
+              {saving
+                ? 'SAVING...'
+                : 'PUBLISH'}
+            </button>
+
+            <button
+              type="button"
+              className="draft-button"
+              disabled={saving}
+              onClick={() => save('draft')}
+            >
+              {saving
+                ? 'SAVING...'
+                : 'SAVE'}
+            </button>
+          </>
         )}
       </div>
 
