@@ -6,6 +6,7 @@ export type NewsTag =
 
 export type NewsStatus =
   | 'draft'
+  | 'private'
   | 'published';
 
 export type NewsCalendar =
@@ -55,7 +56,7 @@ export interface NewsArticle {
   createdAt: string;
   updatedAt: string;
 
-  // Firestoreで一般公開 / 下書きを分ける
+  // Firestoreで一般公開 / 非公開コンテンツを分ける
   visibility: 'public' | 'private';
 
   // 作成者
