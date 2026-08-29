@@ -21,7 +21,9 @@ export default function NewsDetailPage() {
     NEWS_SEED
   );
 
-  const article = articles.find(item => item.id === id);
+  const article = articles.find(
+    item => item.id === id || item.slug === id
+  );
 
   const safeBodyHtml = useMemo(
     () =>
@@ -96,7 +98,7 @@ export default function NewsDetailPage() {
       <article>
         <header className="article-header">
           <div className="article-meta">
-            <time>{formatDate(article.date)}</time>
+            <time>{formatArticleDate(article)}</time>
 
             <span className="article-tag">
               {newsTagLabel(article.tag)}
@@ -159,18 +161,54 @@ function optimizeNewsBodyImages(html: string) {
   );
 }
 
-function formatDate(value: string) {
-  const date = new Date(value);
+function formatArticleDate(article: NewsArticle) {
+  const parts = article.calendarDate ?? parseLegacyDate(article.date);
 
-  if (Number.isNaN(date.getTime())) {
-    return value.replaceAll('-', '.');
+  if (!parts) {
+    return article.date.replaceAll('-', '.');
   }
 
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(parts.month).padStart(2, '0');
+  const day = String(parts.day).padStart(2, '0');
 
-  return `${year}.${month}.${day}`;
+  if (article.calendar === 'frenesia') {
+    return `F${parts.year}.${month}.${day}`;
+  }
+
+  if (article.calendar === 'galactic') {
+    return `G${parts.year}.${month}.${day}`;
+  }
+
+  if (
+    !article.calendar &&
+    (article.tag === 'shiki' ||
+      article.tag === 'solas') &&
+    parts.year < 2000
+  ) {
+    return `F${parts.year}.${month}.${day}`;
+  }
+
+  if (!article.calendar && parts.year >= 100000) {
+    return `G${parts.year}.${month}.${day}`;
+  }
+
+  return `${parts.year}.${month}.${day}`;
+}
+
+function parseLegacyDate(value: string) {
+  const match = value.match(
+    /^(-?\d+)-(\d{1,2})-(\d{1,2})$/
+  );
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3]),
+  };
 }
 
 const styles = `
@@ -210,14 +248,15 @@ const styles = `
   }
 
   .news-detail-page .article-meta time {
-    color: rgba(255, 255, 255, 0.45);
-    font-size: 10px;
-    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
   }
 
   .news-detail-page .article-tag {
     color: #aaaef2;
-    font-size: 9px;
+    font-size: 10px;
     font-weight: 800;
     letter-spacing: 0.1em;
   }
