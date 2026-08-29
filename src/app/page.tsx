@@ -176,12 +176,20 @@ export default function MainPage() {
     })),
     ...newsArticles
       .filter(article => article.status === 'published')
-      .map(article => ({
-        id: `news:${article.id}`,
-        date: article.date,
-        label: `NEWS · ${article.title}`,
-        href: `/news/${encodeURIComponent(article.id)}`,
-      })),
+      .map(article => {
+        const publishedDate =
+          article.createdAt?.slice(0, 10) ||
+          new Date().toISOString().slice(0, 10);
+
+        return {
+          id: `news:${article.id}`,
+          date: publishedDate,
+          label: `NEWS · ${article.title}`,
+          href: `/news/${encodeURIComponent(
+            article.slug ?? article.id
+          )}`,
+        };
+      }),
   ]
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 3);
