@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { RichEditor } from '@/components/ui/RichEditor';
 import {
   DEFAULT_CALENDAR_BY_TAG,
@@ -38,6 +38,7 @@ type NewsEditFormProps = {
   saving?: boolean;
   currentStatus?: NewsStatus;
   mode?: 'new' | 'edit';
+  onDirtyChange?: (dirty: boolean) => void;
 };
 
 function todayParts(): NewsCalendarDate {
@@ -164,6 +165,7 @@ export default function NewsEditForm({
   saving = false,
   currentStatus = 'draft',
   mode = 'new',
+  onDirtyChange,
 }: NewsEditFormProps) {
   const initialTag =
     initialValue?.tag ?? 'news';
@@ -209,6 +211,49 @@ export default function NewsEditForm({
 
   const [bodyHtml, setBodyHtml] =
     useState(initialValue?.bodyHtml ?? '');
+
+  const initialSnapshot = useRef<string | null>(null);
+
+  const currentSnapshot = JSON.stringify({
+    title,
+    tag,
+    calendar,
+    calendarDate,
+    bodyHtml,
+  });
+
+  if (initialSnapshot.current === null) {
+    initialSnapshot.current = currentSnapshot;
+  }
+
+  const isDirty =
+    currentSnapshot !== initialSnapshot.current;
+
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (
+      event: BeforeUnloadEvent
+    ) => {
+      if (!isDirty) return;
+
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener(
+      'beforeunload',
+      handleBeforeUnload
+    );
+
+    return () =>
+      window.removeEventListener(
+        'beforeunload',
+        handleBeforeUnload
+      );
+  }, [isDirty]);
 
   const frenesiaEquivalent =
     useMemo<NewsCalendarDate | null>(() => {
@@ -631,72 +676,88 @@ export default function NewsEditForm({
           <>
             <button
               type="button"
-              className="publish-button"
+              className="state-button"
               disabled={saving}
               onClick={() => save('published')}
             >
-              {saving
-                ? 'SAVING...'
-                : 'PUBLISH'}
+              PUBLISH
             </button>
 
             <button
               type="button"
-              className="draft-button"
+              className="save-button"
               disabled={saving}
               onClick={() => save('draft')}
             >
               {saving
                 ? 'SAVING...'
-                : 'SAVE AS PRIVATE 🔒'}
+                : 'SAVE DRAFT'}
             </button>
           </>
         ) : currentStatus === 'published' ? (
           <>
             <button
               type="button"
-              className="publish-button"
+              className="state-button"
               disabled={saving}
-              onClick={() => save('draft')}
+              onClick={() => save('private')}
             >
-              {saving
-                ? 'SAVING...'
-                : 'MAKE PRIVATE 🔒'}
+              <span
+                className="lock-icon"
+                aria-hidden="true"
+              />
+              MAKE PRIVATE
             </button>
 
             <button
               type="button"
-              className="draft-button"
+              className="save-button"
               disabled={saving}
               onClick={() => save('published')}
             >
-              {saving
-                ? 'SAVING...'
-                : 'SAVE'}
+              {saving ? 'SAVING...' : 'SAVE'}
+            </button>
+          </>
+        ) : currentStatus === 'private' ? (
+          <>
+            <button
+              type="button"
+              className="state-button"
+              disabled={saving}
+              onClick={() => save('published')}
+            >
+              PUBLISH
+            </button>
+
+            <button
+              type="button"
+              className="save-button"
+              disabled={saving}
+              onClick={() => save('private')}
+            >
+              {saving ? 'SAVING...' : 'SAVE'}
             </button>
           </>
         ) : (
           <>
             <button
               type="button"
-              className="publish-button"
+              className="state-button"
               disabled={saving}
               onClick={() => save('published')}
             >
-              {saving
-                ? 'SAVING...'
-                : 'PUBLISH'}
+              PUBLISH
             </button>
 
             <button
               type="button"
-              className="draft-button"
+              className="save-button"
               disabled={saving}
               onClick={() => save('draft')}
             >
               {saving
                 ? 'SAVING...'
-                : 'SAVE'}
+                : 'SAVE DRAFT'}
             </button>
           </>
         )}
@@ -963,7 +1024,11 @@ export default function NewsEditForm({
           cursor: default;
         }
 
-        .draft-button {
+        .state-button {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
           border: 1px solid
             rgba(255, 255, 255, 0.3);
           background: transparent;
@@ -975,10 +1040,32 @@ export default function NewsEditForm({
           );
         }
 
-        .publish-button {
+        .save-button {
           border: 1px solid #8083d6;
           background: #8083d6;
           color: #fff;
+        }
+
+        .lock-icon {
+          position: relative;
+          display: inline-block;
+          width: 9px;
+          height: 7px;
+          border: 1px solid currentColor;
+          border-radius: 2px;
+        }
+
+        .lock-icon::before {
+          content: '';
+          position: absolute;
+          left: 50%;
+          bottom: 5px;
+          width: 5px;
+          height: 5px;
+          border: 1px solid currentColor;
+          border-bottom: 0;
+          border-radius: 5px 5px 0 0;
+          transform: translateX(-50%);
         }
 
         @media (max-width: 700px) {
