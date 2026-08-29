@@ -187,7 +187,7 @@ export default function NewsPage() {
               onClick={() =>
                 router.push(
                   `/news/${encodeURIComponent(
-                    article.id
+                    article.slug ?? article.id
                   )}`
                 )
               }
