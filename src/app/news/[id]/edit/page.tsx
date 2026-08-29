@@ -143,7 +143,7 @@ export default function NewsEditPage() {
             }
           >
             {article.status === 'draft'
-              ? 'PRIVATE'
+              ? 'PRIVATE 🔒'
               : 'PUBLISHED'}
           </span>
         </div>
@@ -161,6 +161,7 @@ export default function NewsEditPage() {
         onSubmit={handleSubmit}
         saving={saving}
         currentStatus={article.status}
+        mode="edit"
       />
 
       <style jsx>{styles}</style>
