@@ -33,7 +33,7 @@ export default function NewsDetailPage() {
       <main className="news-detail-page">
         <div className="news-message">LOADING...</div>
 
-        <style jsx>{styles}</style>
+        <style jsx global>{styles}</style>
       </main>
     );
   }
@@ -53,7 +53,7 @@ export default function NewsDetailPage() {
           記事が見つかりません。
         </div>
 
-        <style jsx>{styles}</style>
+        <style jsx global>{styles}</style>
       </main>
     );
   }
@@ -73,7 +73,7 @@ export default function NewsDetailPage() {
           この記事は公開されていません。
         </div>
 
-        <style jsx>{styles}</style>
+        <style jsx global>{styles}</style>
       </main>
     );
   }
@@ -124,7 +124,7 @@ export default function NewsDetailPage() {
         </button>
       </footer>
 
-      <style jsx>{styles}</style>
+      <style jsx global>{styles}</style>
     </main>
   );
 }
@@ -151,7 +151,7 @@ const styles = `
     color: #f5f5f5;
   }
 
-  .back-button {
+  .news-detail-page .back-button {
     margin-bottom: 38px;
     padding: 0;
     border: 0;
@@ -163,36 +163,36 @@ const styles = `
     cursor: pointer;
   }
 
-  .back-button:hover {
+  .news-detail-page .back-button:hover {
     color: #fff;
   }
 
-  .article-header {
+  .news-detail-page .article-header {
     padding-bottom: 34px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.18);
   }
 
-  .article-meta {
+  .news-detail-page .article-meta {
     display: flex;
     align-items: center;
     gap: 14px;
     margin-bottom: 18px;
   }
 
-  .article-meta time {
+  .news-detail-page .article-meta time {
     color: rgba(255, 255, 255, 0.45);
     font-size: 10px;
     letter-spacing: 0.1em;
   }
 
-  .article-tag {
+  .news-detail-page .article-tag {
     color: #aaaef2;
     font-size: 9px;
     font-weight: 800;
     letter-spacing: 0.1em;
   }
 
-  .draft-badge {
+  .news-detail-page .draft-badge {
     padding: 4px 7px;
     border: 1px solid rgba(128, 131, 214, 0.5);
     border-radius: 4px;
@@ -202,7 +202,7 @@ const styles = `
     letter-spacing: 0.12em;
   }
 
-  .article-header h1 {
+  .news-detail-page .article-header h1 {
     margin: 0;
     color: #f7f7f9;
     font-size: clamp(28px, 5vw, 46px);
@@ -211,7 +211,7 @@ const styles = `
     overflow-wrap: anywhere;
   }
 
-  .article-body {
+  .news-detail-page .article-body {
     min-height: 220px;
     padding: 46px 4px 64px;
     color: rgba(248, 248, 250, 0.94);
@@ -220,11 +220,11 @@ const styles = `
     overflow-wrap: anywhere;
   }
 
-  .article-body :global(p) {
+  .news-detail-page .article-body p {
     margin: 0 0 1.5em;
   }
 
-  .article-body :global(h2) {
+  .news-detail-page .article-body h2 {
     margin: 2.3em 0 0.9em;
     padding-bottom: 10px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.18);
@@ -233,50 +233,51 @@ const styles = `
     line-height: 1.5;
   }
 
-  .article-body :global(h3) {
+  .news-detail-page .article-body h3 {
     margin: 2em 0 0.8em;
     color: #fff;
     font-size: 18px;
     line-height: 1.5;
   }
 
-  .article-body :global(ul),
-  .article-body :global(ol) {
+  .news-detail-page .article-body ul,
+  .news-detail-page .article-body ol {
     margin: 1.2em 0;
     padding-left: 1.8em;
   }
 
-  .article-body :global(li) {
+  .news-detail-page .article-body li {
     margin: 0.45em 0;
   }
 
-  .article-body :global(blockquote) {
+  .news-detail-page .article-body blockquote {
     margin: 1.8em 0;
     padding: 4px 0 4px 18px;
     border-left: 3px solid #8083d6;
     color: rgba(255, 255, 255, 0.72);
   }
 
-  .article-body :global(hr) {
+  .news-detail-page .article-body hr {
     margin: 42px 0;
     border: 0;
     border-top: 1px solid rgba(255, 255, 255, 0.18);
   }
 
-  .article-body :global(img) {
+  .news-detail-page .article-body img {
     display: block;
-    max-width: 100%;
+    width: auto;
+    max-width: min(100%, 720px);
     height: auto;
-    margin: 28px auto;
+    margin: 32px auto;
     border-radius: 4px;
   }
 
-  .article-footer {
+  .news-detail-page .article-footer {
     padding-top: 24px;
     border-top: 1px solid rgba(255, 255, 255, 0.18);
   }
 
-  .article-footer button {
+  .news-detail-page .article-footer button {
     padding: 0;
     border: 0;
     background: transparent;
@@ -287,11 +288,11 @@ const styles = `
     cursor: pointer;
   }
 
-  .article-footer button:hover {
+  .news-detail-page .article-footer button:hover {
     color: #fff;
   }
 
-  .news-message {
+  .news-detail-page .news-message {
     padding: 100px 0;
     color: rgba(255, 255, 255, 0.45);
     font-size: 11px;
@@ -303,36 +304,41 @@ const styles = `
       padding: 40px 18px 80px;
     }
 
-    .back-button {
+    .news-detail-page .back-button {
       margin-bottom: 30px;
     }
 
-    .article-header {
+    .news-detail-page .article-header {
       padding-bottom: 26px;
     }
 
-    .article-meta {
+    .news-detail-page .article-meta {
       flex-wrap: wrap;
       gap: 9px 12px;
       margin-bottom: 15px;
     }
 
-    .article-header h1 {
+    .news-detail-page .article-header h1 {
       font-size: clamp(25px, 8vw, 34px);
     }
 
-    .article-body {
+    .news-detail-page .article-body {
       padding: 34px 2px 52px;
       font-size: 14px;
       line-height: 1.95;
     }
 
-    .article-body :global(h2) {
+    .news-detail-page .article-body h2 {
       font-size: 20px;
     }
 
-    .article-body :global(h3) {
+    .news-detail-page .article-body h3 {
       font-size: 17px;
+    }
+
+    .news-detail-page .article-body img {
+      max-width: 100%;
+      margin: 26px auto;
     }
   }
 `;
