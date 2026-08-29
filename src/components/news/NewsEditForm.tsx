@@ -36,6 +36,7 @@ type NewsEditFormProps = {
     status: NewsStatus
   ) => void | Promise<void>;
   saving?: boolean;
+  currentStatus?: NewsStatus;
 };
 
 function todayParts(): NewsCalendarDate {
@@ -160,6 +161,7 @@ export default function NewsEditForm({
   initialValue,
   onSubmit,
   saving = false,
+  currentStatus = 'draft',
 }: NewsEditFormProps) {
   const initialTag =
     initialValue?.tag ?? 'news';
@@ -627,25 +629,36 @@ export default function NewsEditForm({
           type="button"
           className="draft-button"
           disabled={saving}
-          onClick={() => save('draft')}
+          onClick={() => save(currentStatus)}
         >
           {saving
             ? 'SAVING...'
-            : 'SAVE DRAFT'}
+            : 'SAVE'}
         </button>
 
-        <button
-          type="button"
-          className="publish-button"
-          disabled={saving}
-          onClick={() =>
-            save('published')
-          }
-        >
-          {saving
-            ? 'SAVING...'
-            : 'PUBLISH'}
-        </button>
+        {currentStatus === 'draft' ? (
+          <button
+            type="button"
+            className="publish-button"
+            disabled={saving}
+            onClick={() => save('published')}
+          >
+            {saving
+              ? 'SAVING...'
+              : 'PUBLISH'}
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="publish-button"
+            disabled={saving}
+            onClick={() => save('draft')}
+          >
+            {saving
+              ? 'SAVING...'
+              : 'MAKE PRIVATE'}
+          </button>
+        )}
       </div>
 
       <style jsx>{`
