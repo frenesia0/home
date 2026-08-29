@@ -401,7 +401,7 @@ export default function NewsPage() {
           display: grid;
           grid-template-columns:
             140px 120px minmax(0, 1fr)
-            auto 24px;
+            64px 24px;
           align-items: center;
           gap: 16px;
           padding: 14px 4px;
@@ -440,7 +440,7 @@ export default function NewsPage() {
 
         .news-tag {
           color: #aaaef2;
-          font-size: 9px;
+          font-size: 11px;
           font-weight: 800;
           letter-spacing: 0.08em;
         }
@@ -449,7 +449,7 @@ export default function NewsPage() {
           min-width: 0;
           overflow: hidden;
           color: rgba(255, 255, 255, 0.94);
-          font-size: 14px;
+          font-size: 16px;
           font-weight: 600;
           line-height: 1.6;
           text-overflow: ellipsis;
@@ -457,6 +457,8 @@ export default function NewsPage() {
         }
 
         .draft-badge {
+          grid-column: 4;
+          justify-self: end;
           padding: 4px 7px;
           border: 1px solid
             rgba(128, 131, 214, 0.5);
@@ -468,6 +470,8 @@ export default function NewsPage() {
         }
 
         .news-arrow {
+          grid-column: 5;
+          justify-self: end;
           color: rgba(255, 255, 255, 0.36);
           font-size: 14px;
           transition: transform 0.18s ease;
@@ -532,10 +536,12 @@ export default function NewsPage() {
           .news-tag {
             grid-column: 1;
             grid-row: 2;
+            font-size: 10px;
           }
 
           .news-title {
             grid-column: 2;
+            font-size: 15px;
             grid-row: 1 / 3;
             white-space: normal;
             display: -webkit-box;
