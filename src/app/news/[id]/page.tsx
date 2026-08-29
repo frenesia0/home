@@ -280,17 +280,17 @@ const styles = `
   }
 
   .news-detail-page .article-meta time {
-    color: rgba(255, 255, 255, 0.5);
-    font-size: 11px;
+    color: rgba(255, 255, 255, 0.58);
+    font-size: 13px;
     font-weight: 600;
-    letter-spacing: 0.09em;
+    letter-spacing: 0.08em;
   }
 
   .news-detail-page .article-tag {
     color: #aaaef2;
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 800;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.09em;
   }
 
   .news-detail-page .draft-badge {
@@ -306,8 +306,8 @@ const styles = `
   .news-detail-page .article-header h1 {
     margin: 0;
     color: #f7f7f9;
-    font-size: clamp(28px, 5vw, 46px);
-    line-height: 1.4;
+    font-size: clamp(25px, 4vw, 34px);
+    line-height: 1.45;
     letter-spacing: 0.025em;
     overflow-wrap: anywhere;
   }
@@ -420,7 +420,7 @@ const styles = `
     }
 
     .news-detail-page .article-header h1 {
-      font-size: clamp(25px, 8vw, 34px);
+      font-size: clamp(23px, 7vw, 30px);
     }
 
     .news-detail-page .article-body {
