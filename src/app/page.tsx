@@ -20,6 +20,15 @@ import {
 } from '@/lib/galleryData';
 import { CropImg } from '@/components/ui/CropEditor';
 
+function optimizeHomeVisualUrl(url: string) {
+  if (!url.includes('/upload/')) return url;
+
+  return url.replace(
+    '/upload/',
+    '/upload/f_auto,q_auto:good,c_limit,w_1600/'
+  );
+}
+
 const ADDABLE: WidgetType[] = ['memo', 'dday', 'todo', 'upcoming', 'freetext', 'deco', 'diary', 'latest'];
 /** 내용 설정 모달이 있는 위젯 — 우클릭 「설정」 노출 대상 (v1.9) */
 const EDITABLE: WidgetType[] = ['banner', 'memo', 'dday', 'todo', 'freetext', 'deco'];
@@ -280,7 +289,7 @@ export default function MainPage() {
             >
               {homeVisualImage && homeVisualPost ? (
                 <CropImg
-                  src={homeVisualImage.url}
+                  src={optimizeHomeVisualUrl(homeVisualImage.url)}
                   crop={homeVisualPost.heroCrop}
                   alt=""
                 />
