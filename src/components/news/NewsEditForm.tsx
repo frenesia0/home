@@ -678,20 +678,20 @@ export default function NewsEditForm({
               type="button"
               className="state-button"
               disabled={saving}
-              onClick={() => save('published')}
+              onClick={() => save('draft')}
             >
-              PUBLISH
+              {saving
+                ? 'SAVING...'
+                : 'SAVE DRAFT'}
             </button>
 
             <button
               type="button"
               className="save-button"
               disabled={saving}
-              onClick={() => save('draft')}
+              onClick={() => save('published')}
             >
-              {saving
-                ? 'SAVING...'
-                : 'SAVE DRAFT'}
+              PUBLISH
             </button>
           </>
         ) : currentStatus === 'published' ? (
