@@ -19,7 +19,7 @@ export default function NewsPage() {
   const router = useRouter();
   const { isAdmin } = useAuth();
 
-  const [articles, , loaded] = useLocalList<NewsArticle>(
+  const [articles, setArticles, loaded] = useLocalList<NewsArticle>(
     'ohome.news.v1',
     NEWS_SEED
   );
@@ -61,6 +61,35 @@ export default function NewsPage() {
         return true;
       })
       .sort((a, b) => {
+        // PIN記事を常に通常記事より上へ固定する。
+        if (!!a.pinned !== !!b.pinned) {
+          return a.pinned ? -1 : 1;
+        }
+
+        // PIN同士は手動順を最優先。
+        if (a.pinned && b.pinned) {
+          const aOrder =
+            typeof a.pinOrder === 'number'
+              ? a.pinOrder
+              : Number.MAX_SAFE_INTEGER;
+          const bOrder =
+            typeof b.pinOrder === 'number'
+              ? b.pinOrder
+              : Number.MAX_SAFE_INTEGER;
+
+          if (aOrder !== bOrder) {
+            return aOrder - bOrder;
+          }
+
+          // 手動順が同じ/未設定なら、最後にPINしたものが上。
+          const pinTimeDiff =
+            getPinTime(b) - getPinTime(a);
+
+          if (pinTimeDiff !== 0) {
+            return pinTimeDiff;
+          }
+        }
+
         // ALLは「サイト上で最後に更新された順」。
         // 作中年代の大きさには左右されない。
         if (filter === 'all') {
@@ -86,6 +115,101 @@ export default function NewsPage() {
         );
       });
   }, [articles, filter, isAdmin, searchQuery]);
+
+  const togglePin = (article: NewsArticle) => {
+    if (!isAdmin) return;
+
+    const now = new Date().toISOString();
+
+    if (article.pinned) {
+      setArticles(
+        articles.map(item =>
+          item.id === article.id
+            ? {
+                ...item,
+                pinned: false,
+                pinnedAt: undefined,
+                pinOrder: undefined,
+              }
+            : item
+        )
+      );
+      return;
+    }
+
+    const pinnedArticles = articles
+      .filter(item => item.pinned)
+      .sort(comparePinnedArticles);
+
+    setArticles(
+      articles.map(item =>
+        item.id === article.id
+          ? {
+              ...item,
+              pinned: true,
+              pinnedAt: now,
+              pinOrder: 0,
+            }
+          : item.pinned
+            ? {
+                ...item,
+                pinOrder:
+                  pinnedArticles.findIndex(
+                    pinned => pinned.id === item.id
+                  ) + 1,
+              }
+            : item
+      )
+    );
+  };
+
+  const movePinnedArticle = (
+    article: NewsArticle,
+    direction: -1 | 1
+  ) => {
+    if (!isAdmin || !article.pinned) return;
+
+    const pinnedArticles = articles
+      .filter(item => item.pinned)
+      .sort(comparePinnedArticles);
+
+    const currentIndex = pinnedArticles.findIndex(
+      item => item.id === article.id
+    );
+    const targetIndex = currentIndex + direction;
+
+    if (
+      currentIndex < 0 ||
+      targetIndex < 0 ||
+      targetIndex >= pinnedArticles.length
+    ) {
+      return;
+    }
+
+    const reordered = [...pinnedArticles];
+    const [moved] = reordered.splice(currentIndex, 1);
+    reordered.splice(targetIndex, 0, moved);
+
+    const orderById = new Map(
+      reordered.map((item, index) => [
+        item.id,
+        index,
+      ])
+    );
+
+    setArticles(
+      articles.map(item =>
+        item.pinned
+          ? {
+              ...item,
+              pinOrder:
+                orderById.get(item.id) ??
+                item.pinOrder,
+            }
+          : item
+      )
+    );
+  };
 
   const hasSearchQuery = searchQuery.trim().length > 0;
 
@@ -180,41 +304,86 @@ export default function NewsPage() {
       ) : (
         <section className="news-list">
           {visibleArticles.map(article => (
-            <button
+            <div
               key={article.id}
-              type="button"
-              className="news-row"
-              onClick={() =>
-                router.push(
-                  `/news/${encodeURIComponent(
-                    article.slug ?? article.id
-                  )}`
-                )
-              }
+              className={`news-row-wrap${
+                article.pinned ? ' is-pinned' : ''
+              }`}
             >
-              <time>
-                {formatArticleDate(article)}
-              </time>
+              <button
+                type="button"
+                className="news-row"
+                onClick={() =>
+                  router.push(
+                    `/news/${encodeURIComponent(
+                      article.slug ?? article.id
+                    )}`
+                  )
+                }
+              >
+                <time>
+                  {formatArticleDate(article)}
+                </time>
 
-              <span className="news-tag">
-                {newsTagLabel(article.tag)}
-              </span>
+                <span className="news-tag">
+                  {newsTagLabel(article.tag)}
+                </span>
 
-              <span className="news-title">
-                {article.title}
-              </span>
+                <span className="news-title">
+                  {article.pinned && (
+                    <span className="pin-mark">
+                      PIN
+                    </span>
+                  )}
+                  {article.title}
+                </span>
 
-              {isAdmin &&
-                article.status === 'draft' && (
-                  <span className="draft-badge">
-                    DRAFT
-                  </span>
-                )}
+                {isAdmin &&
+                  article.status === 'draft' && (
+                    <span className="draft-badge">
+                      DRAFT
+                    </span>
+                  )}
 
-              <span className="news-arrow">
-                →
-              </span>
-            </button>
+                <span className="news-arrow">
+                  →
+                </span>
+              </button>
+
+              {isAdmin && (
+                <div className="pin-controls">
+                  <button
+                    type="button"
+                    onClick={() => togglePin(article)}
+                  >
+                    {article.pinned ? 'UNPIN' : 'PIN'}
+                  </button>
+
+                  {article.pinned && (
+                    <>
+                      <button
+                        type="button"
+                        aria-label="PINを上へ移動"
+                        onClick={() =>
+                          movePinnedArticle(article, -1)
+                        }
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="PINを下へ移動"
+                        onClick={() =>
+                          movePinnedArticle(article, 1)
+                        }
+                      >
+                        ↓
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           ))}
         </section>
       )}
@@ -395,6 +564,67 @@ export default function NewsPage() {
             rgba(255, 255, 255, 0.16);
         }
 
+        .news-row-wrap {
+          position: relative;
+          border-bottom: 1px solid
+            rgba(255, 255, 255, 0.11);
+        }
+
+        .news-row-wrap:last-child {
+          border-bottom: 0;
+        }
+
+        .news-row-wrap.is-pinned {
+          background: rgba(
+            128,
+            131,
+            214,
+            0.035
+          );
+        }
+
+        .news-row-wrap .news-row {
+          border-bottom: 0;
+        }
+
+        .pin-mark {
+          display: inline-block;
+          margin-right: 10px;
+          color: #aaaef2;
+          font-size: 8px;
+          font-weight: 900;
+          letter-spacing: 0.14em;
+          vertical-align: 2px;
+        }
+
+        .pin-controls {
+          position: absolute;
+          z-index: 2;
+          right: 34px;
+          bottom: 5px;
+          display: flex;
+          gap: 5px;
+        }
+
+        .pin-controls button {
+          min-width: 28px;
+          padding: 3px 6px;
+          border: 1px solid
+            rgba(170, 174, 242, 0.38);
+          border-radius: 4px;
+          background: rgba(23, 25, 31, 0.92);
+          color: #aaaef2;
+          font-size: 7px;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          cursor: pointer;
+        }
+
+        .pin-controls button:hover {
+          border-color: #aaaef2;
+          color: #fff;
+        }
+
         .news-row {
           width: 100%;
           min-height: 70px;
@@ -541,6 +771,15 @@ export default function NewsPage() {
           .news-filters {
             margin-right: -18px;
             padding-right: 18px;
+          }
+
+          .pin-controls {
+            right: 26px;
+            bottom: 3px;
+          }
+
+          .pin-controls button {
+            padding: 3px 5px;
           }
 
           .news-row {
@@ -723,4 +962,33 @@ function getUpdateTime(article: NewsArticle) {
   }
 
   return 0;
+}
+
+function getPinTime(article: NewsArticle) {
+  if (!article.pinnedAt) {
+    return 0;
+  }
+
+  const time = new Date(article.pinnedAt).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function comparePinnedArticles(
+  a: NewsArticle,
+  b: NewsArticle
+) {
+  const aOrder =
+    typeof a.pinOrder === 'number'
+      ? a.pinOrder
+      : Number.MAX_SAFE_INTEGER;
+  const bOrder =
+    typeof b.pinOrder === 'number'
+      ? b.pinOrder
+      : Number.MAX_SAFE_INTEGER;
+
+  if (aOrder !== bOrder) {
+    return aOrder - bOrder;
+  }
+
+  return getPinTime(b) - getPinTime(a);
 }
