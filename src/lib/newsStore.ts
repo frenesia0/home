@@ -61,6 +61,26 @@ export interface NewsArticle {
 
   // 作成者
   authorId?: string;
+
+  /**
+   * NEWS一覧の上部へ固定する。
+   * 既存記事との互換のため optional。
+   * true の記事は複数・上限なしでPIN可能。
+   */
+  pinned?: boolean;
+
+  /**
+   * PINした時刻。
+   * 通常は新しくPINした記事ほど上へ並べる。
+   */
+  pinnedAt?: string;
+
+  /**
+   * 手動並べ替え用の順序。
+   * 値があるPIN記事はこの数値を優先して並べる。
+   * 小さい数値ほど上。
+   */
+  pinOrder?: number;
 }
 
 export interface NewsCalendarDate {
