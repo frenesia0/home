@@ -32,6 +32,17 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title,
     description,
+    robots: {
+      index: false,
+      follow: false,
+      nocache: true,
+      googleBot: {
+        index: false,
+        follow: false,
+        noimageindex: true,
+        'max-image-preview': 'none',
+      },
+    },
     openGraph: { title, description, type: 'website' },
     twitter: { card: 'summary', title, description },
   };
