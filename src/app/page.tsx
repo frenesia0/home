@@ -202,8 +202,14 @@ export default function MainPage() {
   }, []);
 
   // HOMEへ入った時は、前ページのスクロール位置を引き継がない。
+  // このサイトの実際のスクロール領域は window ではなく #appMain。
   useEffect(() => {
     const id = window.requestAnimationFrame(() => {
+      document.getElementById('appMain')?.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: 'auto',
+      });
       window.scrollTo({
         top: 0,
         left: 0,
