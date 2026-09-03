@@ -2,7 +2,8 @@ export type NewsTag =
   | 'news'
   | 'world'
   | 'solas'
-  | 'shiki';
+  | 'shiki'
+  | 'other';
 
 export type NewsStatus =
   | 'draft'
@@ -108,6 +109,7 @@ export const NEWS_TAGS: {
   },
   { value: 'shiki', label: 'SHIKI' },
   { value: 'solas', label: 'SOLAS' },
+  { value: 'other', label: 'OTHER' },
 ];
 
 export const newsTagLabel = (tag: NewsTag): string =>
@@ -125,6 +127,7 @@ export const DEFAULT_CALENDAR_BY_TAG: Record<
   world: 'western',
   shiki: 'frenesia',
   solas: 'frenesia',
+  other: 'western',
 };
 
 /**
