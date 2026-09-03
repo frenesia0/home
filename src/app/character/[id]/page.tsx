@@ -21,6 +21,48 @@ const fallbackEnName = (c: Character) =>
       ? 'Solas Frenesia'
       : c.name;
 
+function CharacterLoading() {
+  return (
+    <section
+      className="page character-page"
+      aria-busy="true"
+      aria-label="CHARACTERを読み込み中"
+      style={{ paddingTop: 30, paddingBottom: 70 }}
+    >
+      <div
+        style={{
+          minHeight: 160,
+          display: 'grid',
+          alignContent: 'start',
+          gap: 14,
+          color: '#f5f5f5',
+        }}
+      >
+        <h1
+          style={{
+            margin: 0,
+            fontSize: 32,
+            fontWeight: 700,
+            lineHeight: 1,
+            letterSpacing: '.08em',
+          }}
+        >
+          CHARACTER
+        </h1>
+        <div
+          style={{
+            fontSize: 10,
+            letterSpacing: '.16em',
+            color: 'var(--faint)',
+          }}
+        >
+          LOADING...
+        </div>
+      </div>
+    </section>
+  );
+}
+
 
 
 function useResolvedImage(ref?: string) {
@@ -166,7 +208,7 @@ function CharacterDetailInner() {
     setMobileFull(false);
   }, [eff?.id]);
 
-  if (!loaded) return <section className="page" />;
+  if (!loaded) return <CharacterLoading />;
   if (!ch || !eff) return <section className="page"><p>キャラクターが見つかりません。</p></section>;
   if (ch.visibility === 'private' && !isAdmin) return <section className="page"><p>非公開のキャラクターです。</p></section>;
   if (ch.visibility === 'member' && !user) return <section className="page"><p>メンバー限定公開です。</p></section>;
@@ -1198,8 +1240,16 @@ function CharacterDetailInner() {
   }
 
   .char-switch button{
+    position:relative !important;
     padding:4px 1px !important;
     white-space:nowrap !important;
+    touch-action:manipulation;
+  }
+
+  .char-switch button::before{
+    content:"";
+    position:absolute;
+    inset:-10px -5px;
   }
 
   .char-switch span{
@@ -1286,4 +1336,4 @@ function CharacterDetailInner() {
   );
 }
 
-export default function CharacterDetailPage(){return <Suspense fallback={<section className="page"/>}><CharacterDetailInner/></Suspense>}
+export default function CharacterDetailPage(){return <Suspense fallback={<CharacterLoading />}><CharacterDetailInner/></Suspense>}
