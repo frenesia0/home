@@ -70,7 +70,7 @@ export function CommFormFill({ fields, commName }: { fields: CommFormField[]; co
     const now = new Date();
     const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const html = `<!doctype html>
-<html lang="ko"><head><meta charset="utf-8">
+<html lang="ja"><head><meta charset="utf-8">
 <title>${esc(commName)} 신청서</title>
 <style>
 body{font-family:Pretendard,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;max-width:640px;margin:40px auto;padding:0 20px 60px;color:#2c3037;background:#f4f2ef;line-height:1.7}

@@ -21,10 +21,17 @@ export default function NewsDetailPage() {
     NEWS_SEED
   );
 
-  const article = articles.find(item => item.id === id);
+  const article = articles.find(
+    item => item.id === id || item.slug === id
+  );
 
   const safeBodyHtml = useMemo(
-    () => article ? sanitizeHtml(article.bodyHtml) : '',
+    () =>
+      article
+        ? optimizeNewsBodyImages(
+            sanitizeHtml(article.bodyHtml)
+          )
+        : '',
     [article]
   );
 
@@ -32,8 +39,7 @@ export default function NewsDetailPage() {
     return (
       <main className="news-detail-page">
         <div className="news-message">LOADING...</div>
-
-        <style jsx>{styles}</style>
+        <style jsx global>{styles}</style>
       </main>
     );
   }
@@ -48,12 +54,10 @@ export default function NewsDetailPage() {
         >
           ← NEWS
         </button>
-
         <div className="news-message">
           記事が見つかりません。
         </div>
-
-        <style jsx>{styles}</style>
+        <style jsx global>{styles}</style>
       </main>
     );
   }
@@ -68,39 +72,51 @@ export default function NewsDetailPage() {
         >
           ← NEWS
         </button>
-
         <div className="news-message">
           この記事は公開されていません。
         </div>
-
-        <style jsx>{styles}</style>
+        <style jsx global>{styles}</style>
       </main>
     );
   }
 
   return (
     <main className="news-detail-page">
-      <button
-        type="button"
-        className="back-button"
-        onClick={() => router.push('/news')}
-      >
-        ← NEWS
-      </button>
+      <div className="top-actions">
+        <button
+          type="button"
+          className="back-button"
+          onClick={() => router.push('/news')}
+        >
+          ← NEWS
+        </button>
+
+        {isAdmin && (
+          <button
+            type="button"
+            className="edit-button"
+            onClick={() =>
+              router.push(
+                `/news/${encodeURIComponent(article.id)}/edit`
+              )
+            }
+          >
+            EDIT
+          </button>
+        )}
+      </div>
 
       <article>
         <header className="article-header">
           <div className="article-meta">
-            <time>{formatDate(article.date)}</time>
+            <time>{formatArticleDate(article)}</time>
 
             <span className="article-tag">
               {newsTagLabel(article.tag)}
             </span>
 
             {isAdmin && article.status === 'draft' && (
-              <span className="draft-badge">
-                DRAFT
-              </span>
+              <span className="draft-badge">DRAFT</span>
             )}
           </div>
 
@@ -124,23 +140,84 @@ export default function NewsDetailPage() {
         </button>
       </footer>
 
-      <style jsx>{styles}</style>
+      <style jsx global>{styles}</style>
     </main>
   );
 }
 
-function formatDate(value: string) {
-  const date = new Date(value);
+function optimizeCloudinaryImageUrl(url: string) {
+  if (!url.includes('/upload/')) return url;
 
-  if (Number.isNaN(date.getTime())) {
-    return value.replaceAll('-', '.');
+  if (
+    url.includes(
+      '/upload/f_auto,q_auto:good,c_limit,w_1440/'
+    )
+  ) {
+    return url;
   }
 
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  return url.replace(
+    '/upload/',
+    '/upload/f_auto,q_auto:good,c_limit,w_1440/'
+  );
+}
 
-  return `${year}.${month}.${day}`;
+function optimizeNewsBodyImages(html: string) {
+  return html.replace(
+    /(<img\b[^>]*\bsrc=["'])([^"']+)(["'][^>]*>)/gi,
+    (_, before: string, src: string, after: string) =>
+      `${before}${optimizeCloudinaryImageUrl(src)}${after}`
+  );
+}
+
+function formatArticleDate(article: NewsArticle) {
+  const parts =
+    article.calendarDate ??
+    parseLegacyDate(article.date);
+
+  if (!parts) {
+    return article.date.replaceAll('-', '.');
+  }
+
+  const month = String(parts.month).padStart(2, '0');
+  const day = String(parts.day).padStart(2, '0');
+
+  if (article.calendar === 'frenesia') {
+    return `F${parts.year}.${month}.${day}`;
+  }
+
+  if (article.calendar === 'galactic') {
+    return `G${parts.year}.${month}.${day}`;
+  }
+
+  if (
+    !article.calendar &&
+    (article.tag === 'shiki' ||
+      article.tag === 'solas') &&
+    parts.year < 2000
+  ) {
+    return `F${parts.year}.${month}.${day}`;
+  }
+
+  if (!article.calendar && parts.year >= 100000) {
+    return `G${parts.year}.${month}.${day}`;
+  }
+
+  return `${parts.year}.${month}.${day}`;
+}
+
+function parseLegacyDate(value: string) {
+  const match = value.match(
+    /^(-?\d+)-(\d{1,2})-(\d{1,2})$/
+  );
+
+  if (!match) return null;
+
+  return {
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3]),
+  };
 }
 
 const styles = `
@@ -151,48 +228,75 @@ const styles = `
     color: #f5f5f5;
   }
 
-  .back-button {
+  .news-detail-page .top-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
     margin-bottom: 38px;
+  }
+
+  .news-detail-page .back-button,
+  .news-detail-page .edit-button {
     padding: 0;
     border: 0;
     background: transparent;
-    color: rgba(255, 255, 255, 0.5);
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.12em;
     cursor: pointer;
   }
 
-  .back-button:hover {
+  .news-detail-page .back-button {
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .news-detail-page .back-button:hover {
     color: #fff;
   }
 
-  .article-header {
+  .news-detail-page .edit-button {
+    padding: 8px 14px;
+    border: 1px solid rgba(170, 174, 242, 0.55);
+    border-radius: 999px;
+    color: #aaaef2;
+  }
+
+  .news-detail-page .edit-button:hover {
+    border-color: #aaaef2;
+    color: #fff;
+  }
+
+  .news-detail-page .article-header {
     padding-bottom: 34px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.18);
   }
 
-  .article-meta {
+  .news-detail-page .article-meta {
     display: flex;
     align-items: center;
     gap: 14px;
     margin-bottom: 18px;
   }
 
-  .article-meta time {
-    color: rgba(255, 255, 255, 0.45);
-    font-size: 10px;
-    letter-spacing: 0.1em;
+  .news-detail-page .article-meta time {
+    color: rgba(255, 255, 255, 0.58);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
   }
 
-  .article-tag {
+  .news-detail-page .article-tag {
     color: #aaaef2;
-    font-size: 9px;
+    font-size: 12px;
     font-weight: 800;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.09em;
   }
 
-  .draft-badge {
+  .news-detail-page .draft-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     padding: 4px 7px;
     border: 1px solid rgba(128, 131, 214, 0.5);
     border-radius: 4px;
@@ -202,16 +306,39 @@ const styles = `
     letter-spacing: 0.12em;
   }
 
-  .article-header h1 {
+
+  .news-detail-page .draft-badge .lock-icon {
+    position: relative;
+    display: inline-block;
+    width: 8px;
+    height: 6px;
+    border: 1px solid currentColor;
+    border-radius: 2px;
+  }
+
+  .news-detail-page .draft-badge .lock-icon::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: 4px;
+    width: 4px;
+    height: 4px;
+    border: 1px solid currentColor;
+    border-bottom: 0;
+    border-radius: 4px 4px 0 0;
+    transform: translateX(-50%);
+  }
+
+  .news-detail-page .article-header h1 {
     margin: 0;
     color: #f7f7f9;
-    font-size: clamp(28px, 5vw, 46px);
-    line-height: 1.4;
+    font-size: clamp(25px, 4vw, 34px);
+    line-height: 1.45;
     letter-spacing: 0.025em;
     overflow-wrap: anywhere;
   }
 
-  .article-body {
+  .news-detail-page .article-body {
     min-height: 220px;
     padding: 46px 4px 64px;
     color: rgba(248, 248, 250, 0.94);
@@ -220,11 +347,11 @@ const styles = `
     overflow-wrap: anywhere;
   }
 
-  .article-body :global(p) {
+  .news-detail-page .article-body p {
     margin: 0 0 1.5em;
   }
 
-  .article-body :global(h2) {
+  .news-detail-page .article-body h2 {
     margin: 2.3em 0 0.9em;
     padding-bottom: 10px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.18);
@@ -233,50 +360,51 @@ const styles = `
     line-height: 1.5;
   }
 
-  .article-body :global(h3) {
+  .news-detail-page .article-body h3 {
     margin: 2em 0 0.8em;
     color: #fff;
     font-size: 18px;
     line-height: 1.5;
   }
 
-  .article-body :global(ul),
-  .article-body :global(ol) {
+  .news-detail-page .article-body ul,
+  .news-detail-page .article-body ol {
     margin: 1.2em 0;
     padding-left: 1.8em;
   }
 
-  .article-body :global(li) {
+  .news-detail-page .article-body li {
     margin: 0.45em 0;
   }
 
-  .article-body :global(blockquote) {
+  .news-detail-page .article-body blockquote {
     margin: 1.8em 0;
     padding: 4px 0 4px 18px;
     border-left: 3px solid #8083d6;
     color: rgba(255, 255, 255, 0.72);
   }
 
-  .article-body :global(hr) {
+  .news-detail-page .article-body hr {
     margin: 42px 0;
     border: 0;
     border-top: 1px solid rgba(255, 255, 255, 0.18);
   }
 
-  .article-body :global(img) {
+  .news-detail-page .article-body img {
     display: block;
-    max-width: 100%;
+    width: auto;
+    max-width: min(100%, 720px);
     height: auto;
-    margin: 28px auto;
+    margin: 32px auto;
     border-radius: 4px;
   }
 
-  .article-footer {
+  .news-detail-page .article-footer {
     padding-top: 24px;
     border-top: 1px solid rgba(255, 255, 255, 0.18);
   }
 
-  .article-footer button {
+  .news-detail-page .article-footer button {
     padding: 0;
     border: 0;
     background: transparent;
@@ -287,11 +415,11 @@ const styles = `
     cursor: pointer;
   }
 
-  .article-footer button:hover {
+  .news-detail-page .article-footer button:hover {
     color: #fff;
   }
 
-  .news-message {
+  .news-detail-page .news-message {
     padding: 100px 0;
     color: rgba(255, 255, 255, 0.45);
     font-size: 11px;
@@ -303,36 +431,64 @@ const styles = `
       padding: 40px 18px 80px;
     }
 
-    .back-button {
+    .news-detail-page .top-actions {
       margin-bottom: 30px;
     }
 
-    .article-header {
+    .news-detail-page .article-header {
       padding-bottom: 26px;
     }
 
-    .article-meta {
+    .news-detail-page .article-meta {
       flex-wrap: wrap;
       gap: 9px 12px;
       margin-bottom: 15px;
     }
 
-    .article-header h1 {
-      font-size: clamp(25px, 8vw, 34px);
+  
+  .news-detail-page .draft-badge .lock-icon {
+    position: relative;
+    display: inline-block;
+    width: 8px;
+    height: 6px;
+    border: 1px solid currentColor;
+    border-radius: 2px;
+  }
+
+  .news-detail-page .draft-badge .lock-icon::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: 4px;
+    width: 4px;
+    height: 4px;
+    border: 1px solid currentColor;
+    border-bottom: 0;
+    border-radius: 4px 4px 0 0;
+    transform: translateX(-50%);
+  }
+
+  .news-detail-page .article-header h1 {
+      font-size: clamp(23px, 7vw, 30px);
     }
 
-    .article-body {
+    .news-detail-page .article-body {
       padding: 34px 2px 52px;
       font-size: 14px;
       line-height: 1.95;
     }
 
-    .article-body :global(h2) {
+    .news-detail-page .article-body h2 {
       font-size: 20px;
     }
 
-    .article-body :global(h3) {
+    .news-detail-page .article-body h3 {
       font-size: 17px;
+    }
+
+    .news-detail-page .article-body img {
+      max-width: 100%;
+      margin: 26px auto;
     }
   }
 `;

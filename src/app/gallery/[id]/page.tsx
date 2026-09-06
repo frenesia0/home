@@ -42,6 +42,15 @@ function optimizeThumbUrl(url: string) {
   );
 }
 
+function optimizeMainUrl(url: string) {
+  if (!url.includes('/upload/')) return url;
+
+  return url.replace(
+    '/upload/',
+    '/upload/f_auto,q_auto:good,c_limit,w_1800/'
+  );
+}
+
 export default function GalleryDetailPage() {
   const router = useRouter();
   const searchParams =
@@ -629,7 +638,7 @@ export default function GalleryDetailPage() {
           >
             {currentImage ? (
               <WatermarkedImage
-                src={currentImage.url}
+                src={optimizeMainUrl(currentImage.url)}
                 alt={`illustration ${
                   imageIndex + 1
                 }`}

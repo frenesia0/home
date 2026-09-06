@@ -11,6 +11,7 @@ import {
   NEWS_SEED,
   NewsArticle,
   NewsStatus,
+  makeUniqueNewsSlug,
 } from '@/lib/newsStore';
 
 function makeId() {
@@ -31,11 +32,14 @@ export default function NewNewsPage() {
     );
 
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
   if (!loaded) {
     return (
       <main className="news-new-page">
-        <div className="news-message">LOADING...</div>
+        <div className="news-message">
+          LOADING...
+        </div>
       </main>
     );
   }
@@ -50,6 +54,19 @@ export default function NewNewsPage() {
     );
   }
 
+  const handleBack = () => {
+    if (
+      dirty &&
+      !window.confirm(
+        '編集中のデータがあります。変更内容を破棄しますか？'
+      )
+    ) {
+      return;
+    }
+
+    router.push('/news');
+  };
+
   const handleSubmit = async (
     value: NewsFormValue,
     status: NewsStatus
@@ -60,18 +77,28 @@ export default function NewNewsPage() {
 
     try {
       const now = new Date().toISOString();
+      const id = makeId();
+
+      const slug = makeUniqueNewsSlug(
+        value.calendar,
+        value.calendarDate,
+        articles
+      );
 
       const article: NewsArticle = {
-        id: makeId(),
+        id,
+        slug,
         title: value.title,
         date: value.date,
+        calendar: value.calendar,
+        calendarDate: value.calendarDate,
         tag: value.tag,
         bodyHtml: value.bodyHtml,
         status,
         createdAt: now,
         updatedAt: now,
 
-        // 下書きはFirestore側でも非公開
+        // 下書き・非公開記事は一般ユーザーには見せない
         visibility:
           status === 'published'
             ? 'public'
@@ -80,7 +107,10 @@ export default function NewNewsPage() {
         authorId: user?.id,
       };
 
-      setArticles([article, ...articles]);
+      setArticles([
+        article,
+        ...articles,
+      ]);
 
       router.push('/news');
     } finally {
@@ -94,7 +124,7 @@ export default function NewNewsPage() {
         <button
           type="button"
           className="back-button"
-          onClick={() => router.push('/news')}
+          onClick={handleBack}
         >
           ← NEWS
         </button>
@@ -108,6 +138,8 @@ export default function NewNewsPage() {
       <NewsEditForm
         onSubmit={handleSubmit}
         saving={saving}
+        mode="new"
+        onDirtyChange={setDirty}
       />
 
       <style jsx>{`
@@ -130,7 +162,12 @@ export default function NewNewsPage() {
           padding: 0;
           border: 0;
           background: transparent;
-          color: rgba(255, 255, 255, 0.56);
+          color: rgba(
+            255,
+            255,
+            255,
+            0.56
+          );
           font-size: 10px;
           font-weight: 700;
           letter-spacing: 0.12em;
@@ -143,20 +180,34 @@ export default function NewNewsPage() {
 
         .news-new-header p {
           margin: 0 0 9px;
-          color: rgba(255, 255, 255, 0.4);
+          color: rgba(
+            255,
+            255,
+            255,
+            0.4
+          );
           font-size: 9px;
           letter-spacing: 0.18em;
         }
 
         .news-new-header h1 {
           margin: 0;
-          font-size: clamp(26px, 5vw, 40px);
+          font-size: clamp(
+            26px,
+            5vw,
+            40px
+          );
           letter-spacing: 0.08em;
         }
 
         .news-message {
           padding: 100px 0;
-          color: rgba(255, 255, 255, 0.45);
+          color: rgba(
+            255,
+            255,
+            255,
+            0.45
+          );
           font-size: 11px;
           text-align: center;
         }

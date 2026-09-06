@@ -25,9 +25,10 @@ export default function NewsEditPage() {
     );
 
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
   const article = articles.find(
-    item => item.id === id
+    item => item.id === id || item.slug === id
   );
 
   if (!loaded) {
@@ -36,7 +37,6 @@ export default function NewsEditPage() {
         <div className="news-message">
           LOADING...
         </div>
-
         <style jsx>{styles}</style>
       </main>
     );
@@ -48,7 +48,6 @@ export default function NewsEditPage() {
         <div className="news-message">
           このページは管理者専用です。
         </div>
-
         <style jsx>{styles}</style>
       </main>
     );
@@ -64,15 +63,49 @@ export default function NewsEditPage() {
         >
           ← NEWS
         </button>
-
         <div className="news-message">
           記事が見つかりません。
         </div>
-
         <style jsx>{styles}</style>
       </main>
     );
   }
+
+  const articleRoute =
+    article.slug ?? article.id;
+
+  const handleBack = () => {
+    if (
+      dirty &&
+      !window.confirm(
+        '編集中のデータがあります。変更内容を破棄しますか？'
+      )
+    ) {
+      return;
+    }
+
+    router.push(
+      `/news/${encodeURIComponent(articleRoute)}`
+    );
+  };
+
+  const handleDelete = () => {
+    if (
+      !window.confirm(
+        'この記事を削除しますか？この操作は元に戻せません。'
+      )
+    ) {
+      return;
+    }
+
+    setArticles(
+      articles.filter(
+        item => item.id !== article.id
+      )
+    );
+
+    router.push('/news');
+  };
 
   const handleSubmit = async (
     value: NewsFormValue,
@@ -87,6 +120,8 @@ export default function NewsEditPage() {
         ...article,
         title: value.title,
         date: value.date,
+        calendar: value.calendar,
+        calendarDate: value.calendarDate,
         tag: value.tag,
         bodyHtml: value.bodyHtml,
         status,
@@ -106,7 +141,7 @@ export default function NewsEditPage() {
       );
 
       router.push(
-        `/news/${encodeURIComponent(article.id)}`
+        `/news/${encodeURIComponent(articleRoute)}`
       );
     } finally {
       setSaving(false);
@@ -119,11 +154,7 @@ export default function NewsEditPage() {
         <button
           type="button"
           className="back-button"
-          onClick={() =>
-            router.push(
-              `/news/${encodeURIComponent(article.id)}`
-            )
-          }
+          onClick={handleBack}
         >
           ← ARTICLE
         </button>
@@ -143,7 +174,9 @@ export default function NewsEditPage() {
           >
             {article.status === 'draft'
               ? 'DRAFT'
-              : 'PUBLISHED'}
+              : article.status === 'private'
+                ? 'PRIVATE'
+                : 'PUBLISHED'}
           </span>
         </div>
       </header>
@@ -152,12 +185,28 @@ export default function NewsEditPage() {
         initialValue={{
           title: article.title,
           date: article.date,
+          calendar: article.calendar,
+          calendarDate: article.calendarDate,
           tag: article.tag,
           bodyHtml: article.bodyHtml,
         }}
         onSubmit={handleSubmit}
         saving={saving}
+        currentStatus={article.status}
+        mode="edit"
+        onDirtyChange={setDirty}
       />
+
+      <div className="danger-zone">
+        <button
+          type="button"
+          className="delete-button"
+          onClick={handleDelete}
+          disabled={saving}
+        >
+          DELETE ARTICLE
+        </button>
+      </div>
 
       <style jsx>{styles}</style>
     </main>
@@ -235,6 +284,35 @@ const styles = `
   .status.published {
     color:
       rgba(255, 255, 255, 0.72);
+  }
+
+  .danger-zone {
+    display: flex;
+    justify-content: flex-start;
+    margin-top: 54px;
+    padding-top: 24px;
+    border-top: 1px solid
+      rgba(255, 255, 255, 0.12);
+  }
+
+  .delete-button {
+    padding: 8px 0;
+    border: 0;
+    background: transparent;
+    color: rgba(255, 125, 125, 0.68);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+  }
+
+  .delete-button:hover {
+    color: rgb(255, 145, 145);
+  }
+
+  .delete-button:disabled {
+    opacity: 0.4;
+    cursor: default;
   }
 
   .news-message {

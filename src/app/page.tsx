@@ -19,6 +19,20 @@ import {
   type GalleryPost,
 } from '@/lib/galleryData';
 import { CropImg } from '@/components/ui/CropEditor';
+import { useLocalList } from '@/lib/postStore';
+import {
+  NEWS_SEED,
+  type NewsArticle,
+} from '@/lib/newsStore';
+
+function optimizeHomeVisualUrl(url: string) {
+  if (!url.includes('/upload/')) return url;
+
+  return url.replace(
+    '/upload/',
+    '/upload/f_auto,q_auto:good,c_limit,w_1600/'
+  );
+}
 
 const ADDABLE: WidgetType[] = ['memo', 'dday', 'todo', 'upcoming', 'freetext', 'deco', 'diary', 'latest'];
 /** 내용 설정 모달이 있는 위젯 — 우클릭 「설정」 노출 대상 (v1.9) */
@@ -36,6 +50,10 @@ export default function MainPage() {
   const [homePosts, setHomePosts] = useState<GalleryPost[]>([]);
   const [homeVisualId, setHomeVisualId] = useState<string | null>(null);
   const [homeVisualLoaded, setHomeVisualLoaded] = useState(false);
+  const [newsArticles] = useLocalList<NewsArticle>(
+    'ohome.news.v1',
+    NEWS_SEED
+  );
 
   useEffect(() => {
     let alive = true;
@@ -147,7 +165,32 @@ export default function MainPage() {
       ? homeVisualPost.id
       : null;
 
-  const recentPosts = [...homePosts]
+  const recentUpdates = [
+    ...homePosts.map(post => ({
+      id: `gallery:${post.id}`,
+      date: post.date,
+      label: getGalleryTags(post).includes('song-parody')
+        ? 'SONG PARODY UPDATE'
+        : 'GALLERY UPDATE',
+      href: `/gallery/${encodeURIComponent(post.id)}`,
+    })),
+    ...newsArticles
+      .filter(article => article.status === 'published')
+      .map(article => {
+        const publishedDate =
+          article.createdAt?.slice(0, 10) ||
+          new Date().toISOString().slice(0, 10);
+
+        return {
+          id: `news:${article.id}`,
+          date: publishedDate,
+          label: `NEWS · ${article.title}`,
+          href: `/news/${encodeURIComponent(
+            article.slug ?? article.id
+          )}`,
+        };
+      }),
+  ]
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 3);
 
@@ -159,8 +202,14 @@ export default function MainPage() {
   }, []);
 
   // HOMEへ入った時は、前ページのスクロール位置を引き継がない。
+  // このサイトの実際のスクロール領域は window ではなく #appMain。
   useEffect(() => {
     const id = window.requestAnimationFrame(() => {
+      document.getElementById('appMain')?.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: 'auto',
+      });
       window.scrollTo({
         top: 0,
         left: 0,
@@ -280,7 +329,7 @@ export default function MainPage() {
             >
               {homeVisualImage && homeVisualPost ? (
                 <CropImg
-                  src={homeVisualImage.url}
+                  src={optimizeHomeVisualUrl(homeVisualImage.url)}
                   crop={homeVisualPost.heroCrop}
                   alt=""
                 />
@@ -308,31 +357,23 @@ export default function MainPage() {
               <span>RECENT UPDATE</span>
               <button
                 type="button"
-                onClick={() => router.push('/gallery')}
+                onClick={() => router.push('/news')}
               >
-                GALLERY ›
+                NEWS ›
               </button>
             </div>
 
             <div className="home-news-list">
-              {recentPosts.length > 0 ? (
-                recentPosts.map(post => (
+              {recentUpdates.length > 0 ? (
+                recentUpdates.map(update => (
                   <button
-                    key={post.id}
+                    key={update.id}
                     type="button"
                     className="home-news-row"
-                    onClick={() =>
-                      router.push(
-                        `/gallery/${encodeURIComponent(post.id)}`
-                      )
-                    }
+                    onClick={() => router.push(update.href)}
                   >
-                    <time>{post.date.replaceAll('-', '.')}</time>
-                    <span>
-                      {getGalleryTags(post).includes('song-parody')
-                        ? 'SONG PARODY UPDATE'
-                        : 'GALLERY UPDATE'}
-                    </span>
+                    <time>{update.date.replaceAll('-', '.')}</time>
+                    <span>{update.label}</span>
                   </button>
                 ))
               ) : (
